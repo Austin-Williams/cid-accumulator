@@ -1,5 +1,7 @@
 # cid-accumulator
 
+**IMPORTANT:** This has not been audited or even tested. Treat is as a prototype.
+
 ## How to use
 
 Have your contract inherit the `CIDAccumulator`.
