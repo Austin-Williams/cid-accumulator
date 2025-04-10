@@ -1,0 +1,37 @@
+{
+	"compilerOptions": {
+		"module": "nodenext",
+		"target": "es2020",
+		"moduleResolution": "nodenext",
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"allowImportingTsExtensions": true,
+		"emitDeclarationOnly": true,
+		"noEmitOnError": true,
+		"sourceMap": true,
+		"inlineSources": true,
+		"declaration": true,
+		"declarationMap": true,
+		"noEmit": false,
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+		"experimentalDecorators": true,
+		"allowJs": true,
+		"checkJs": false,
+		"typeRoots": [
+			"./node_modules/@types",
+			"./source/types"
+		],
+		"rootDir": "./source",
+		"outDir": "./output"
+	},
+	"include": [
+		"source/**/*.ts",
+		"source/**/*.js",
+	]
+}
