@@ -29,3 +29,9 @@ If nobody has uploaded it to IPFS, you can fall back to getting all the leaves f
 See `index.ts` for example code for the bonevolent service providers who upload the data to IPFS, as well as an example of how a normal client would downlaod it.
 
 `npx --no-install tsx ./source/index.ts`
+
+## Notes
+
+This implementation uses an append-only merkle mountain range (rather than a left-heafy merkle tree) for the DAG, so it can scale to arbitrarily many leaves without causing issues for the offchain IPFS nodes.
+
+It stores `log(n_leaves)` of `bytes32` data on the contract.
