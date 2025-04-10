@@ -1,6 +1,6 @@
 # cid-accumulator
 
-**IMPORTANT:** This has not been audited or even tested. Treat is as a prototype.
+**IMPORTANT:** This has not been audited or even tested. Treat it as a prototype.
 
 ## How to use
 
