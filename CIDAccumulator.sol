@@ -2,22 +2,25 @@
 pragma solidity 0.8.29;
 
 abstract contract CIDAccumulator {
+    // Event emitted whenever data is added.
+    event NewData(bytes indexed newData, bytes newIpfsCid);
+
     // Represents a node in the Merkle Mountain Range (MMR):
-    // - 'hash' is the node's digest.
-    // - 'height' is 0 for leaves, >0 for internal nodes.
     struct Node {
         bytes32 hash;
         uint256 height;
     }
 
     // The current MMR peaks (fringes) are kept on-chain.
-    Node[] public peaks;
+    Node[] private peaks;
 
     // Total number of leaves that have been added.
-    uint256 public count;
+    uint256 private count;
 
-    // Event emitted on each poke.
-    event NewLeaf(bytes indexed newLeaf, bytes newIpfsCid);
+    // So the derived contract can view the count but not accidentally change it.
+    function getCount() public view returns (uint256) {
+        return count;
+    }
 
     // Function to "combine" two nodes into a new parent node.
     // The combination is performed by CBOR-encoding a map with keys "L" and "R" and then taking sha256.
@@ -79,52 +82,52 @@ abstract contract CIDAccumulator {
         return b;
     }
 
-    // Function to encode a leaf node.
-    // Now supports an arbitrary byte string by CBOR-encoding a map with one key-value pair.
-    // The key "v" is always encoded as in your previous version.
-    function _encodeLeaf(
-        bytes memory newValue
+    // Function to encode a data node.
+    // Supports an arbitrary byte string by CBOR-encoding a map with one key-value pair.
+    // The key "v" is always encoded.
+    function _encodeData(
+        bytes memory newData
     ) private pure returns (bytes memory) {
         return
             abi.encodePacked(
                 hex"a1", // CBOR map with one key-value pair.
                 hex"6176", // Key: "v" (0x76 in ASCII) with length 1.
-                _encodeBytes(newValue) // Encodes the newValue with the proper length header.
+                _encodeBytes(newData) // Encodes the newValue with the proper length header.
             );
     }
 
-    // Appends a new leaf to the MMR.
-    // It updates the peaks array by merging nodes of equal height.
-    function _addLeaf(bytes memory newLeafValue) internal {
+    // Appends new data
+    // Updates the peaks array by merging nodes of equal height.
+    function _addData(bytes memory newDataValue) internal {
         count += 1;
 
-        // Compute the leaf's CBOR encoding and then its hash.
-        bytes memory leafCbor = _encodeLeaf(newLeafValue);
-        bytes32 leafHash = sha256(leafCbor);
+        // Compute the data's CBOR encoding and then its hash
+        bytes memory dataCbor = _encodeData(newDataValue);
+        bytes32 dataHash = sha256(dataCbor);
 
-        // Initialize a new node ("carry") from the leaf.
-        Node memory carry = Node({hash: leafHash, height: 0});
+        // Initialize a new "carry" node
+        Node memory carry = Node({hash: dataHash, height: 0});
 
-        // While there's a peak with the same height, merge (combine) it.
+        // While there's a peak with the same height, merge (combine) it
         while (
             peaks.length > 0 && peaks[peaks.length - 1].height == carry.height
         ) {
-            Node memory leftNode = peaks[peaks.length - 1];
+            Node memory dataNode = peaks[peaks.length - 1];
             peaks.pop(); // Remove the last peak.
             // Combine the two nodes; the result has height = carry.height + 1.
-            carry.hash = _combine(leftNode.hash, carry.hash);
+            carry.hash = _combine(dataNode.hash, carry.hash);
             carry.height += 1;
         }
         // Push the resulting node onto the peaks array.
         peaks.push(carry);
 
         // Emit an event with the new value and the current overall CID.
-        emit NewLeaf(newLeafValue, getLatestCID());
+        emit NewData(newDataValue, getLatestCID());
     }
 
     // Computes the aggregate MMR root by "bagging" the peaks.
     // This simply combines the peaks sequentially.
-    function getMMRRoot() public view returns (bytes32) {
+    function getMMRRoot() internal view returns (bytes32) {
         if (peaks.length == 0) {
             return bytes32(0);
         }
@@ -156,13 +159,13 @@ abstract contract CIDAccumulator {
 }
 
 contract Example is CIDAccumulator {
-    function addLeaf(bytes calldata input) external {
-        _addLeaf(input);
+    function addData(bytes calldata input) external {
+        _addData(input);
     }
 
     function addBatch(bytes[] calldata inputs) external {
         for (uint256 i = 0; i < inputs.length; i++) {
-            _addLeaf(inputs[i]);
+            _addData(inputs[i]);
         }
     }
 }
