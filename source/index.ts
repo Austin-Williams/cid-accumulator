@@ -11,8 +11,7 @@ const main = async () => {
 
 	const blockData = Array.from({ length: 11 }, () => generateRandomBytes())
 	console.log(
-		"Generated data blocks:",
-		blockData.map((b) => "0x" + Buffer.from(b).toString("hex"))
+		"\nGenerated data blocks:\n" + JSON.stringify(blockData.map((b) => "0x" + Buffer.from(b).toString("hex"))) + "\n"
 	)
 
 	const MMR = new MerkleMountainRange(blockstore)

@@ -3,20 +3,20 @@ import { CID } from "multiformats/cid"
 import { sha256 } from "multiformats/hashes/sha2"
 import type { Blockstore } from "interface-blockstore"
 
-export type IpldNode = Uint8Array | CID | { left: CID; right: CID }
+export type IpldNode = Uint8Array | CID | { L: CID; R: CID }
 
 function isIpldLink(obj: unknown): obj is CID {
 	return obj instanceof CID
 }
 
-function isInternalNode(obj: unknown): obj is { left: CID; right: CID } {
+function isInternalNode(obj: unknown): obj is { L: CID; R: CID } {
 	return (
 		typeof obj === "object" &&
 		obj !== null &&
-		"left" in obj &&
-		"right" in obj &&
-		(obj as any).left instanceof CID &&
-		(obj as any).right instanceof CID
+		"L" in obj &&
+		"R" in obj &&
+		(obj as any).L instanceof CID &&
+		(obj as any).R instanceof CID
 	)
 }
 
@@ -29,9 +29,9 @@ export async function resolveMerkleTree(cid: CID, blockstore: Blockstore): Promi
 	} else if (isIpldLink(node)) {
 		return await resolveMerkleTree(node, blockstore)
 	} else if (isInternalNode(node)) {
-		const left = await resolveMerkleTree(node.left, blockstore)
-		const right = await resolveMerkleTree(node.right, blockstore)
-		return [...left, ...right]
+		const L = await resolveMerkleTree(node.L, blockstore)
+		const R = await resolveMerkleTree(node.R, blockstore)
+		return [...L, ...R]
 	} else {
 		throw new Error("Unexpected node structure")
 	}
@@ -75,7 +75,7 @@ export class MerkleMountainRange {
 
 		let current = this.peaks[0]
 		for (let i = 1; i < this.peaks.length; i++) {
-			const { cid, bytes } = await this.encodeBlock({ left: current, right: this.peaks[i] })
+			const { cid, bytes } = await this.encodeBlock({ L: current, R: this.peaks[i] })
 			await this.blockstore.put(cid, bytes)
 			current = cid
 		}
@@ -95,7 +95,7 @@ export class MerkleMountainRange {
 			const nextLayer: CID[] = []
 			for (let i = 0; i < layer.length; i += 2) {
 				if (i + 1 < layer.length) {
-					const { cid, bytes } = await this.encodeBlock({ left: layer[i], right: layer[i + 1] })
+					const { cid, bytes } = await this.encodeBlock({ L: layer[i], R: layer[i + 1] })
 					await this.blockstore.put(cid, bytes)
 					nextLayer.push(cid)
 				} else {
