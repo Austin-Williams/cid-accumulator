@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity 0.8.29;
 
 abstract contract CIDAccumulator {
     // Represents a node in the Merkle Mountain Range (MMR):
@@ -17,7 +17,7 @@ abstract contract CIDAccumulator {
     uint256 public count;
 
     // Event emitted on each poke.
-    event NewLeaf(bytes32 indexed newLeaf, bytes newIpfsCid);
+    event NewLeaf(bytes indexed newLeaf, bytes newIpfsCid);
 
     // Function to "combine" two nodes into a new parent node.
     // The combination is performed by CBOR-encoding a map with keys "L" and "R" and then taking sha256.
@@ -39,28 +39,63 @@ abstract contract CIDAccumulator {
             );
     }
 
+    // Helper function to CBOR-encode a byte string of arbitrary length.
+    function _encodeBytes(
+        bytes memory data
+    ) private pure returns (bytes memory) {
+        uint256 len = data.length;
+        // For small byte strings (length < 24), the header is one byte: 0x40 + length.
+        if (len < 24) {
+            return abi.encodePacked(uint8(0x40 + uint8(len)), data);
+        } else if (len < 256) {
+            // For lengths 24..255, header is 0x58 followed by one byte for length.
+            return abi.encodePacked(hex"58", uint8(len), data);
+        } else if (len < 65536) {
+            // For lengths 256..65535, header is 0x59 followed by two bytes (big-endian).
+            return abi.encodePacked(hex"59", _toBigEndian16(uint16(len)), data);
+        } else if (len < 4294967296) {
+            // For lengths 65536..2^32-1, header is 0x5A followed by four bytes (big-endian).
+            return abi.encodePacked(hex"5A", _toBigEndian32(uint32(len)), data);
+        } else {
+            revert("Data too large");
+        }
+    }
+
+    // Helper function: converts a uint16 to its big-endian representation in 2 bytes.
+    function _toBigEndian16(uint16 x) private pure returns (bytes memory) {
+        bytes memory b = new bytes(2);
+        b[0] = bytes1(uint8(x >> 8));
+        b[1] = bytes1(uint8(x));
+        return b;
+    }
+
+    // Helper function: converts a uint32 to its big-endian representation in 4 bytes.
+    function _toBigEndian32(uint32 x) private pure returns (bytes memory) {
+        bytes memory b = new bytes(4);
+        b[0] = bytes1(uint8(x >> 24));
+        b[1] = bytes1(uint8(x >> 16));
+        b[2] = bytes1(uint8(x >> 8));
+        b[3] = bytes1(uint8(x));
+        return b;
+    }
+
     // Function to encode a leaf node.
-    // Here, we encode the leaf as a CBOR map with one key-value pair.
-    // Key "v" (0x76) holds the raw 32-byte value.
-    // CBOR encoding breakdown:
-    //   a1        // map with 1 pair
-    //   61 76     // key: "v" (a 1-character text string)
-    //   58 20     // byte string of 32 bytes follows
-    //   <value>   // the actual 32-byte value
-    // This prevents tree-extension attacks which would otherwise be a DoS vector.
-    function _encodeLeaf(bytes32 newValue) private pure returns (bytes memory) {
+    // Now supports an arbitrary byte string by CBOR-encoding a map with one key-value pair.
+    // The key "v" is always encoded as in your previous version.
+    function _encodeLeaf(
+        bytes memory newValue
+    ) private pure returns (bytes memory) {
         return
             abi.encodePacked(
-                hex"a1", // Map with one key-value pair.
-                hex"6176", // Key: "v" (0x76 is ASCII for 'v') with length 1.
-                hex"5820", // CBOR tag indicating a byte string of length 32.
-                newValue // The actual 32-byte value.
+                hex"a1", // CBOR map with one key-value pair.
+                hex"6176", // Key: "v" (0x76 in ASCII) with length 1.
+                _encodeBytes(newValue) // Encodes the newValue with the proper length header.
             );
     }
 
     // Appends a new leaf to the MMR.
     // It updates the peaks array by merging nodes of equal height.
-    function _addLeaf(bytes32 newLeafValue) internal {
+    function _addLeaf(bytes memory newLeafValue) internal {
         count += 1;
 
         // Compute the leaf's CBOR encoding and then its hash.
@@ -121,11 +156,11 @@ abstract contract CIDAccumulator {
 }
 
 contract Example is CIDAccumulator {
-    function addLeaf(bytes32 input) external {
+    function addLeaf(bytes calldata input) external {
         _addLeaf(input);
     }
 
-    function addBatch(bytes32[] calldata inputs) external {
+    function addBatch(bytes[] calldata inputs) external {
         for (uint256 i = 0; i < inputs.length; i++) {
             _addLeaf(inputs[i]);
         }

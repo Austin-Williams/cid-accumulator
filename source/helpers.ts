@@ -5,15 +5,35 @@ export function computeSha256(data: Buffer): Buffer {
 	return crypto.createHash('sha256').update(data).digest()
 }
 
-// Encode a leaf node exactly as in Solidity’s _encodeLeaf.
-// Leaf encoding: a1 6176 5820 <32-byte value>
+export function encodeBytes(data: Buffer): Buffer {
+	const len = data.length;
+	if (len < 24) {
+		// Single byte: 0x40 + len
+		return Buffer.concat([Buffer.from([0x40 + len]), data]);
+	} else if (len < 256) {
+		// 0x58 followed by one byte length.
+		return Buffer.concat([Buffer.from('58', 'hex'), Buffer.from([len]), data]);
+	} else if (len < 65536) {
+		// 0x59 followed by two bytes big-endian.
+		const buf = Buffer.alloc(2);
+		buf.writeUInt16BE(len, 0);
+		return Buffer.concat([Buffer.from('59', 'hex'), buf, data]);
+	} else if (len < 4294967296) {
+		// 0x5A followed by four bytes big-endian.
+		const buf = Buffer.alloc(4);
+		buf.writeUInt32BE(len, 0);
+		return Buffer.concat([Buffer.from('5A', 'hex'), buf, data]);
+	} else {
+		throw new Error("Data too large");
+	}
+}
+
 export function encodeLeaf(newValue: Buffer): Buffer {
 	return Buffer.concat([
-		Buffer.from('a1', 'hex'),
-		Buffer.from('6176', 'hex'),
-		Buffer.from('5820', 'hex'),
-		newValue,
-	])
+		Buffer.from('a1', 'hex'),     // CBOR map with one key-value pair.
+		Buffer.from('6176', 'hex'),   // Key: "v" encoded as 6176.
+		encodeBytes(newValue)         // Value: CBOR-encoded byte string.
+	]);
 }
 
 // Combine two nodes into an internal node using the fixed CBOR scheme.
@@ -33,15 +53,17 @@ export function combineNodes(leftHash: Buffer, rightHash: Buffer): { block: Buff
 }
 
 export function getTestLeaves(numLeaves: number): Buffer[] {
-	const leaves: Buffer[] = []
+	const leaves: Buffer[] = [];
 	console.log("\nTest Leaves:\n");
-	const hexLeaves: string[] = []
+	const hexLeaves: string[] = [];
 	for (let i = 0; i < numLeaves; i++) {
-		const rand = crypto.randomBytes(32)
-		leaves.push(rand)
-		hexLeaves.push("0x" + rand.toString('hex'))
+		// Pick a random length between 1 and 2048 bytes (inclusive)
+		const length = crypto.randomInt(1, 1024); // upper bound is exclusive
+		const rand = crypto.randomBytes(length);
+		leaves.push(rand);
+		hexLeaves.push("0x" + rand.toString("hex"));
 	}
 	// Output the whole array as a single line for copy/paste
-	console.log("[" + hexLeaves.map(s => `"${s}"`).join(", ") + "]\n")
-	return leaves
+	console.log("[" + hexLeaves.map((s) => `"${s}"`).join(", ") + "]\n");
+	return leaves;
 }
