@@ -3,7 +3,7 @@ import { CID } from "multiformats/cid"
 import { sha256 } from "multiformats/hashes/sha2"
 import type { Blockstore } from "interface-blockstore"
 
-export type IpldNode = string | CID | { left: CID; right: CID }
+export type IpldNode = Uint8Array | CID | { left: CID; right: CID }
 
 function isIpldLink(obj: unknown): obj is CID {
 	return obj instanceof CID
@@ -20,11 +20,11 @@ function isInternalNode(obj: unknown): obj is { left: CID; right: CID } {
 	)
 }
 
-export async function resolveMerkleTree(cid: CID, blockstore: Blockstore): Promise<string[]> {
+export async function resolveMerkleTree(cid: CID, blockstore: Blockstore): Promise<Uint8Array[]> {
 	const raw = await blockstore.get(cid)
 	const node: IpldNode = dagCbor.decode(raw)
 
-	if (typeof node === "string") {
+	if (node instanceof Uint8Array) {
 		return [node]
 	} else if (isIpldLink(node)) {
 		return await resolveMerkleTree(node, blockstore)
@@ -48,7 +48,7 @@ export class MerkleMountainRange {
 
 	constructor(private blockstore: Blockstore) {}
 
-	async addLeaves(blockData: string[]) {
+	async addLeaves(blockData: Uint8Array[]) {
 		let index = 0
 
 		while (index < blockData.length) {
@@ -83,7 +83,7 @@ export class MerkleMountainRange {
 		return current
 	}
 
-	private async buildMerkleTree(blockData: string[]): Promise<CID> {
+	private async buildMerkleTree(blockData: Uint8Array[]): Promise<CID> {
 		let layer: CID[] = []
 		for (const data of blockData) {
 			const { cid, bytes } = await this.encodeBlock(data)

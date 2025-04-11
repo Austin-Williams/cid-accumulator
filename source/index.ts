@@ -1,24 +1,26 @@
 import { createHelia } from "helia"
 import { resolveMerkleTree, MerkleMountainRange } from "./utils/ipfs.ts"
 
-const generateRandomString = (): string => {
-	return Array.from(crypto.getRandomValues(new Uint8Array(16)))
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join("")
+const generateRandomBytes = (): Uint8Array => {
+	return crypto.getRandomValues(new Uint8Array(16))
 }
 
 const main = async () => {
 	const helia = await createHelia()
 	const blockstore = helia.blockstore
 
-	const blockData = Array.from({ length: 11 }, () => generateRandomString())
-	console.log("Generated data blocks:", blockData)
+	const blockData = Array.from({ length: 11 }, () => generateRandomBytes())
+	console.log(
+		"Generated data blocks:",
+		blockData.map((b) => "0x" + Buffer.from(b).toString("hex"))
+	)
 
 	const MMR = new MerkleMountainRange(blockstore)
 	await MMR.addLeaves(blockData)
 	const rootCid = await MMR.rootCID()
 
 	console.log("Merkle Root CID:", rootCid.toString())
+	console.log("Merkle Root CID (hex):", "0x" + Buffer.from(rootCid.bytes).toString("hex"))
 
 	const allStrings = await resolveMerkleTree(rootCid, blockstore)
 
