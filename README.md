@@ -1,47 +1,81 @@
 # cid-accumulator
 
-**IMPORTANT:** This has not been audited or even tested.
+> ⚠️ **Warning:** This project is unaudited and has not been thoroughly tested.
 
-Many apps emit smart contract events to record important data that must later be collected off-chain in order to use the app. For instance, some apps (Tornado Cash, Railgun, 0xbow, etc) require the user to collect all commitment values from previous deposit events to reconstruct a Merkle tree in order to spend their deposit. Other apps may emit events for markets, offers, etc that will be rendered in the UI.
+### What it does
 
-Over time, the number of events that need to be collected can grow large. Users without their own node and without a paid-plan RPC provider will find that they quickly hit the free-teir RPC limits when trying to collect the data they need to use these apps. In practice, they usually have to trust a third party to provide the data and trust that they aren't censoring or altering any of the data.
+- Trustlessly computes and stores an IPFS CID on-chain that represents **all emitted event data**
+- Computes the CID incrementally as new data is added
+- Allows users to fetch the full dataset from IPFS using a single `getLatestCID()` call
 
-To address this problem, you can store an IPFS CID of a DAG_CLOB file that contains all data ever emitted by your contract. Then your users can query the app contract once to get the CID, then download the entire set of data they need from IPFS. This allows users to get the data they need efficiently. But how can they know that the CID they get from your contract is correct? That's where the `CIDAccumulator` comes in.
+Apps often emit on-chain events that users need later — like Merkle tree commitments, offers, or market data. But querying and reconstructing large event logs is inefficient, especially for users on free-tier RPCs.
 
-Each time you emit new data via the `CIDAccumulator`, it efficeintly calculates the IPFS CID of the DAG_CLOB file that contains all the data ever emitted from your contract. It keeps the most recent such CID in storage, which can be read via the `getLatestCID` function.
+This contract solves that by having _the smart contract itself_ compute and store an IPFS CID (using the `dag-cbor` codec) that points to a file containing all data ever emitted. The contract maintains this CID as an accumulator root. A lightweight (and untrusted) off-chain service can watch events and publish the data to IPFS. Users can fetch everything they need directly from IPFS, with full trust in the data’s integrity — because _the smart contract itself_ computed the CID.
 
-The app devs (or anyone) can run a simple service that watches for events from the app contract, extracts the data from them, and adds/pins the data to IPFS. This allows app devs (or anyone) to give users efficent access to the data they need without users having to trust any third parties.
+### Usage
 
-## How to use
-
-Have your contract inherit from the `CIDAccumulator`.
+Have your contract inherit from the `DagCborAccumulator` contract.
 
 ```solidity
-contract Example is CIDAccumulatorMMR {
-  function addData(bytes calldata newData) external {
-    _addData(newData);
-  }
-
-  function addMany(bytes[] calldata newData) external {
-    _addDataMany(newData);
-  }
+contract Example is DagCborAccumulator {
+    function addData(bytes calldata newData) external {
+        _addData(newData);
+    }
 }
 ```
 
-Add any `bytes` data you want via the `_addData` function. This costs around 40k gas for any reasonable sized data.
+You can call `_addData` with any `bytes` payload you'd like to include in the accumulator. This appends the data to the internal Merkle Mountain Range (MMR) and updates the CID.
 
-At any time you can call the `getLatestCID` view function to get the IPFS CID of the DAG_CLOB file that contains all the data that has been added via `_addData` since contract creation (assuming someone has uploaded it to IPFS -- see below).
+> ℹ️ Most inserts fall in the 13k–19k gas range. See below for more about gas costs.
 
-If nobody has uploaded it to IPFS, you can fall back to the way it is usually done today: getting all the leaves from the contract events yourself, or trusting a third party to do it for you.
+Use `getLatestCID()` to retrieve the IPFS CID of the file that includes all data added so far.
 
-## Example nodejs code
+### ⛽ Gas Costs
+
+The execution gas cost of `_addData` depends on how many **merge steps** are triggered by that particular insert. Most inserts only require a single peak update and are cheap. Occasionally, an insert will trigger a chain of merges — and this is what increases gas (for that insert only).
+
+| Merge Depth | Description                        | Approx Gas |
+| ----------- | ---------------------------------- | ---------- |
+| 0           | No merges (new peak at height 0)   | ~13,100    |
+| 1           | Merge with 1 peak (into height 1)  | ~15,900    |
+| 2           | Merge with 2 peaks (into height 2) | ~18,400    |
+| 3           | Merge with 3 peaks (into height 3) | ~22,900    |
+| 4           | Merge with 4 peaks (into height 4) | ~31,600    |
+| 5           | Merge with 5 peaks (into height 5) | ~44,800    |
+| 6           | Merge with 6 peaks (into height 6) | ~60,300    |
+| 7           | Merge with 7 peaks (into height 7) | ~76,000    |
+| 8           | Merge with 8 peaks (into height 8) | ~91,700    |
+| 9           | Merge with 9 peaks (into height 9) | ~107,400   |
+
+> ℹ️ Most inserts fall in the **13k–19k gas** range. Deeper merges are **exponentially rare**:
+>
+> - Merge depth 3 happens once every 8 inserts
+> - Merge depth 6 happens once every 64 inserts
+> - Merge depth 9 happens once every 512 inserts
+
+For example, if you insert `2^20` entries (just over 1 million), here’s how often each merge depth occurs:
+
+| Merge Depth | Inserts (%) |
+| ----------- | ----------- |
+| 0           | 50.0%       |
+| 1           | 25.0%       |
+| 2           | 12.5%       |
+| 3           | 6.25%       |
+| 4           | 3.125%      |
+| 5           | 1.5625%     |
+| 6           | 0.78125%    |
+| 7           | 0.390625%   |
+| 8           | 0.1953125%  |
+| 9           | 0.09765625% |
+
+> ✅ Even after a million inserts, over **87%** of them will require **2 or fewer merges**, keeping gas costs low and consistent.
+
+So the gas cost is determined only by that insert’s merge activity — **not** by the total size of the data set.
+
+### Service providers and clients
+
+> 🚧 In Progess
 
 See `index.ts` for example code for the bonevolent service providers who upload the data to IPFS, as well as an example of how a normal client would downlaod it.
 
 `npx --no-install tsx ./source/index.ts`
-
-## Notes
-
-This implementation uses an append-only merkle mountain range (rather than a left-heafy merkle tree) for the DAG, so it can scale to arbitrarily many leaves without causing issues for the offchain IPFS nodes.
-
-It stores `log(n_leaves)` of `bytes32` data on the contract, irrespective of how large or small the leaves are.

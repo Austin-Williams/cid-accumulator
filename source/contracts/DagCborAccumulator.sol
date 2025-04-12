@@ -1,24 +1,25 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import "./MinimalCIDEncoding.sol";
+import "./DagCborCIDEncoder.sol";
 
-contract CIDAccumulatorMMR is MinimalCIDEncoding {
+// A content-addressable Merkle (mountain range) accumulator 
+// using IPLD dag-cbor and CID-based hashing
+contract DagCborAccumulator is DagCborCIDEncoder {
 
     event NewData(bytes newData);
 
     error CountOverflow();
     error TooManyPeaks();
 
+    bytes32[32] public peaks;  // Fixed-size array for node hashes
 
     // Packed bitfield layout for peakHeightsBits
     uint256 private constant PEAK_COUNT_OFFSET = 160;
     uint256 private constant PEAK_COUNT_MASK   = 0x1F;           // 5 bits
 
-    uint256 private constant COUNT_OFFSET      = 165;
-    uint256 private constant COUNT_MASK        = 0xFFFFFFFF;     // 32 bits
-
-    bytes32[32] public peaks;  // Fixed-size array for node hashes
+    uint256 private constant LEAF_COUNT_OFFSET      = 165;
+    uint256 private constant LEAF_COUNT_MASK        = 0xFFFFFFFF;     // 32 bits
 
     /**
     * Packed bitfield containing all peak node heights, peak count, and total leaf count.
@@ -30,40 +31,38 @@ contract CIDAccumulatorMMR is MinimalCIDEncoding {
     * This structure allows us to avoid separate storage slots for peak metadata,
     * reducing gas usage by packing everything into a single uint256.
     */
-    uint256 private peakHeightsBits;
+    uint256 private mmrMetaBits;
 
     constructor() {
         // Pre-fill peaks with dummy non-zero values
         for (uint256 i = 0; i < 32; i++) {
-            peaks[i] = bytes32(uint256(1)); // or any small dummy value
+            peaks[i] = bytes32(uint256(1)); // dummy value for gas optimization
         }
     }
 
-
-    function _getCount() internal view returns (uint32) {
-        return uint32((peakHeightsBits >> COUNT_OFFSET) & COUNT_MASK);
+    function _getLeafCount() internal view returns (uint32) {
+        return uint32((mmrMetaBits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK);
     }
 
     function _getHeight(uint256 index) internal view returns (uint8) {
         require(index < 32, "index out of bounds");
-        return uint8((peakHeightsBits >> (index * 5)) & 0x1F);
+        return uint8((mmrMetaBits >> (index * 5)) & 0x1F);
     }
 
     function _getPeakCount() internal view returns (uint8) {
-        return uint8((peakHeightsBits >> PEAK_COUNT_OFFSET) & PEAK_COUNT_MASK);
+        return uint8((mmrMetaBits >> PEAK_COUNT_OFFSET) & PEAK_COUNT_MASK);
     }
 
     function _addData(bytes calldata newData) internal {
-        uint256 bits = peakHeightsBits; // read once
+        uint256 bits = mmrMetaBits; // read once
 
         // Get current count and increment
-        uint256 count = (bits >> COUNT_OFFSET) & COUNT_MASK;
+        uint256 count = (bits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK;
         if (count >= type(uint32).max) revert CountOverflow();
 
         unchecked { count++; }
 
-
-        (, bytes32 leafHash) = encodeRawBytes(newData);
+        bytes32 leafHash = encodeRawBytes(newData);
         bytes32 carryHash = leafHash;
         uint256 carryHeight = 0;
 
@@ -95,22 +94,16 @@ contract CIDAccumulatorMMR is MinimalCIDEncoding {
         bits |= uint256(peakCount + 1) << PEAK_COUNT_OFFSET;      // set
 
         // Update count
-        bits &= ~(COUNT_MASK << COUNT_OFFSET);                    // clear
-        bits |= count << COUNT_OFFSET;                            // set
+        bits &= ~(LEAF_COUNT_MASK << LEAF_COUNT_OFFSET);                    // clear
+        bits |= count << LEAF_COUNT_OFFSET;                            // set
 
         // Final single SSTORE
-        peakHeightsBits = bits;
+        mmrMetaBits = bits;
 
         emit NewData(newData);
     }
 
-    function _addDataMany(bytes[] calldata newItems) internal {
-        for (uint256 i = 0; i < newItems.length; i++) {
-            _addData(newItems[i]);
-        }
-    }
-
-    function getMMRRoot() public view returns (bytes32 root) {
+    function getMMRRoot() internal view returns (bytes32 root) {
         uint8 peakCount = _getPeakCount();
         require(peakCount > 0, "no data");
         root = peaks[0];
@@ -119,15 +112,13 @@ contract CIDAccumulatorMMR is MinimalCIDEncoding {
         }
     }
 
-
     function getLatestCID() public view returns (bytes memory) {
         bytes32 root = getMMRRoot();
         return _wrapCID(root);
     }
 
-    function _combine(bytes32 left, bytes32 right) internal pure returns (bytes32 hash) {
-        (, bytes32 digest) = encodeLinkNode(left, right);
-        hash = digest;
+    function _combine(bytes32 left, bytes32 right) internal pure returns (bytes32) {
+        return encodeLinkNode(left, right);
     }
 
     function _wrapCID(bytes32 hash) internal pure returns (bytes memory) {
@@ -143,15 +134,16 @@ contract CIDAccumulatorMMR is MinimalCIDEncoding {
             multihash
         );
     }
-
 }
 
-contract Example is CIDAccumulatorMMR {
+contract Example is DagCborAccumulator {
     function addData(bytes calldata newData) external {
         _addData(newData);
     }
 
     function addMany(bytes[] calldata newData) external {
-        _addDataMany(newData);
+        for (uint256 i = 0; i < newData.length; i++) {
+            _addData(newData[i]);
+        }
     }
 }
