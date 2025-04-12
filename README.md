@@ -36,16 +36,13 @@ The execution gas cost of `_addData` depends on how many **merge steps** are tri
 
 | Merge Depth | Description                        | Approx Gas |
 | ----------- | ---------------------------------- | ---------- |
-| 0           | No merges (new peak at height 0)   | ~13,100    |
-| 1           | Merge with 1 peak (into height 1)  | ~15,900    |
-| 2           | Merge with 2 peaks (into height 2) | ~18,400    |
-| 3           | Merge with 3 peaks (into height 3) | ~22,900    |
-| 4           | Merge with 4 peaks (into height 4) | ~31,600    |
-| 5           | Merge with 5 peaks (into height 5) | ~44,800    |
-| 6           | Merge with 6 peaks (into height 6) | ~60,300    |
-| 7           | Merge with 7 peaks (into height 7) | ~76,000    |
-| 8           | Merge with 8 peaks (into height 8) | ~91,700    |
-| 9           | Merge with 9 peaks (into height 9) | ~107,400   |
+| 0           | No merges (new peak at height 0)   | ~12,785    |
+| 1           | Merge with 1 peak (into height 1)  | ~17,285    |
+| 2           | Merge with 2 peaks (into height 2) | ~21,785    |
+| 3           | Merge with 3 peaks (into height 3) | ~26,285    |
+| 4           | Merge with 4 peaks (into height 4) | ~30,785    |
+| 5           | Merge with 5 peaks (into height 5) | ~35,285    |
+| 6           | Merge with 6 peaks (into height 6) | ~39,785    |
 
 > ℹ️ Most inserts fall in the **13k–19k gas** range. Deeper merges are **exponentially rare**:
 >
