@@ -136,6 +136,9 @@ dist
 .pnp.*
 
 .prettierrc
+.vscode/
+bin/
+soljson-*
 
 # Foundry build artifacts
 out/
