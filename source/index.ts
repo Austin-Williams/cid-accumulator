@@ -2,7 +2,8 @@ import { createHelia } from "helia"
 import { resolveMerkleTree, MerkleMountainRange } from "./utils/ipfs.ts"
 
 const generateRandomBytes = (): Uint8Array => {
-	return crypto.getRandomValues(new Uint8Array(16))
+	const length = Math.floor(Math.random() * 257) // generates a number between 0 and 256 inclusive
+	return crypto.getRandomValues(new Uint8Array(length))
 }
 
 const main = async () => {

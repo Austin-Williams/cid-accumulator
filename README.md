@@ -1,6 +1,6 @@
 # cid-accumulator
 
-**IMPORTANT:** This has not been audited or even tested. Don't use it. It's currently a non-working prototype.
+**IMPORTANT:** This has not been audited or even tested.
 
 Many apps emit smart contract events to record important data that must later be collected off-chain in order to use the app. For instance, some apps (Tornado Cash, Railgun, 0xbow, etc) require the user to collect all commitment values from previous deposit events to reconstruct a Merkle tree in order to spend their deposit. Other apps may emit events for markets, offers, etc that will be rendered in the UI.
 
@@ -17,20 +17,18 @@ The app devs (or anyone) can run a simple service that watches for events from t
 Have your contract inherit from the `CIDAccumulator`.
 
 ```solidity
-contract Example is CIDAccumulator {
-    function adddata(bytes input) external {
-        _addData(input);
-    }
+contract Example is CIDAccumulatorMMR {
+  function addData(bytes calldata newData) external {
+    _addData(newData);
+  }
 
-    function addBatch(bytes[] calldata inputs) external {
-        for (uint256 i = 0; i < inputs.length; i++) {
-            _addData(inputs[i]);
-        }
-    }
+  function addMany(bytes[] calldata newData) external {
+    _addDataMany(newData);
+  }
 }
 ```
 
-Add any `bytes` data you want via the `_addData` function. This costs around 60k gas for any reasonable sized data.
+Add any `bytes` data you want via the `_addData` function. This costs around 40k gas for any reasonable sized data.
 
 At any time you can call the `getLatestCID` view function to get the IPFS CID of the DAG_CLOB file that contains all the data that has been added via `_addData` since contract creation (assuming someone has uploaded it to IPFS -- see below).
 
