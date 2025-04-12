@@ -136,3 +136,11 @@ dist
 .pnp.*
 
 .prettierrc
+
+# Foundry build artifacts
+out/
+cache/
+lib/
+
+# Foundry test coverage
+coverage/

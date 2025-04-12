@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.29;
+pragma solidity 0.8.25;
 
 // Minimal encoder for IPFS CIDs used in an IPLD DAG (dag-cbor codec)
 library DagCborCIDEncoder {
