@@ -39,6 +39,7 @@ export async function resolveMerkleTree(cid: CID, blockstore: Blockstore): Promi
 
 export class MerkleMountainRange {
 	private peaks: CID[] = []
+	private leafCount = 0
 	private encodeBlock = async (value: unknown): Promise<{ cid: CID; bytes: Uint8Array }> => {
 		const encoded = dagCbor.encode(value)
 		const hash = await sha256.digest(encoded)
@@ -48,25 +49,47 @@ export class MerkleMountainRange {
 
 	constructor(private blockstore: Blockstore) {}
 
-	async addLeaves(blockData: Uint8Array[]) {
-		let index = 0
+	private async _addLeaf(blockData:Uint8Array) {
+		const { cid, bytes } = await this.encodeBlock(blockData)
+		await this.blockstore.put(cid, bytes)
+		let newPeak = cid
+		let height = 0
 
-		while (index < blockData.length) {
-			let size = 1
-			while (index + size * 2 <= blockData.length) {
-				size *= 2
-			}
+		// While the number of trailing 1s in leafCount allows merging
+		while ((this.leafCount >> height) & 1) {
+			const left = this.peaks.pop()
+			if (!left) throw new Error('MMR structure error: no peak to merge')
 
-			const chunk = blockData.slice(index, index + size)
-			const peak = await this.buildMerkleTree(chunk)
-			this.peaks.push(peak)
-			index += size
+			const { cid: merged, bytes } = await this.encodeBlock({ L: left, R: newPeak })
+			await this.blockstore.put(merged, bytes)
+			newPeak = merged
+			height++
 		}
+
+		this.peaks.push(newPeak)
+		this.leafCount++
 	}
 
+	async addLeaf(blockData:Uint8Array, leafIndexHint?: number): Promise<CID> {
+		if (leafIndexHint) { // optional check to ensure leaves are being inserted in the proper order
+			if (this.leafCount !== leafIndexHint) {
+				throw new Error(`Expected leaf with index ${this.leafCount} but got leafIndexHint ${leafIndexHint}`)
+			}
+		}
+		await this._addLeaf(blockData)
+		return await this.rootCID()
+	}
+
+	async addLeaves(blockData: Uint8Array[]): Promise<CID> {
+		for (const leaf of blockData) {
+			await this._addLeaf(leaf)
+		}
+		return await this.rootCID()
+	}
+	
 	async rootCID(): Promise<CID> {
 		if (this.peaks.length === 0) {
-			throw new Error("MMR has no peaks")
+			return CID.parse('bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku') // canonical empty block
 		}
 
 		if (this.peaks.length === 1) {
@@ -81,30 +104,5 @@ export class MerkleMountainRange {
 		}
 
 		return current
-	}
-
-	private async buildMerkleTree(blockData: Uint8Array[]): Promise<CID> {
-		let layer: CID[] = []
-		for (const data of blockData) {
-			const { cid, bytes } = await this.encodeBlock(data)
-			await this.blockstore.put(cid, bytes)
-			layer.push(cid)
-		}
-
-		while (layer.length > 1) {
-			const nextLayer: CID[] = []
-			for (let i = 0; i < layer.length; i += 2) {
-				if (i + 1 < layer.length) {
-					const { cid, bytes } = await this.encodeBlock({ L: layer[i], R: layer[i + 1] })
-					await this.blockstore.put(cid, bytes)
-					nextLayer.push(cid)
-				} else {
-					nextLayer.push(layer[i])
-				}
-			}
-			layer = nextLayer
-		}
-
-		return layer[0]
 	}
 }

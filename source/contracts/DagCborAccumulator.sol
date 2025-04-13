@@ -10,7 +10,7 @@ contract DagCborAccumulator {
 	using DagCborCIDEncoder for bytes;
 
 	// EVENTS
-	event NewData(bytes newData);
+	event NewData(uint32 leafIndex, bytes newData);
 
 	// CUSTOM ERRORS
 	error CountOverflow();
@@ -38,11 +38,13 @@ contract DagCborAccumulator {
 	uint256 private mmrMetaBits;
 
 	constructor() {
-		// Pre-fill peaks with dummy non-zero values
+		// Insert non-zerp data to all 33 storage slots used by this contract for gas optimization.
 		for (uint256 i = 0; i < 32; i++) {
-			peaks[i] = bytes32(uint256(1)); // dummy value for gas optimization
+			peaks[i] = bytes32(uint256(1));
 		}
+		mmrMetaBits = 1 << 255; // Set an unused high bit
 	}
+
 
 	// PUBLIC FUNCTIONS
 	function getLatestCID() public view returns (bytes memory) {
@@ -89,13 +91,13 @@ contract DagCborAccumulator {
 		bits |= uint256(peakCount + 1) << PEAK_COUNT_OFFSET;      // set
 
 		// Update count
-		bits &= ~(LEAF_COUNT_MASK << LEAF_COUNT_OFFSET);                    // clear
-		bits |= count << LEAF_COUNT_OFFSET;                            // set
+		bits &= ~(LEAF_COUNT_MASK << LEAF_COUNT_OFFSET);          // clear
+		bits |= count << LEAF_COUNT_OFFSET;                       // set
 
 		// Final single SSTORE
 		mmrMetaBits = bits;
 
-		emit NewData(newData);
+		emit NewData(uint32(count - 1), newData);
 	}
 
 	function _getPeaks(uint256 index) internal view returns (bytes32) {
@@ -104,7 +106,7 @@ contract DagCborAccumulator {
 
 	function _getMMRRoot() internal view returns (bytes32 root) {
 		uint8 peakCount = _getPeakCount();
-		require(peakCount > 0, "no data");
+		if (peakCount == 0) { return bytes32(0); }
 		root = peaks[0];
 		for (uint256 i = 1; i < peakCount; i++) {
 			root = _combine(root, peaks[i]);
@@ -145,17 +147,5 @@ contract DagCborAccumulator {
 			hex"71", // dag-cbor codec.
 			multihash
 		);
-	}
-}
-
-contract Example is DagCborAccumulator {
-	function addData(bytes calldata newData) external {
-		_addData(newData);
-	}
-
-	function addMany(bytes[] calldata newData) external {
-		for (uint256 i = 0; i < newData.length; i++) {
-			_addData(newData[i]);
-		}
 	}
 }

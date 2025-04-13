@@ -77,6 +77,6 @@ So the gas cost is determined only by that insert’s merge activity — **not**
 
 > 🚧 In Progess
 
-See `index.ts` for example code for the bonevolent service providers who upload the data to IPFS, as well as an example of how a normal client would downlaod it.
+See `data-indexer.ts` for example code for the bonevolent service providers who listen for the event data and upload it to IPFS. 
 
-`npx --no-install tsx ./source/index.ts`
+Usage: `npx --no-install tsx ./source/data-indexer.ts <TARGET_CONTRACT_ADDRESS>`

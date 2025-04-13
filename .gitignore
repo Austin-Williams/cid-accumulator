@@ -148,3 +148,6 @@ broadcast/
 
 # Foundry test coverage
 coverage/
+
+# Foundry scripts
+script/
