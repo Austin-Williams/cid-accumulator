@@ -19,15 +19,15 @@ contract DagCborAccumulator {
 	);
 
 	// CONSTANTS
-	// Packed bitfield layout for peakHeightsBits
+	// Packed bitfield layout for mmrMetaBits
 	uint256 private constant PEAK_COUNT_OFFSET = 160;
-	uint256 private constant PEAK_COUNT_MASK   = 0x1F;       // 5 bits
+	uint256 private constant PEAK_COUNT_MASK   = 0x1F;	// 5 bits
 	uint256 private constant LEAF_COUNT_OFFSET = 165;
-	uint256 private constant LEAF_COUNT_MASK   = 0xFFFFFFFF; // 32 bits
+	uint256 private constant LEAF_COUNT_MASK   = 0xFFFFFFFF;	// 32 bits
 	uint256 private constant PREVIOUS_INSERT_BLOCKNUM_OFFSET = 197;
-	uint256 private constant PREVIOUS_INSERT_BLOCKNUM_MASK = 0xFFFFFFFF; // 32 bits
+	uint256 private constant PREVIOUS_INSERT_BLOCKNUM_MASK = 0xFFFFFFFF;	// 32 bits
 	uint256 private constant DEPLOY_BLOCKNUM_OFFSET = 229;
-	uint256 private constant DEPLOY_BLOCKNUM_MASK = (1 << 27) - 1; // 0x7FFFFFF
+	uint256 private constant DEPLOY_BLOCKNUM_MASK = (1 << 27) - 1;	// 0x7FFFFFF
 
 	// STATE VARIABLES
 	bytes32[32] private peaks;  // Fixed-size array for node hashes
