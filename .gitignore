@@ -151,3 +151,6 @@ coverage/
 
 # Foundry scripts
 script/
+
+# Pinner state
+.pinner/
