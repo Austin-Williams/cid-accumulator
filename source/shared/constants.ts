@@ -1,3 +1,5 @@
+import { Interface } from 'ethers'
+
 export const MINIMAL_ACCUMULATOR_ABI = [
 	{
 		"anonymous": false,
@@ -68,3 +70,5 @@ export const MINIMAL_ACCUMULATOR_ABI = [
 		"type": "function"
 	}
 ] as const
+
+export const MINIMAL_ACCUMULATOR_INTERFACE = new Interface(MINIMAL_ACCUMULATOR_ABI)
