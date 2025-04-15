@@ -1,5 +1,5 @@
 import { test, expect, vi } from "vitest"
-import { retryRpcCall } from "../../source/shared/rpc.ts"
+import { retryRpcCall } from "../source/shared/rpc.ts"
 
 test("retryRpcCall returns result on first try", async () => {
 	const mockFn = vi.fn().mockResolvedValue("ok")

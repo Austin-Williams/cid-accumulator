@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { rebuildLocalDagForContiguousLeaves, syncFromEvents } from "../pinner/sync.ts"
+import { rebuildLocalDagForContiguousLeaves, syncFromEvents } from "../source/pinner/sync.ts"
 
-vi.mock("../shared/rpc.ts", () => ({
+vi.mock("../source/shared/rpc.ts", () => ({
 	retryRpcCall: vi.fn(),
 }))
-vi.mock("../shared/codec.ts", () => ({
+vi.mock("../source/shared/codec.ts", () => ({
 	decodeLeafInsert: vi.fn(),
 }))
 
-import { retryRpcCall as _retryRpcCall } from "../shared/rpc.ts"
-import { decodeLeafInsert as _decodeLeafInsert } from "../shared/codec.ts"
+import { retryRpcCall as _retryRpcCall } from "../source/shared/rpc.ts"
+import { decodeLeafInsert as _decodeLeafInsert } from "../source/shared/codec.ts"
 
 const retryRpcCall = _retryRpcCall as unknown as ReturnType<typeof vi.fn>
 const decodeLeafInsert = _decodeLeafInsert as unknown as ReturnType<typeof vi.fn>

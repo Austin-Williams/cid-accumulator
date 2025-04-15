@@ -2,15 +2,15 @@ import { test, expect } from "vitest"
 import { CID } from "multiformats/cid"
 import * as dagCbor from "@ipld/dag-cbor"
 import { sha256 } from "multiformats/hashes/sha2"
-import { MerkleMountainRange } from "../shared/mmr.ts"
-import { resolveMerkleTree } from "../shared/ipfs.ts"
-import { readFile } from "fs/promises"
-import { encodeBlock } from "../shared/codec.ts"
+import { MerkleMountainRange } from "../source/shared/mmr.ts"
+import { resolveMerkleTree } from "../source/shared/ipfs.ts"
+import { readFile } from "node:fs/promises"
+import { encodeBlock } from "../source/shared/codec.ts"
 
 import { createHelia } from "helia"
 
 test("resolveMerkleTree reconstructs leaf data in order", async () => {
-	const raw = await readFile("./source/test/data/accumulatorFixture.json", "utf8")
+	const raw = await readFile(new URL("./data/accumulatorFixture.json", import.meta.url), "utf8")
 	const fixture = JSON.parse(raw)
 	const flattened = fixture.events.flat()
 

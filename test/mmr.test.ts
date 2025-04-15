@@ -1,11 +1,11 @@
 import { test, expect } from "vitest"
-import { readFile } from "fs/promises"
+import { readFile } from "node:fs/promises"
 import { CID } from "multiformats/cid"
-import { MerkleMountainRange } from "../../source/shared/mmr.ts"
+import { MerkleMountainRange } from "../source/shared/mmr.ts"
 import { create as createMultihashDigest } from "multiformats/hashes/digest"
 
 test("MMR combineResults and rightInputs match emitted logs", async () => {
-	const raw = await readFile("./source/test/data/accumulatorFixture.json", "utf-8")
+	const raw = await readFile(new URL("./data/accumulatorFixture.json", import.meta.url), "utf-8")
 	const fixture = JSON.parse(raw)
 
 	const expectedCID = CID.decode(Uint8Array.from(Buffer.from(fixture.latestCID.slice(2), "hex")))

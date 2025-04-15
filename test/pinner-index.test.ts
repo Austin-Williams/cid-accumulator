@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import * as pinnerIndex from "../pinner/index.ts"
+import * as pinnerIndex from "../source/pinner/index.ts"
 
 describe("pinner/index.ts", () => {
   it("should re-export Pinner and other modules without error", () => {

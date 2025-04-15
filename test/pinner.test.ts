@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 describe("Pinner", () => {
 	it("prepareDB should call rebuildLocalDagForContiguousLeaves if highestContiguousLeafIndex returns a number", async () => {
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		const pinner = new Pinner();
 		const mockRebuild = vi.fn();
 		pinner.highestContiguousLeafIndex = vi.fn(() => 5);
@@ -13,7 +13,7 @@ describe("Pinner", () => {
 	});
 
 	it("prepareDB should set syncedToLeafIndex to 0 if highestContiguousLeafIndex returns null", async () => {
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		const pinner = new Pinner();
 		const mockRebuild = vi.fn();
 		pinner.highestContiguousLeafIndex = vi.fn(() => null);
@@ -42,7 +42,7 @@ describe("Pinner", () => {
 		});
 
 		// Mock codec
-		vi.doMock("../shared/codec.ts", () => ({
+		vi.doMock("../source/shared/codec.ts", () => ({
 			decodeLeafInsert: () => ({
 				leafCID: "cid",
 				rootCID: "rootcid",
@@ -69,7 +69,7 @@ describe("Pinner", () => {
 		}));
 
 		// Mock db
-		vi.doMock("../pinner/db.ts", () => {
+		vi.doMock("../source/pinner/db.ts", () => {
 			return {
 				openOrCreateDatabase: vi.fn(),
 				initializeSchema: vi.fn(),
@@ -84,8 +84,8 @@ describe("Pinner", () => {
 	it("should create new DB and schema if DB does not exist", async () => {
 		const fs = await import("fs");
 		vi.spyOn(fs, "existsSync").mockReturnValue(false);
-		const db = await import("../pinner/db.ts");
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const db = await import("../source/pinner/db.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		await Pinner.init("0xabc", { getNetwork: vi.fn().mockResolvedValue({ chainId: 123 }) } as any);
 		expect(vi.mocked(db.openOrCreateDatabase)).toHaveBeenCalled();
 		expect(vi.mocked(db.initializeSchema)).toHaveBeenCalled();
@@ -97,15 +97,15 @@ describe("Pinner", () => {
 			existsSync: vi.fn(() => true),
 			default: { existsSync: vi.fn(() => true) }
 		}));
-		const db = await import("../pinner/db.ts");
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const db = await import("../source/pinner/db.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		await Pinner.init("0xabc", { getNetwork: vi.fn().mockResolvedValue({ chainId: 123 }) } as any);
 		expect(vi.mocked(db.openOrCreateDatabase)).toHaveBeenCalled();
 		expect(vi.mocked(db.initializeSchema)).not.toHaveBeenCalled();
 	});
 
 	it("should insert leaf event and update meta in processLeafEvent", async () => {
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		const run = vi.fn();
 		const prepare = vi.fn(() => ({ run }));
 		const pinner = await Pinner.init("0xabc", { getNetwork: vi.fn().mockResolvedValue({ chainId: 123 }) } as any);
@@ -134,7 +134,7 @@ describe("Pinner", () => {
 	});
 
 	it("should update meta with lastSyncedLeafIndex in processLeafEvent", async () => {
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		const runIntermediate = vi.fn();
 		const runMeta = vi.fn();
 		const prepare = vi.fn((sql: string) => {
@@ -173,18 +173,18 @@ describe("Pinner", () => {
 			.mockImplementationOnce(() => undefined) // storedChainId
 			.mockImplementationOnce(() => undefined) // storedDeployBlock
 		const mockSetMeta = vi.fn();
-		vi.doMock("../pinner/db.ts", () => ({
+		vi.doMock("../source/pinner/db.ts", () => ({
 			createMetaHandlers: () => ({ getMeta: mockGetMeta, setMeta: mockSetMeta }),
 			initializeSchema: vi.fn(),
 			openOrCreateDatabase: vi.fn(() => ({})),
 			__esModule: true,
 		}));
 		const mockGetAccumulatorData = vi.fn().mockResolvedValue([BigInt(0), null]);
-		vi.doMock("../shared/accumulator.ts", () => ({
+		vi.doMock("../source/shared/accumulator.ts", () => ({
 			getAccumulatorData: mockGetAccumulatorData,
 			__esModule: true,
 		}));
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		const provider = { getNetwork: vi.fn().mockResolvedValue({ chainId: 123 }) } as any;
 		await expect(Pinner.init("0xabc", provider)).rejects.toThrow("DB contract address mismatch");
 	});
@@ -194,18 +194,18 @@ describe("Pinner", () => {
 			.mockImplementationOnce(() => "999") // storedChainId (mismatch)
 			.mockImplementationOnce(() => undefined) // storedDeployBlock
 		const mockSetMeta = vi.fn();
-		vi.doMock("../pinner/db.ts", () => ({
+		vi.doMock("../source/pinner/db.ts", () => ({
 			createMetaHandlers: () => ({ getMeta: mockGetMeta, setMeta: mockSetMeta }),
 			initializeSchema: vi.fn(),
 			openOrCreateDatabase: vi.fn(() => ({})),
 			__esModule: true,
 		}));
 		const mockGetAccumulatorData = vi.fn().mockResolvedValue([BigInt(0), null]);
-		vi.doMock("../shared/accumulator.ts", () => ({
+		vi.doMock("../source/shared/accumulator.ts", () => ({
 			getAccumulatorData: mockGetAccumulatorData,
 			__esModule: true,
 		}));
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		const provider = { getNetwork: vi.fn().mockResolvedValue({ chainId: 123 }) } as any;
 		await expect(Pinner.init("0xabc", provider)).rejects.toThrow("DB chain ID mismatch");
 	});
@@ -216,18 +216,18 @@ describe("Pinner", () => {
 			.mockImplementationOnce(() => undefined) // storedChainId
 			.mockImplementationOnce(() => "1234") // storedDeployBlock (mismatch)
 		const mockSetMeta = vi.fn();
-		vi.doMock("../pinner/db.ts", () => ({
+		vi.doMock("../source/pinner/db.ts", () => ({
 			createMetaHandlers: () => ({ getMeta: mockGetMeta, setMeta: mockSetMeta }),
 			initializeSchema: vi.fn(),
 			openOrCreateDatabase: vi.fn(() => ({})),
 			__esModule: true,
 		}));
 		const mockGetAccumulatorData = vi.fn().mockResolvedValue([BigInt(5678 << 229), null]);
-		vi.doMock("../shared/accumulator.ts", () => ({
+		vi.doMock("../source/shared/accumulator.ts", () => ({
 			getAccumulatorData: mockGetAccumulatorData,
 			__esModule: true,
 		}));
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		const provider = { getNetwork: vi.fn().mockResolvedValue({ chainId: 1 }) } as any;
 		await expect(Pinner.init("0xabc", provider)).rejects.toThrow("DB deployBlockNumber mismatch");
 	});
@@ -235,7 +235,7 @@ describe("Pinner", () => {
 
 describe("processLeafEvent", () => {
 	it("should handle empty combineResultsCIDs and peakBaggingCIDs arrays", async () => {
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		const run = vi.fn();
 		const prepare = vi.fn(() => ({ run }));
 		const pinner = await Pinner.init("0xabc", { getNetwork: vi.fn().mockResolvedValue({ chainId: 123 }) } as any);
@@ -261,7 +261,7 @@ describe("processLeafEvent", () => {
 	});
 
 	it("should insert all combineResultsCIDs and peakBaggingCIDs in processLeafEvent", async () => {
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		const run = vi.fn();
 		const prepare = vi.fn(() => ({ run }));
 		const pinner = await Pinner.init("0xabc", { getNetwork: vi.fn().mockResolvedValue({ chainId: 123 }) } as any);
@@ -303,11 +303,11 @@ describe("processLeafEvent", () => {
 describe("getAccumulatorData", () => {
 	it("should call getAccumulatorData with provider and contractAddress", async () => {
 		const mockGetAccumulatorData = vi.fn().mockResolvedValue({ foo: "bar" });
-		vi.doMock("../shared/accumulator.ts", () => ({
+		vi.doMock("../source/shared/accumulator.ts", () => ({
 			getAccumulatorData: mockGetAccumulatorData,
 			__esModule: true,
 		}));
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		const pinner = new Pinner();
 		pinner.provider = {} as any;
 		pinner.contractAddress = "0xabc";
@@ -320,11 +320,11 @@ describe("getAccumulatorData", () => {
 describe("rebuildLocalDagForContiguousLeaves", () => {
 	it("should call rebuildLocalDagForContiguousLeaves with correct args", async () => {
 		const mockRebuild = vi.fn().mockResolvedValue(undefined);
-		vi.doMock("../pinner/sync.ts", () => ({
+		vi.doMock("../source/pinner/sync.ts", () => ({
 			rebuildLocalDagForContiguousLeaves: mockRebuild,
 			__esModule: true,
 		}));
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		const pinner = new Pinner();
 		pinner.highestContiguousLeafIndex = vi.fn().mockReturnValue(5);
 		await pinner.rebuildLocalDagForContiguousLeaves(1, 4);
@@ -335,12 +335,12 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 describe("syncFromEvents", () => {
 	it("should call syncFromEvents with correct arguments", async () => {
 		const syncFromEventsMock = vi.fn();
-		vi.doMock("../pinner/sync.ts", () => ({
+		vi.doMock("../source/pinner/sync.ts", () => ({
 			syncFromEvents: syncFromEventsMock,
 			__esModule: true,
 		}));
 
-		const { Pinner } = await import("../pinner/Pinner.ts");
+		const { Pinner } = await import("../source/pinner/Pinner.ts");
 		const pinner = new Pinner();
 
 		await pinner.syncFromEvents(10, 5, 100, 2);
@@ -352,7 +352,7 @@ describe("syncFromEvents", () => {
 describe("highestContiguousLeafIndex", () => {
 		let pinner: any;
 		beforeEach(async () => {
-			const { Pinner } = await import("../pinner/Pinner.ts");
+			const { Pinner } = await import("../source/pinner/Pinner.ts");
 			pinner = new Pinner();
 		});
 		it("should return null for no rows", () => {

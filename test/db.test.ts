@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
-import fs from "fs"
-import path from "path"
-import { openOrCreateDatabase, createMetaHandlers, initializeSchema } from "../pinner/db.ts"
+import fs from "node:fs"
+import path from "node:path"
+import { openOrCreateDatabase, createMetaHandlers, initializeSchema } from "../source/pinner/db.ts"
 
 const TEST_DB_PATH = path.join(__dirname, "testdb.sqlite")
 

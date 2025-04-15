@@ -1,7 +1,7 @@
 // test/codec.test.ts
 import { test, expect } from "vitest"
-import { encodeBlock, decodeLeafInsert } from "../shared/codec.ts"
-import { MINIMAL_ACCUMULATOR_INTERFACE } from "../shared/constants.ts"
+import { encodeBlock, decodeLeafInsert } from "../source/shared/codec.ts"
+import { MINIMAL_ACCUMULATOR_INTERFACE } from "../source/shared/constants.ts"
 import type { Log } from "ethers"
 import { vi } from "vitest"
 

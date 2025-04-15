@@ -1,5 +1,5 @@
 import { test, expect, vi } from "vitest"
-import { readFile } from "fs/promises"
+import { readFile } from "node:fs/promises"
 
 vi.mock("ethers", async () => {
 	const actual = await vi.importActual<typeof import("ethers")>("ethers")
@@ -7,7 +7,7 @@ vi.mock("ethers", async () => {
 	class MockContract {
 		constructor(_address: string, _abi: any, _provider: any) {}
 		async getAccumulatorData(): Promise<[bigint]> {
-			const raw = await readFile("./source/test/data/accumulatorFixture.json", "utf8")
+			const raw = await readFile(new URL("./data/accumulatorFixture.json", import.meta.url), "utf8")
 			const fixture = JSON.parse(raw)
 			const mmrMetaBits = BigInt(fixture.accumulatorData["0"].split(": ")[1])
 			return [mmrMetaBits]
@@ -23,10 +23,10 @@ vi.mock("ethers", async () => {
 	}
 })
 
-import { getAccumulatorData } from "../../source/shared/accumulator.ts"
+import { getAccumulatorData } from "../source/shared/accumulator.ts"
 
 test("getAccumulatorData decodes accumulator bits correctly", async () => {
-	const raw = await readFile("./source/test/data/accumulatorFixture.json", "utf8")
+	const raw = await readFile(new URL("./data/accumulatorFixture.json", import.meta.url), "utf8")
 	const fixture = JSON.parse(raw)
 
 	const provider = {} as any
