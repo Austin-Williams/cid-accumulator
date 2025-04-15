@@ -1,7 +1,6 @@
 import { test, expect, vi } from 'vitest'
 import { readFile } from 'fs/promises'
 
-// 👇 This must come before the import of `getAccumulatorData`
 vi.mock('ethers', async () => {
 	const actual = await vi.importActual<typeof import('ethers')>('ethers')
 
@@ -24,7 +23,6 @@ vi.mock('ethers', async () => {
 	}
 })
 
-// 👇 Now that the mock is set up, safely import this
 import { getAccumulatorData } from '../../source/shared/accumulator.ts'
 
 test('getAccumulatorData decodes accumulator bits correctly', async () => {
