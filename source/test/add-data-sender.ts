@@ -21,7 +21,7 @@ async function main() {
   const wallet = new ethers.Wallet(PRIVATE_KEY, provider)
 
   // Get the bytecode from the local compiled artifact
-  const artifact = await import('../out/Example.sol/Example.json', { assert: { type: 'json' } })
+  const artifact = await import('../../out/Example.sol/Example.json', { assert: { type: 'json' } })
   const bytecode = artifact.default.bytecode.object || artifact.default.bytecode
   if (!bytecode) throw new Error('Missing bytecode in artifact')
 

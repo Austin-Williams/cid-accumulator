@@ -24,6 +24,7 @@
 		"allowJs": true,
 		"checkJs": false,
 		"skipLibCheck": true,
+		"types": ["node"],
 		"typeRoots": [
 			"./node_modules/@types",
 			"./source/types"
@@ -34,5 +35,6 @@
 	"include": [
 		"source/**/*.ts",
 		"source/**/*.js",
+		"source/test/**/*.ts"
 	]
 }
