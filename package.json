@@ -5,9 +5,6 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
-		"test": "vitest",
-		"test:watch": "vitest --watch",
-		"test:ui": "vitest --ui"
 	},
 	"author": "",
 	"license": "MIT",
