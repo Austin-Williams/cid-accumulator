@@ -1,19 +1,11 @@
-import { CID } from "multiformats/cid"
-import * as dagCbor from "@ipld/dag-cbor"
-import { sha256 } from "multiformats/hashes/sha2"
+import { CID } from 'multiformats/cid'
+import { encodeBlock } from './codec.ts'
 
 export class MerkleMountainRange {
 	private peaks: CID[] = []
 	private leafCount = 0
 
 	constructor() {}
-
-	private encodeBlock = async (value: unknown): Promise<{ cid: CID; bytes: Uint8Array }> => {
-		const encoded = dagCbor.encode(value)
-		const hash = await sha256.digest(encoded)
-		const cid = CID.createV1(dagCbor.code, hash)
-		return { cid, bytes: encoded }
-	}
 
 	async addLeafWithTrail(blockData: Uint8Array, expectedLeafIndex?: number, expectedNewRootCID?: string): Promise<{
 		leafCID: string
@@ -28,7 +20,7 @@ export class MerkleMountainRange {
 			throw new Error(`Expected leafIndex ${this.leafCount} but got ${expectedLeafIndex}`)
 		}
 
-		const { cid: leafCID, } = await this.encodeBlock(blockData)
+		const { cid: leafCID, } = await encodeBlock(blockData)
 
 		let newPeak = leafCID
 		let height = 0
@@ -41,7 +33,7 @@ export class MerkleMountainRange {
 			const left = this.peaks.pop()
 			if (!left) throw new Error('MMR structure error: no peak to merge')
 
-			const { cid: merged, bytes } = await this.encodeBlock({ L: left, R: newPeak })
+			const { cid: merged, bytes } = await encodeBlock({ L: left, R: newPeak })
 
 			combineResultsCIDs.push(merged.toString())
 			combineResultsData.push(bytes)
@@ -88,7 +80,7 @@ export class MerkleMountainRange {
 
 		let current = this.peaks[0]
 		for (let i = 1; i < this.peaks.length; i++) {
-			const { cid, bytes } = await this.encodeBlock({ L: current, R: this.peaks[i] })
+			const { cid, bytes } = await encodeBlock({ L: current, R: this.peaks[i] })
 			cids.push(cid.toString())
 			data.push(bytes)
 			current = cid

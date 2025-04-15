@@ -1,6 +1,6 @@
 {
 	"contractAddress": "0xC1144C9dbf6F3489CE9C808a1Da653FB4465403d",
-	"latestCID": "0x01711220a359f3a9e9cbf3dc294c349f84531cb70f40fc79823f2e07795f9f0922f1b6a4",
+	"latestCID": "0x017112209c6ff206fdf2d6ef949aa52144a086809a9fcb34e5adc0cca8a8cfaaa690e190",
 	"events": [
 		[
 			{
@@ -94,6 +94,52 @@
 					"rightInputs": [
 						"0xc2e1b005642323067f3ed9ffc537221a334f71f854c56c30603623ac29bc10ef",
 						"0x7b3fc74a625a0cf78612fea792c9624282d01a70f0d5fe213bdf3e533fd1014a"
+					]
+				}
+			}
+		],
+		[
+			{
+				"from": "0xC1144C9dbf6F3489CE9C808a1Da653FB4465403d",
+				"topic": "0xb90f8757fff64801925e43c3fd43e1b6936348dd74bb1769b32bba95e41aeb72",
+				"event": "LeafInsert",
+				"args": {
+					"0": 4,
+					"1": 87,
+					"2": "0x5c7cd020d15f56f70a3ec31ed39acfd6371e0803fcf5e92e835761bc728f5600",
+					"3": [],
+					"4": [],
+					"leafIndex": 4,
+					"previousInsertBlockNumber": 87,
+					"newData": "0x5c7cd020d15f56f70a3ec31ed39acfd6371e0803fcf5e92e835761bc728f5600",
+					"combineResults": [],
+					"rightInputs": []
+				}
+			}
+		],
+		[
+			{
+				"from": "0xC1144C9dbf6F3489CE9C808a1Da653FB4465403d",
+				"topic": "0xb90f8757fff64801925e43c3fd43e1b6936348dd74bb1769b32bba95e41aeb72",
+				"event": "LeafInsert",
+				"args": {
+					"0": 5,
+					"1": 88,
+					"2": "0x9899f459383cc1e01e608a111100f034ba415574aecb8a403dd724b9cb0eb6d0",
+					"3": [
+						"0x4bda56690bc7cd87b62e7a918444ff834f473311383662ace49ab81146b17e49"
+					],
+					"4": [
+						"0x212c725a9f24d76a1ffabc7ad75b626ce6bf4c045b8009de9eaa0e2738fe9c3c"
+					],
+					"leafIndex": 5,
+					"previousInsertBlockNumber": 88,
+					"newData": "0x9899f459383cc1e01e608a111100f034ba415574aecb8a403dd724b9cb0eb6d0",
+					"combineResults": [
+						"0x4bda56690bc7cd87b62e7a918444ff834f473311383662ace49ab81146b17e49"
+					],
+					"rightInputs": [
+						"0x212c725a9f24d76a1ffabc7ad75b626ce6bf4c045b8009de9eaa0e2738fe9c3c"
 					]
 				}
 			}
