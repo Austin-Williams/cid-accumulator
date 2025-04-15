@@ -23,6 +23,7 @@
 		"experimentalDecorators": true,
 		"allowJs": true,
 		"checkJs": false,
+		"skipLibCheck": true,
 		"typeRoots": [
 			"./node_modules/@types",
 			"./source/types"
