@@ -54,9 +54,7 @@ test('resolveMerkleTree reconstructs leaf data in order', async () => {
 	const rootCID = CID.decode(Uint8Array.from(Buffer.from(fixture.latestCID.slice(2), 'hex')))
 
 	const resolved = await resolveMerkleTree(rootCID, blockstore)
-	resolved.forEach(bytes => {
-		console.log('0x' + Buffer.from(bytes).toString('hex'))
-	})
+
 	expect(resolved).toEqual(originalLeafBuffers)
 })
 

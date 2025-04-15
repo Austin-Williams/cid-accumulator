@@ -1,3 +1,4 @@
+// shared/accumulator.ts
 import { ethers } from 'ethers'
 import { MINIMAL_ACCUMULATOR_ABI } from './constants.ts'
 import { AccumulatorMetadata } from './types.ts'
