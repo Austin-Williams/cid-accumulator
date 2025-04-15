@@ -1,15 +1,15 @@
-import { test, expect, vi } from 'vitest'
-import { readFile } from 'fs/promises'
+import { test, expect, vi } from "vitest"
+import { readFile } from "fs/promises"
 
-vi.mock('ethers', async () => {
-	const actual = await vi.importActual<typeof import('ethers')>('ethers')
+vi.mock("ethers", async () => {
+	const actual = await vi.importActual<typeof import("ethers")>("ethers")
 
 	class MockContract {
 		constructor(_address: string, _abi: any, _provider: any) {}
 		async getAccumulatorData(): Promise<[bigint]> {
-			const raw = await readFile('./source/test/data/accumulatorFixture.json', 'utf8')
+			const raw = await readFile("./source/test/data/accumulatorFixture.json", "utf8")
 			const fixture = JSON.parse(raw)
-			const mmrMetaBits = BigInt(fixture.accumulatorData["0"].split(': ')[1])
+			const mmrMetaBits = BigInt(fixture.accumulatorData["0"].split(": ")[1])
 			return [mmrMetaBits]
 		}
 	}
@@ -18,15 +18,15 @@ vi.mock('ethers', async () => {
 		...actual,
 		ethers: {
 			...actual.ethers,
-			Contract: MockContract
-		}
+			Contract: MockContract,
+		},
 	}
 })
 
-import { getAccumulatorData } from '../../source/shared/accumulator.ts'
+import { getAccumulatorData } from "../../source/shared/accumulator.ts"
 
-test('getAccumulatorData decodes accumulator bits correctly', async () => {
-	const raw = await readFile('./source/test/data/accumulatorFixture.json', 'utf8')
+test("getAccumulatorData decodes accumulator bits correctly", async () => {
+	const raw = await readFile("./source/test/data/accumulatorFixture.json", "utf8")
 	const fixture = JSON.parse(raw)
 
 	const provider = {} as any

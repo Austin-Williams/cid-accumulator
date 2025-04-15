@@ -1,16 +1,16 @@
-import { test, expect } from 'vitest'
-import { CID } from 'multiformats/cid'
-import * as dagCbor from '@ipld/dag-cbor'
-import { sha256 } from 'multiformats/hashes/sha2'
-import { MerkleMountainRange } from '../shared/mmr.ts'
-import { resolveMerkleTree } from '../shared/ipfs.ts'
-import { readFile } from 'fs/promises'
-import { encodeBlock } from '../shared/codec.ts'
+import { test, expect } from "vitest"
+import { CID } from "multiformats/cid"
+import * as dagCbor from "@ipld/dag-cbor"
+import { sha256 } from "multiformats/hashes/sha2"
+import { MerkleMountainRange } from "../shared/mmr.ts"
+import { resolveMerkleTree } from "../shared/ipfs.ts"
+import { readFile } from "fs/promises"
+import { encodeBlock } from "../shared/codec.ts"
 
-import { createHelia } from 'helia'
+import { createHelia } from "helia"
 
-test('resolveMerkleTree reconstructs leaf data in order', async () => {
-	const raw = await readFile('./source/test/data/accumulatorFixture.json', 'utf8')
+test("resolveMerkleTree reconstructs leaf data in order", async () => {
+	const raw = await readFile("./source/test/data/accumulatorFixture.json", "utf8")
 	const fixture = JSON.parse(raw)
 	const flattened = fixture.events.flat()
 
@@ -22,7 +22,7 @@ test('resolveMerkleTree reconstructs leaf data in order', async () => {
 	const originalLeafBuffers: Uint8Array[] = []
 
 	for (const event of flattened) {
-		const data = Uint8Array.from(Buffer.from(event.args.newData.slice(2), 'hex'))
+		const data = Uint8Array.from(Buffer.from(event.args.newData.slice(2), "hex"))
 		originalLeafBuffers.push(data)
 
 		const {
@@ -32,7 +32,7 @@ test('resolveMerkleTree reconstructs leaf data in order', async () => {
 			rightInputsCIDs,
 			peakBaggingCIDs,
 			peakBaggingData,
-			rootCID
+			rootCID,
 		} = await mmr.addLeafWithTrail(data)
 
 		// Store leaf node
@@ -51,14 +51,14 @@ test('resolveMerkleTree reconstructs leaf data in order', async () => {
 	}
 
 	// Use rootCID from the fixture to validate full traversal
-	const rootCID = CID.decode(Uint8Array.from(Buffer.from(fixture.latestCID.slice(2), 'hex')))
+	const rootCID = CID.decode(Uint8Array.from(Buffer.from(fixture.latestCID.slice(2), "hex")))
 
 	const resolved = await resolveMerkleTree(rootCID, blockstore)
 
 	expect(resolved).toEqual(originalLeafBuffers)
 })
 
-test('resolveMerkleTree handles raw CID link node', async () => {
+test("resolveMerkleTree handles raw CID link node", async () => {
 	const helia = await createHelia()
 	const blockstore = helia.blockstore
 
@@ -80,7 +80,7 @@ test('resolveMerkleTree handles raw CID link node', async () => {
 	expect(result).toEqual([leafData])
 })
 
-test('resolveMerkleTree throws on unexpected structure', async () => {
+test("resolveMerkleTree throws on unexpected structure", async () => {
 	const helia = await createHelia()
 	const blockstore = helia.blockstore
 

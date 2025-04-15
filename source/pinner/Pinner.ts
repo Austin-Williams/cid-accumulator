@@ -1,17 +1,17 @@
-import { ethers } from 'ethers'
-import { keccak_256 } from '@noble/hashes/sha3'
-import { bytesToHex } from '@noble/hashes/utils'
+import { ethers } from "ethers"
+import { keccak_256 } from "@noble/hashes/sha3"
+import { bytesToHex } from "@noble/hashes/utils"
 
-import { MerkleMountainRange } from '../shared/mmr.ts'
-import { MINIMAL_ACCUMULATOR_ABI } from '../shared/constants.ts'
-import { rebuildLocalDagForContiguousLeaves, syncFromEvents } from './sync.ts'
-import { AccumulatorMetadata } from '../shared/types.ts'
-import { getAccumulatorData } from '../shared/accumulator.ts'
-import { initializeSchema, openOrCreateDatabase, createMetaHandlers } from './db.ts'
+import { MerkleMountainRange } from "../shared/mmr.ts"
+import { MINIMAL_ACCUMULATOR_ABI } from "../shared/constants.ts"
+import { rebuildLocalDagForContiguousLeaves, syncFromEvents } from "./sync.ts"
+import { AccumulatorMetadata } from "../shared/types.ts"
+import { getAccumulatorData } from "../shared/accumulator.ts"
+import { initializeSchema, openOrCreateDatabase, createMetaHandlers } from "./db.ts"
 
-import Database from 'better-sqlite3'
-import path from 'path'
-import fs from 'fs'
+import Database from "better-sqlite3"
+import path from "path"
+import fs from "fs"
 
 export class Pinner {
 	public provider!: ethers.JsonRpcProvider
@@ -20,7 +20,7 @@ export class Pinner {
 	public db!: Database.Database
 	public mmr = new MerkleMountainRange()
 
-	constructor(){}
+	constructor() {}
 
 	static async init(contractAddress: string, provider: ethers.JsonRpcProvider): Promise<Pinner> {
 		const pinner = new Pinner()
@@ -40,7 +40,7 @@ export class Pinner {
 
 		console.log(`[pinner] Initializing for contract ${normalizedAddress} on chainId ${chainId}`)
 
-		const dbPath = path.join('.pinner', `pinner-${labelHash}.db`)
+		const dbPath = path.join(".pinner", `pinner-${labelHash}.db`)
 		console.log(`[pinner] Looking for DB at path: ${dbPath}`)
 
 		const dbAlreadyExists = fs.existsSync(dbPath)
@@ -55,8 +55,8 @@ export class Pinner {
 		}
 
 		const { getMeta, setMeta } = createMetaHandlers(pinner.db)
-		const storedAddress = getMeta('contractAddress')
-		const storedChainId = getMeta('chainId')
+		const storedAddress = getMeta("contractAddress")
+		const storedChainId = getMeta("chainId")
 
 		if (storedAddress && storedAddress !== normalizedAddress) {
 			throw new Error(`DB contract address mismatch: expected ${storedAddress}, got ${normalizedAddress}`)
@@ -65,18 +65,18 @@ export class Pinner {
 			throw new Error(`DB chain ID mismatch: expected ${storedChainId}, got ${chainId}`)
 		}
 
-		setMeta('contractAddress', normalizedAddress)
-		setMeta('chainId', String(chainId))
+		setMeta("contractAddress", normalizedAddress)
+		setMeta("chainId", String(chainId))
 
 		const [mmrMetaBits]: [bigint, any] = await pinner.contract.getAccumulatorData()
 		const bits = mmrMetaBits
-		const deployBlockNumber = Number((bits >> 229n) & 0x7FFFFFFn)
+		const deployBlockNumber = Number((bits >> 229n) & 0x7ffffffn)
 
-		const storedDeployBlock = getMeta('deployBlockNumber')
+		const storedDeployBlock = getMeta("deployBlockNumber")
 		if (storedDeployBlock && Number(storedDeployBlock) !== deployBlockNumber) {
 			throw new Error(`DB deployBlockNumber mismatch: expected ${storedDeployBlock}, got ${deployBlockNumber}`)
 		}
-		setMeta('deployBlockNumber', String(deployBlockNumber))
+		setMeta("deployBlockNumber", String(deployBlockNumber))
 
 		return pinner
 	}
@@ -84,7 +84,7 @@ export class Pinner {
 	async rebuildLocalDagForContiguousLeaves(startLeaf = 0, endLeaf = this.highestContiguousLeafIndex()): Promise<void> {
 		await rebuildLocalDagForContiguousLeaves(this, startLeaf, endLeaf)
 	}
-	
+
 	async getAccumulatorData(): Promise<AccumulatorMetadata> {
 		return await getAccumulatorData(this.provider, this.contractAddress)
 	}
@@ -95,13 +95,8 @@ export class Pinner {
 		data: Uint8Array
 		previousInsertBlockNumber?: number
 	}): Promise<void> {
-		const {
-			leafIndex,
-			blockNumber,
-			data,
-			previousInsertBlockNumber
-		} = params
-	
+		const { leafIndex, blockNumber, data, previousInsertBlockNumber } = params
+
 		const {
 			leafCID,
 			rootCID,
@@ -109,10 +104,12 @@ export class Pinner {
 			rightInputsCIDs,
 			combineResultsData,
 			peakBaggingCIDs,
-			peakBaggingData
+			peakBaggingData,
 		} = await this.mmr.addLeafWithTrail(data, leafIndex)
-	
-		this.db.prepare(`
+
+		this.db
+			.prepare(
+				`
 			INSERT OR REPLACE INTO leaf_events (
 				leaf_index,
 				block_number,
@@ -124,33 +121,35 @@ export class Pinner {
 				root_cid,
 				pinned
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`).run(
-			leafIndex,
-			blockNumber ?? null,
-			leafCID,
-			Buffer.from(data),
-			previousInsertBlockNumber ?? null,
-			JSON.stringify(combineResultsCIDs),
-			JSON.stringify(rightInputsCIDs),
-			rootCID,
-			0
-		)
-	
+		`,
+			)
+			.run(
+				leafIndex,
+				blockNumber ?? null,
+				leafCID,
+				Buffer.from(data),
+				previousInsertBlockNumber ?? null,
+				JSON.stringify(combineResultsCIDs),
+				JSON.stringify(rightInputsCIDs),
+				rootCID,
+				0,
+			)
+
 		const insertIntermediate = this.db.prepare(`
 			INSERT OR IGNORE INTO intermediate_nodes (cid, data) VALUES (?, ?)
 		`)
-	
+
 		for (let i = 0; i < combineResultsCIDs.length; i++) {
 			insertIntermediate.run(combineResultsCIDs[i], combineResultsData[i])
 		}
-	
+
 		for (let i = 0; i < peakBaggingCIDs.length; i++) {
 			insertIntermediate.run(peakBaggingCIDs[i], peakBaggingData[i])
 		}
-	
+
 		const setMeta = this.db.prepare(`INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)`)
-		setMeta.run('lastSyncedLeafIndex', String(leafIndex))
-	
+		setMeta.run("lastSyncedLeafIndex", String(leafIndex))
+
 		console.log(`[pinner] Processed and inserted leaf ${leafIndex}`)
 	}
 
@@ -158,7 +157,7 @@ export class Pinner {
 		startBlock: number,
 		lastSyncedLeafIndex: number,
 		logBatchSize?: number,
-		throttleSeconds?: number
+		throttleSeconds?: number,
 	): Promise<void> {
 		return syncFromEvents(this, startBlock, lastSyncedLeafIndex, logBatchSize, throttleSeconds)
 	}
@@ -168,11 +167,15 @@ export class Pinner {
 	// This does NOT guarantee that intermediate or root CIDs are present,
 	// nor that the DAG structure has been resolved.
 	highestContiguousLeafIndex(): number | null {
-		const rows = this.db.prepare(`
+		const rows = this.db
+			.prepare(
+				`
 			SELECT leaf_index
 			FROM leaf_events
 			ORDER BY leaf_index ASC
-		`).all() as { leaf_index: number }[]
+		`,
+			)
+			.all() as { leaf_index: number }[]
 
 		for (let i = 0; i < rows.length; i++) {
 			if (rows[i].leaf_index !== i) {
@@ -183,4 +186,3 @@ export class Pinner {
 		return rows.length > 0 ? rows.length - 1 : null
 	}
 }
-

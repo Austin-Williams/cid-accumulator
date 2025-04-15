@@ -25,16 +25,9 @@
 		"checkJs": false,
 		"skipLibCheck": true,
 		"types": ["node"],
-		"typeRoots": [
-			"./node_modules/@types",
-			"./source/types"
-		],
+		"typeRoots": ["./node_modules/@types", "./source/types"],
 		"rootDir": "./source",
 		"outDir": "./output"
 	},
-	"include": [
-		"source/**/*.ts",
-		"source/**/*.js",
-		"source/test/**/*.ts"
-	]
+	"include": ["source/**/*.ts", "source/**/*.js", "source/test/**/*.ts"]
 }

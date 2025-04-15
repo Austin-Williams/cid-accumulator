@@ -1,5 +1,5 @@
-import { CID } from 'multiformats/cid'
-import { encodeBlock } from './codec.ts'
+import { CID } from "multiformats/cid"
+import { encodeBlock } from "./codec.ts"
 
 export class MerkleMountainRange {
 	private peaks: CID[] = []
@@ -7,7 +7,11 @@ export class MerkleMountainRange {
 
 	constructor() {}
 
-	async addLeafWithTrail(blockData: Uint8Array, expectedLeafIndex?: number, expectedNewRootCID?: string): Promise<{
+	async addLeafWithTrail(
+		blockData: Uint8Array,
+		expectedLeafIndex?: number,
+		expectedNewRootCID?: string,
+	): Promise<{
 		leafCID: string
 		rootCID: string
 		combineResultsCIDs: string[]
@@ -20,7 +24,7 @@ export class MerkleMountainRange {
 			throw new Error(`Expected leafIndex ${this.leafCount} but got ${expectedLeafIndex}`)
 		}
 
-		const { cid: leafCID, } = await encodeBlock(blockData)
+		const { cid: leafCID } = await encodeBlock(blockData)
 
 		let newPeak = leafCID
 		let height = 0
@@ -31,14 +35,14 @@ export class MerkleMountainRange {
 
 		while ((this.leafCount >> height) & 1) {
 			const left = this.peaks.pop()
-			if (!left) throw new Error('MMR structure error: no peak to merge')
+			if (!left) throw new Error("MMR structure error: no peak to merge")
 
 			const { cid: merged, bytes } = await encodeBlock({ L: left, R: newPeak })
 
 			combineResultsCIDs.push(merged.toString())
 			combineResultsData.push(bytes)
 			rightInputsCIDs.push(newPeak.toString())
-			
+
 			newPeak = merged
 			height++
 		}
@@ -54,14 +58,14 @@ export class MerkleMountainRange {
 			throw new Error(`Expected new root CID ${this.leafCount} but got ${expectedNewRootCID}`)
 		}
 
-		return { 
-			leafCID:leafCID.toString(),
+		return {
+			leafCID: leafCID.toString(),
 			rootCID: rootCID.toString(),
 			combineResultsCIDs: combineResultsCIDs,
 			combineResultsData: combineResultsData,
 			rightInputsCIDs: rightInputsCIDs,
 			peakBaggingCIDs: peakBaggingInfo.cids,
-			peakBaggingData: peakBaggingInfo.data
+			peakBaggingData: peakBaggingInfo.data,
 		}
 	}
 
@@ -70,7 +74,7 @@ export class MerkleMountainRange {
 		const data: Uint8Array[] = []
 
 		if (this.peaks.length === 0) {
-			const empty = CID.parse('bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku')
+			const empty = CID.parse("bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku")
 			return { root: empty, cids: [], data: [] }
 		}
 
@@ -88,7 +92,7 @@ export class MerkleMountainRange {
 
 		return { root: current, cids, data }
 	}
-	
+
 	async rootCID(): Promise<CID> {
 		const result = await this.rootCIDWithTrail()
 		return result.root

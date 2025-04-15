@@ -1,13 +1,13 @@
 // pinner/db.ts
 
-import Database from 'better-sqlite3'
-import path from 'path'
-import fs from 'fs'
+import Database from "better-sqlite3"
+import path from "path"
+import fs from "fs"
 
 export function openOrCreateDatabase(dbPath: string): Database.Database {
 	fs.mkdirSync(path.dirname(dbPath), { recursive: true })
 	const db = new Database(dbPath)
-	db.pragma('journal_mode = WAL')
+	db.pragma("journal_mode = WAL")
 	return db
 }
 
@@ -25,7 +25,7 @@ export function createMetaHandlers(db: Database.Database): {
 		},
 		setMeta: (key: string, value: string) => {
 			set.run(key, value)
-		}
+		},
 	}
 }
 

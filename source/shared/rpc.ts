@@ -1,9 +1,5 @@
 // shared/rpc.ts
-export async function retryRpcCall<T>(
-	fn: () => Promise<T>,
-	retries = 3,
-	delayMs = 1000
-): Promise<T> {
+export async function retryRpcCall<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): Promise<T> {
 	for (let attempt = 0; attempt <= retries; attempt++) {
 		try {
 			return await fn()
@@ -13,8 +9,8 @@ export async function retryRpcCall<T>(
 			const jitter = Math.floor(Math.random() * 1000) // random 0-1000ms
 			const wait = backoff + jitter
 			console.warn(`[rpc] Call failed (attempt ${attempt + 1}/${retries}). Retrying in ${wait}ms...`)
-			await new Promise(res => setTimeout(res, wait))
+			await new Promise((res) => setTimeout(res, wait))
 		}
 	}
-	throw new Error('Unreachable')
+	throw new Error("Unreachable")
 }
