@@ -1,0 +1,102 @@
+{
+	"contractAddress": "0xC1144C9dbf6F3489CE9C808a1Da653FB4465403d",
+	"latestCID": "0x01711220a359f3a9e9cbf3dc294c349f84531cb70f40fc79823f2e07795f9f0922f1b6a4",
+	"events": [
+		[
+			{
+				"from": "0xC1144C9dbf6F3489CE9C808a1Da653FB4465403d",
+				"topic": "0xb90f8757fff64801925e43c3fd43e1b6936348dd74bb1769b32bba95e41aeb72",
+				"event": "LeafInsert",
+				"args": {
+					"0": 0,
+					"1": 0,
+					"2": "0xea9fe4042a72481d00b03a3229dc260868dd3fde5e8c167901443858b86741f6",
+					"3": [],
+					"4": [],
+					"leafIndex": 0,
+					"previousInsertBlockNumber": 0,
+					"newData": "0xea9fe4042a72481d00b03a3229dc260868dd3fde5e8c167901443858b86741f6",
+					"combineResults": [],
+					"rightInputs": []
+				}
+			}
+		],
+		[
+			{
+				"from": "0xC1144C9dbf6F3489CE9C808a1Da653FB4465403d",
+				"topic": "0xb90f8757fff64801925e43c3fd43e1b6936348dd74bb1769b32bba95e41aeb72",
+				"event": "LeafInsert",
+				"args": {
+					"0": 1,
+					"1": 84,
+					"2": "0xd6923d2f73cda6461e93454c6f0a9a69dde44a35eeec3e2be5d4f8d9a146d021",
+					"3": [
+						"0x5aedba5f31da7f5be23c2973c26ac5d68bfc506bda36a46d1ad8ff63cbe403c1"
+					],
+					"4": [
+						"0x5ee88910cadcf3ad3e1267fd63fd5cf1a833c21d09c955e3d0c13f6518d24e9e"
+					],
+					"leafIndex": 1,
+					"previousInsertBlockNumber": 84,
+					"newData": "0xd6923d2f73cda6461e93454c6f0a9a69dde44a35eeec3e2be5d4f8d9a146d021",
+					"combineResults": [
+						"0x5aedba5f31da7f5be23c2973c26ac5d68bfc506bda36a46d1ad8ff63cbe403c1"
+					],
+					"rightInputs": [
+						"0x5ee88910cadcf3ad3e1267fd63fd5cf1a833c21d09c955e3d0c13f6518d24e9e"
+					]
+				}
+			}
+		],
+		[
+			{
+				"from": "0xC1144C9dbf6F3489CE9C808a1Da653FB4465403d",
+				"topic": "0xb90f8757fff64801925e43c3fd43e1b6936348dd74bb1769b32bba95e41aeb72",
+				"event": "LeafInsert",
+				"args": {
+					"0": 2,
+					"1": 85,
+					"2": "0xf41d710f0cd25ac07611bc6c6dd4827513a863221702ddfd37e56ea1e1b86ce2",
+					"3": [],
+					"4": [],
+					"leafIndex": 2,
+					"previousInsertBlockNumber": 85,
+					"newData": "0xf41d710f0cd25ac07611bc6c6dd4827513a863221702ddfd37e56ea1e1b86ce2",
+					"combineResults": [],
+					"rightInputs": []
+				}
+			}
+		],
+		[
+			{
+				"from": "0xC1144C9dbf6F3489CE9C808a1Da653FB4465403d",
+				"topic": "0xb90f8757fff64801925e43c3fd43e1b6936348dd74bb1769b32bba95e41aeb72",
+				"event": "LeafInsert",
+				"args": {
+					"0": 3,
+					"1": 86,
+					"2": "0x08bb7025f3e55e103c8f35f9d7f34251e8377e7f7b719390e8dd10027b94b887",
+					"3": [
+						"0x7b3fc74a625a0cf78612fea792c9624282d01a70f0d5fe213bdf3e533fd1014a",
+						"0xa359f3a9e9cbf3dc294c349f84531cb70f40fc79823f2e07795f9f0922f1b6a4"
+					],
+					"4": [
+						"0xc2e1b005642323067f3ed9ffc537221a334f71f854c56c30603623ac29bc10ef",
+						"0x7b3fc74a625a0cf78612fea792c9624282d01a70f0d5fe213bdf3e533fd1014a"
+					],
+					"leafIndex": 3,
+					"previousInsertBlockNumber": 86,
+					"newData": "0x08bb7025f3e55e103c8f35f9d7f34251e8377e7f7b719390e8dd10027b94b887",
+					"combineResults": [
+						"0x7b3fc74a625a0cf78612fea792c9624282d01a70f0d5fe213bdf3e533fd1014a",
+						"0xa359f3a9e9cbf3dc294c349f84531cb70f40fc79823f2e07795f9f0922f1b6a4"
+					],
+					"rightInputs": [
+						"0xc2e1b005642323067f3ed9ffc537221a334f71f854c56c30603623ac29bc10ef",
+						"0x7b3fc74a625a0cf78612fea792c9624282d01a70f0d5fe213bdf3e533fd1014a"
+					]
+				}
+			}
+		]
+	]
+}

@@ -5,6 +5,8 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
+		"test": "vitest",
+		"coverage": "vitest run --coverage"
 	},
 	"author": "",
 	"license": "MIT",
@@ -21,6 +23,8 @@
 	"devDependencies": {
 		"@types/better-sqlite3": "^7.6.13",
 		"@types/node": "^22.14.1",
-		"@vitest/ui": "^3.1.1"
+		"@vitest/coverage-v8": "^3.1.1",
+		"@vitest/ui": "^3.1.1",
+		"vitest": "^3.1.1"
 	}
 }

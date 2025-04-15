@@ -73,42 +73,6 @@ export class MerkleMountainRange {
 		}
 	}
 
-	private async _addLeaf(blockData:Uint8Array) {
-		const { cid, } = await this.encodeBlock(blockData)
-		let newPeak = cid
-		let height = 0
-
-		// While the number of trailing 1s in leafCount allows merging
-		while ((this.leafCount >> height) & 1) {
-			const left = this.peaks.pop()
-			if (!left) throw new Error('MMR structure error: no peak to merge')
-
-			const { cid: merged, } = await this.encodeBlock({ L: left, R: newPeak })
-			newPeak = merged
-			height++
-		}
-
-		this.peaks.push(newPeak)
-		this.leafCount++
-	}
-
-	async addLeaf(blockData:Uint8Array, leafIndexHint?: number): Promise<CID> {
-		if (leafIndexHint) { // optional check to ensure leaves are being inserted in the proper order
-			if (this.leafCount !== leafIndexHint) {
-				throw new Error(`Expected leaf with index ${this.leafCount} but got leafIndexHint ${leafIndexHint}`)
-			}
-		}
-		await this._addLeaf(blockData)
-		return await this.rootCID()
-	}
-
-	async addLeaves(blockData: Uint8Array[]): Promise<CID> {
-		for (const leaf of blockData) {
-			await this._addLeaf(leaf)
-		}
-		return await this.rootCID()
-	}
-
 	async rootCIDWithTrail(): Promise<{ root: CID; cids: string[]; data: Uint8Array[] }> {
 		const cids: string[] = []
 		const data: Uint8Array[] = []
@@ -134,20 +98,7 @@ export class MerkleMountainRange {
 	}
 	
 	async rootCID(): Promise<CID> {
-		if (this.peaks.length === 0) {
-			return CID.parse('bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku') // canonical empty block
-		}
-
-		if (this.peaks.length === 1) {
-			return this.peaks[0]
-		}
-
-		let current = this.peaks[0]
-		for (let i = 1; i < this.peaks.length; i++) {
-			const { cid, } = await this.encodeBlock({ L: current, R: this.peaks[i] })
-			current = cid
-		}
-
-		return current
+		const result = await this.rootCIDWithTrail()
+		return result.root
 	}
 }

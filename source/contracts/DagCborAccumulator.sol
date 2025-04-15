@@ -114,7 +114,7 @@ contract DagCborAccumulator {
 		}
 
 		emit LeafInsert(
-			uint32((bits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK) + 1,
+			uint32((bits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK),
 			uint32((bits >> PREVIOUS_INSERT_BLOCKNUM_OFFSET) & PREVIOUS_INSERT_BLOCKNUM_MASK),
 			newData,
 			finalCombineResults,
@@ -131,8 +131,9 @@ contract DagCborAccumulator {
 		bits |= uint256(peakCount + 1) << PEAK_COUNT_OFFSET;
 
 		// Update leaf count
+		uint256 currentLeafCount = (bits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK;
 		bits &= ~(LEAF_COUNT_MASK << LEAF_COUNT_OFFSET);
-		bits |= (uint256((bits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK) + 1) << LEAF_COUNT_OFFSET;
+		bits |= (currentLeafCount + 1) << LEAF_COUNT_OFFSET;
 
 		// Store current block number in mmrMetaBits
 		bits &= ~(PREVIOUS_INSERT_BLOCKNUM_MASK << PREVIOUS_INSERT_BLOCKNUM_OFFSET); // clear
