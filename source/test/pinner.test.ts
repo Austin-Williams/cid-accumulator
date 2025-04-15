@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 describe("Pinner", () => {
-	let Pinner: any;
-
 	beforeEach(async () => {
 		// Reset module registry and mocks for each test
 		vi.resetModules();

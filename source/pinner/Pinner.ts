@@ -16,7 +16,7 @@ import fs from "fs"
 export class Pinner {
 	public provider!: ethers.JsonRpcProvider
 	public contract!: ethers.Contract
-	private contractAddress!: string
+	public contractAddress!: string
 	public db!: Database.Database
 	public mmr = new MerkleMountainRange()
 
