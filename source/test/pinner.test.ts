@@ -1,6 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 describe("Pinner", () => {
+	it("prepareDB should call rebuildLocalDagForContiguousLeaves if highestContiguousLeafIndex returns a number", async () => {
+		const { Pinner } = await import("../pinner/Pinner.ts");
+		const pinner = new Pinner();
+		const mockRebuild = vi.fn();
+		pinner.highestContiguousLeafIndex = vi.fn(() => 5);
+		pinner.rebuildLocalDagForContiguousLeaves = mockRebuild;
+		await pinner.prepareDB();
+		expect(pinner.syncedToLeafIndex).toBe(5);
+		expect(mockRebuild).toHaveBeenCalledWith(0, 5);
+	});
+
+	it("prepareDB should set syncedToLeafIndex to 0 if highestContiguousLeafIndex returns null", async () => {
+		const { Pinner } = await import("../pinner/Pinner.ts");
+		const pinner = new Pinner();
+		const mockRebuild = vi.fn();
+		pinner.highestContiguousLeafIndex = vi.fn(() => null);
+		pinner.rebuildLocalDagForContiguousLeaves = mockRebuild;
+		await pinner.prepareDB();
+		expect(pinner.syncedToLeafIndex).toBe(0);
+		expect(mockRebuild).not.toHaveBeenCalled();
+	});
 	beforeEach(async () => {
 		// Reset module registry and mocks for each test
 		vi.resetModules();

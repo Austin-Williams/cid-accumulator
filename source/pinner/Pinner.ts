@@ -19,6 +19,7 @@ export class Pinner {
 	public contractAddress!: string
 	public db!: Database.Database
 	public mmr = new MerkleMountainRange()
+	public syncedToLeafIndex!: number | null
 
 	constructor() {}
 
@@ -78,10 +79,24 @@ export class Pinner {
 		}
 		setMeta("deployBlockNumber", String(deployBlockNumber))
 
+		console.log('[pinner] Pinner created. Pinner must have its DB prepared before use.', pinner)
+
 		return pinner
 	}
 
+	async prepareDB(): Promise<void> {
+		// Rebuild local DAG for contiguous leaves
+		this.syncedToLeafIndex = this.highestContiguousLeafIndex()
+
+		if (this.syncedToLeafIndex !== null) {
+			await this.rebuildLocalDagForContiguousLeaves(0, this.syncedToLeafIndex)
+		} else {
+			this.syncedToLeafIndex = 0
+		}
+	}
+
 	async rebuildLocalDagForContiguousLeaves(startLeaf = 0, endLeaf = this.highestContiguousLeafIndex()): Promise<void> {
+		console.log(`[pinner] Rebuilding local DAG for contiguous leaves from ${startLeaf} to ${endLeaf}`)
 		await rebuildLocalDagForContiguousLeaves(this, startLeaf, endLeaf)
 	}
 
