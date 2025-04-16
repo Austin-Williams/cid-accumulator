@@ -5,39 +5,20 @@ import { ethers } from "ethers"
 import { getAccumulatorData } from "../shared/accumulator.js"
 
 async function main() {
-	// prompt user for target contract and provider url
-	let contractAddress = process.env.TARGET_CONTRACT_ADDRESS?.trim()
-	if (!contractAddress) {
-		console.log("No TARGET_CONTRACT_ADDRESS found in environment variables.")
-		contractAddress = await promptUserChoice("Enter the target contract address: ", [], false)
-	} else {
-		console.log(`Using contract address from environment variable: ${contractAddress}`)
-	}
-	if (!(contractAddress && contractAddress.startsWith("0x") && contractAddress.length === 42)) {
-		throw new Error("Invalid Ethereum address.")
-	}
-
-	let providerUrl = process.env.RPC_PROVIDER_URL?.trim()
-	if (!providerUrl) {
-		console.log("No RPC_PROVIDER_URL found in environment variables.")
-		providerUrl = await promptUserChoice("Enter the provider URL (default: 'http://127.0.0.1:8545'): ", [], false)
-		providerUrl = providerUrl.trim() || "http://127.0.0.1:8545"
-	} else {
-		console.log(`Using provider URL from environment variable: ${providerUrl}`)
-	}
-
-	// set up the pinner
-	const provider = new ethers.JsonRpcProvider(providerUrl)
+	const { contractAddress, provider } = await getContractAddressAndProvider()
 	const pinner = await Pinner.init(contractAddress, provider)
-	await pinner.initialize() 
+	await pinner.initialize()
 	console.log(`Pinner has synced up to leaf index ${pinner.syncedToLeafIndex}`)
+	await handlePinnerSyncMenu(pinner, provider, contractAddress)
+}
 
+async function handlePinnerSyncMenu(pinner: Pinner, provider: ethers.JsonRpcProvider, contractAddress: string) {
 	// see how far ahead the accumulator is from the pinner
 	const accData = await getAccumulatorData(provider, contractAddress)
 	console.log(`Latest leaf index on-chain: ${accData.leafCount}`)
 	console.log(`You are ${accData.leafCount - (pinner.syncedToLeafIndex ?? 0)} behind.`)
 
-	if (pinner.syncedToLeafIndex! < accData.leafCount) {
+	if ((pinner.syncedToLeafIndex ?? 0) < accData.leafCount) {
 		const answer = await promptUserChoice(
 			"Options:\n" +
 				"1. Sync from here\n" +
@@ -68,6 +49,31 @@ async function main() {
 	} else {
 		// TODO: Start watching for new events
 	}
+}
+
+async function getContractAddressAndProvider() {
+	let contractAddress = process.env.TARGET_CONTRACT_ADDRESS?.trim()
+	if (!contractAddress) {
+		console.log("No TARGET_CONTRACT_ADDRESS found in environment variables.")
+		contractAddress = await promptUserChoice("Enter the target contract address: ", [], false)
+	} else {
+		console.log(`Using contract address from environment variable: ${contractAddress}`)
+	}
+	if (!(contractAddress && contractAddress.startsWith("0x") && contractAddress.length === 42)) {
+		throw new Error("Invalid Ethereum address.")
+	}
+
+	let providerUrl = process.env.RPC_PROVIDER_URL?.trim()
+	if (!providerUrl) {
+		console.log("No RPC_PROVIDER_URL found in environment variables.")
+		providerUrl = await promptUserChoice("Enter the provider URL (default: 'http://127.0.0.1:8545'): ", [], false)
+		providerUrl = providerUrl.trim() || "http://127.0.0.1:8545"
+	} else {
+		console.log(`Using provider URL from environment variable: ${providerUrl}`)
+	}
+
+	const provider = new ethers.JsonRpcProvider(providerUrl)
+	return { contractAddress, provider }
 }
 
 main()

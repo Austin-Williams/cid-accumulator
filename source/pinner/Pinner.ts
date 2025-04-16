@@ -40,7 +40,7 @@ export class Pinner {
 		const labelBytes = new TextEncoder().encode(label)
 		const labelHash = bytesToHex(keccak_256(labelBytes)).slice(0, 8)
 
-		console.log(`[pinner] Creating pinner for contract ${normalizedAddress} on chainId ${chainId}`)
+		console.log(`[pinner] Initializing pinner for contract ${normalizedAddress} on chainId ${chainId}`)
 
 		const dbPath = path.join(".pinner", `pinner-${labelHash}.db`)
 		console.log(`[pinner] Looking for DB at path: ${dbPath}`)
@@ -80,29 +80,83 @@ export class Pinner {
 		}
 		setMeta("deployBlockNumber", String(deployBlockNumber))
 
-		console.log("[pinner] Pinner created. You MUST call this.initialize() before use.")
+		console.log('[pinner] Initializing...')
+		const highestContiguousLeafIndex = pinner.highestContiguousLeafIndex();
+		if (typeof highestContiguousLeafIndex === 'number' && highestContiguousLeafIndex >= 0) {
+			await pinner.rebuildLocalDag(0, highestContiguousLeafIndex)
+			console.log(`[pinner] Pinner initialized. Synced to leaf index ${pinner.syncedToLeafIndex}. Total leaves synced: ${pinner.syncedToLeafIndex + 1}`)
+		} else {
+			console.log(`[pinner] Pinner initialized. No leaves synced.`)
+		}
 
 		return pinner
 	}
 
-	async initialize(): Promise<void> {
-		console.log('[pinner] Initializing...')
-		const highestContiguousLeafIndex = this.highestContiguousLeafIndex();
-		if (typeof highestContiguousLeafIndex === 'number' && highestContiguousLeafIndex >= 0) {
-			await this.rebuildLocalDag(0, highestContiguousLeafIndex)
-			console.log(`[pinner] Pinner initialized. Synced to leaf index ${this.syncedToLeafIndex}. Total leaves synced: ${this.syncedToLeafIndex + 1}`)
-		} else {
-			console.log(`[pinner] Pinner initialized. No leaves synced.`)
+	/**
+	 * Rebuilds and verifies the local Directed Acyclic Graph (DAG) for the pinner's Merkle Mountain Range (MMR)
+	 * between the specified leaf indices (inclusive).
+	 *
+	 * This method is typically called during initialization or resynchronization to ensure that the local state
+	 * matches the on-chain accumulator. It will throw an error if the arguments are invalid (e.g., endLeaf is null/undefined,
+	 * or startLeaf > endLeaf).
+	 *
+	 * @param startLeaf - The starting leaf index (inclusive) for rebuilding the DAG.
+	 * @param endLeaf - The ending leaf index (inclusive) for rebuilding the DAG.
+	 * @throws {Error} If endLeaf is null/undefined or startLeaf > endLeaf.
+	 *
+	 * Example usage:
+	 *   await pinner.rebuildLocalDag(0, 100)
+	 */
+	async rebuildLocalDag(startLeaf: number, endLeaf: number): Promise<void> {
+		if (endLeaf === null || endLeaf === undefined || startLeaf > endLeaf) {
+			throw new Error("[pinner] endLeaf must be a number and startLeaf must be less than or equal to endLeaf.")
+		}
+	
+		console.log(`[pinner] Rebuilding and verifying local DAG from ${endLeaf - startLeaf} synced leaves.`)
+	
+		const select = this.db.prepare(
+			`SELECT data, cid, root_cid, combine_results, right_inputs FROM leaf_events WHERE leaf_index = ?`,
+		)
+1
+		for (let leafIndex = startLeaf; leafIndex <= endLeaf; leafIndex++) {
+			const row = select.get(leafIndex) as
+				| {
+						data: Buffer
+						cid?: string
+						root_cid?: string
+						combine_results?: string
+						right_inputs?: string
+						block_number?: number
+						previous_insert_block?: number
+					}
+				| undefined
+	
+			if (!row) {
+				console.warn(`[pinner] Leaf index ${leafIndex} missing from DB unexpectedly.`)
+				continue
+			}
+	
+			const data = new Uint8Array(row.data)
+			const blockNumber = row.block_number ?? undefined
+			const previousInsertBlockNumber = row.previous_insert_block ?? undefined
+
+			await this.processLeafEvent({
+				leafIndex: leafIndex,
+				data: data,
+				blockNumber: blockNumber,
+				previousInsertBlockNumber: previousInsertBlockNumber,
+			})
+
+			const computedRootCIDString = (await this.mmr.rootCID()).toString()
+	
+			if (row.root_cid !== computedRootCIDString) {
+				throw new Error(
+					`Integrity check failed at leafIndex ${leafIndex}: DB had rootCID: ${row.root_cid}, computed rootCID is: ${computedRootCIDString}`,
+				)
+			}
 		}
 	}
 
-	async rebuildLocalDag(startLeaf: number, endLeaf: number): Promise<void> {
-		await rebuildLocalDag(this, startLeaf, endLeaf)
-	}
-
-	async getAccumulatorData(): Promise<AccumulatorMetadata> {
-		return await getAccumulatorData(this.provider, this.contractAddress)
-	}
 
 	/**
 	 * Processes a new leaf event from the blockchain:
@@ -121,12 +175,17 @@ export class Pinner {
 	 */
 	async processLeafEvent(params: {
 		leafIndex: number
-		blockNumber?: number
 		data: Uint8Array
+		blockNumber?: number
 		previousInsertBlockNumber?: number
 	}): Promise<void> {
 		const { leafIndex, blockNumber, data, previousInsertBlockNumber } = params
-
+		/** TODO: check that the leafIndex matches the current syncedToLeafIndex + 1
+		*		if it does not, then try to follow the previousInsertBlockNumber chain back to 
+		* 	leadfIndex + 1 and then replay forward to here.
+		* 	If that walkback fails, throw an error here.
+		* This will make this function much more robust when processing live events.
+		*/
 		const {
 			leafCID,
 			rootCID,

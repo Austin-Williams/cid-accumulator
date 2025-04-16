@@ -72,7 +72,6 @@ async function main() {
 		process.exit(1)
 	}
 
-	const submissions: Array<{ randomBytes: string; txHash: string }> = []
 	for (let i = 0; i < numLeaves; i++) {
 		if (i > 0) {
 			console.log(`Waiting ${DELAY_SECONDS} seconds before next submission...`)
@@ -86,22 +85,23 @@ async function main() {
 		console.log(`[${i + 1}/${numLeaves}] Submitted tx:`, tx.hash)
 		await tx.wait()
 		console.log(`[${i + 1}/${numLeaves}] Transaction confirmed.`)
-		submissions.push({ randomBytes: Buffer.from(randomBytes).toString("hex"), txHash: tx.hash })
+		const submission = { randomBytes: Buffer.from(randomBytes).toString("hex"), txHash: tx.hash }
+
+		// Immediately append to JSON file after each successful submission
+		let existingData: any[] = []
+		try {
+			const fileContent = await fs.readFile(OUTPUT_PATH, "utf8")
+			existingData = JSON.parse(fileContent)
+			if (!Array.isArray(existingData)) existingData = []
+		} catch (err) {
+			// File doesn't exist or is invalid, start fresh
+			existingData = []
+		}
+		existingData.push(submission)
+		await fs.writeFile(OUTPUT_PATH, JSON.stringify(existingData, null, 2))
 	}
 
-	// Append new data to submitted-data.json instead of overwriting
-	let existingData: any[] = []
-	try {
-		const fileContent = await fs.readFile(OUTPUT_PATH, "utf8")
-		existingData = JSON.parse(fileContent)
-		if (!Array.isArray(existingData)) existingData = []
-	} catch (err) {
-		// File doesn't exist or is invalid, start fresh
-		existingData = []
-	}
-	const allData = existingData.concat(submissions)
-	await fs.writeFile(OUTPUT_PATH, JSON.stringify(allData, null, 2))
-	console.log(`All random data and tx hashes saved to ${OUTPUT_PATH}`)
+	console.log('Finished submitting random data.')
 }
 
 main().catch((e) => {
