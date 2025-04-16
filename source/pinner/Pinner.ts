@@ -14,6 +14,14 @@ import path from "path"
 import fs from "fs"
 
 export class Pinner {
+  /**
+   * Retrieves accumulator data from the chain for this pinner's provider and contractAddress.
+   */
+  async getAccumulatorData() {
+    // Importing here for easier mocking in tests
+    const { getAccumulatorData } = await import("../shared/accumulator.ts")
+    return getAccumulatorData(this.provider, this.contractAddress)
+  }
 	public provider!: ethers.JsonRpcProvider
 	public contract!: ethers.Contract
 	public contractAddress!: string
@@ -107,56 +115,12 @@ export class Pinner {
 	 * Example usage:
 	 *   await pinner.rebuildLocalDag(0, 100)
 	 */
+
 	async rebuildLocalDag(startLeaf: number, endLeaf: number): Promise<void> {
-		if (endLeaf === null || endLeaf === undefined || startLeaf > endLeaf) {
-			throw new Error("[pinner] endLeaf must be a number and startLeaf must be less than or equal to endLeaf.")
-		}
-	
-		console.log(`[pinner] Rebuilding and verifying local DAG from ${endLeaf - startLeaf} synced leaves.`)
-	
-		const select = this.db.prepare(
-			`SELECT data, cid, root_cid, combine_results, right_inputs FROM leaf_events WHERE leaf_index = ?`,
-		)
-1
-		for (let leafIndex = startLeaf; leafIndex <= endLeaf; leafIndex++) {
-			const row = select.get(leafIndex) as
-				| {
-						data: Buffer
-						cid?: string
-						root_cid?: string
-						combine_results?: string
-						right_inputs?: string
-						block_number?: number
-						previous_insert_block?: number
-					}
-				| undefined
-	
-			if (!row) {
-				console.warn(`[pinner] Leaf index ${leafIndex} missing from DB unexpectedly.`)
-				continue
-			}
-	
-			const data = new Uint8Array(row.data)
-			const blockNumber = row.block_number ?? undefined
-			const previousInsertBlockNumber = row.previous_insert_block ?? undefined
-
-			await this.processLeafEvent({
-				leafIndex: leafIndex,
-				data: data,
-				blockNumber: blockNumber,
-				previousInsertBlockNumber: previousInsertBlockNumber,
-			})
-
-			const computedRootCIDString = (await this.mmr.rootCID()).toString()
-	
-			if (row.root_cid !== computedRootCIDString) {
-				throw new Error(
-					`Integrity check failed at leafIndex ${leafIndex}: DB had rootCID: ${row.root_cid}, computed rootCID is: ${computedRootCIDString}`,
-				)
-			}
-		}
+	  // Delegate to the imported function for testability
+	  const { rebuildLocalDag } = await import("./sync.ts")
+	  return rebuildLocalDag(this, startLeaf, endLeaf)
 	}
-
 
 	/**
 	 * Processes a new leaf event from the blockchain:

@@ -7,8 +7,6 @@ import { getAccumulatorData } from "../shared/accumulator.js"
 async function main() {
 	const { contractAddress, provider } = await getContractAddressAndProvider()
 	const pinner = await Pinner.init(contractAddress, provider)
-	await pinner.initialize()
-	console.log(`Pinner has synced up to leaf index ${pinner.syncedToLeafIndex}`)
 	await handlePinnerSyncMenu(pinner, provider, contractAddress)
 }
 
