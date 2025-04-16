@@ -1,26 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 describe("Pinner", () => {
-	it("prepareDB should call rebuildLocalDagForContiguousLeaves if highestContiguousLeafIndex returns a number", async () => {
+	it("initialize should call rebuildLocalDag if highestContiguousLeafIndex returns a number > 0", async () => {
 		const { Pinner } = await import("../source/pinner/Pinner.ts")
 		const pinner = new Pinner()
 		pinner.syncedToLeafIndex = 0 // Ensure initialized for tests
 		const mockRebuild = vi.fn()
 		pinner.highestContiguousLeafIndex = vi.fn(() => 5)
-		pinner.rebuildLocalDagForContiguousLeaves = mockRebuild
-		await pinner.prepareDB()
-		expect(pinner.syncedToLeafIndex).toBe(5)
+		pinner.rebuildLocalDag = mockRebuild
+		await pinner.initialize()
+		expect(pinner.syncedToLeafIndex).toBe(0)
 		expect(mockRebuild).toHaveBeenCalledWith(0, 5)
-	})
+	});
 
-	it("prepareDB should set syncedToLeafIndex to 0 if highestContiguousLeafIndex returns null", async () => {
+	it("initialize should NOT call rebuildLocalDag if highestContiguousLeafIndex returns -1", async () => {
+		const { Pinner } = await import("../source/pinner/Pinner.ts")
+		const pinner = new Pinner()
+		pinner.syncedToLeafIndex = 0 // Ensure initialized for tests
+		const mockRebuild = vi.fn()
+		pinner.highestContiguousLeafIndex = vi.fn(() => -1)
+		pinner.rebuildLocalDag = mockRebuild
+		await pinner.initialize()
+		expect(pinner.syncedToLeafIndex).toBe(0)
+		expect(mockRebuild).not.toHaveBeenCalled()
+	});
+
+	it("initialize should set syncedToLeafIndex to 0 if highestContiguousLeafIndex returns null", async () => {
 		const { Pinner } = await import("../source/pinner/Pinner.ts")
 		const pinner = new Pinner()
 		pinner.syncedToLeafIndex = 0 // Ensure initialized for tests
 		const mockRebuild = vi.fn()
 		pinner.highestContiguousLeafIndex = vi.fn(() => null)
-		pinner.rebuildLocalDagForContiguousLeaves = mockRebuild
-		await pinner.prepareDB()
+		pinner.rebuildLocalDag = mockRebuild
+		await pinner.initialize()
 		expect(pinner.syncedToLeafIndex).toBe(0)
 		expect(mockRebuild).not.toHaveBeenCalled()
 	})
@@ -328,17 +340,17 @@ describe("Pinner", () => {
 		})
 	})
 
-	describe("rebuildLocalDagForContiguousLeaves", () => {
-		it("should call rebuildLocalDagForContiguousLeaves with correct args", async () => {
+	describe("rebuildLocalDag", () => {
+		it("should call rebuildLocalDag with correct args", async () => {
 			const mockRebuild = vi.fn().mockResolvedValue(undefined)
 			vi.doMock("../source/pinner/sync.ts", () => ({
-				rebuildLocalDagForContiguousLeaves: mockRebuild,
+				rebuildLocalDag: mockRebuild,
 				__esModule: true,
 			}))
 			const { Pinner } = await import("../source/pinner/Pinner.ts")
 			const pinner = new Pinner()
 			pinner.highestContiguousLeafIndex = vi.fn().mockReturnValue(5)
-			await pinner.rebuildLocalDagForContiguousLeaves(1, 4)
+			await pinner.rebuildLocalDag(1, 4)
 			expect(mockRebuild).toHaveBeenCalledWith(pinner, 1, 4)
 		})
 	})

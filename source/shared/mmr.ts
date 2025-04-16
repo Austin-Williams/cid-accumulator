@@ -7,6 +7,21 @@ export class MerkleMountainRange {
 
 	constructor() {}
 
+	/**
+	 * Adds a new leaf to the Merkle Mountain Range (MMR) and computes all intermediate nodes.
+	 * IT DOES NOT STORE THE RESULT IN THE DB, because the MMR does not have access to the DB
+	 * @param blockData - The raw data for the new leaf node to be added.
+	 * @param expectedLeafIndex - (Optional) If provided, throws if the new leaf index does not match this value.
+	 * @param expectedNewRootCID - (Optional) If provided, throws if the resulting root CID does not match this value after insertion.
+	 * @returns An object containing:
+	 *   - leafCID: The CID of the newly added leaf.
+	 *   - rootCID: The new root CID after insertion.
+	 *   - combineResultsCIDs: CIDs of all internal nodes combined during this insertion.
+	 *   - combineResultsData: The raw data of all combined internal nodes.
+	 *   - rightInputsCIDs: CIDs of right-side inputs used during peak bagging.
+	 *   - peakBaggingCIDs: CIDs of all peaks bagged to compute the new root.
+	 *   - peakBaggingData: The raw data of all peaks bagged to compute the new root.
+	 */
 	async addLeafWithTrail(
 		blockData: Uint8Array,
 		expectedLeafIndex?: number,

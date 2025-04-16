@@ -4,7 +4,7 @@ import { bytesToHex } from "@noble/hashes/utils"
 
 import { MerkleMountainRange } from "../shared/mmr.ts"
 import { MINIMAL_ACCUMULATOR_ABI } from "../shared/constants.ts"
-import { rebuildLocalDagForContiguousLeaves } from "./sync.ts"
+import { rebuildLocalDag } from "./sync.ts"
 import { AccumulatorMetadata } from "../shared/types.ts"
 import { getAccumulatorData } from "../shared/accumulator.ts"
 import { initializeSchema, openOrCreateDatabase, createMetaHandlers } from "./db.ts"
@@ -19,12 +19,13 @@ export class Pinner {
 	public contractAddress!: string
 	public db!: Database.Database
 	public mmr = new MerkleMountainRange()
-	public syncedToLeafIndex!: number | null
+	public syncedToLeafIndex!: number
 
 	constructor() {}
 
 	static async init(contractAddress: string, provider: ethers.JsonRpcProvider): Promise<Pinner> {
 		const pinner = new Pinner()
+		pinner.syncedToLeafIndex = -1
 
 		pinner.provider = provider
 		const normalizedAddress = contractAddress.toLowerCase()
@@ -39,7 +40,7 @@ export class Pinner {
 		const labelBytes = new TextEncoder().encode(label)
 		const labelHash = bytesToHex(keccak_256(labelBytes)).slice(0, 8)
 
-		console.log(`[pinner] Initializing for contract ${normalizedAddress} on chainId ${chainId}`)
+		console.log(`[pinner] Creating pinner for contract ${normalizedAddress} on chainId ${chainId}`)
 
 		const dbPath = path.join(".pinner", `pinner-${labelHash}.db`)
 		console.log(`[pinner] Looking for DB at path: ${dbPath}`)
@@ -79,31 +80,45 @@ export class Pinner {
 		}
 		setMeta("deployBlockNumber", String(deployBlockNumber))
 
-		console.log("[pinner] Pinner created. Pinner must have its DB prepared before use.")
+		console.log("[pinner] Pinner created. You MUST call this.initialize() before use.")
 
 		return pinner
 	}
 
-	async prepareDB(): Promise<void> {
-		// Rebuild local DAG for contiguous leaves
-		this.syncedToLeafIndex = this.highestContiguousLeafIndex()
-
-		if (this.syncedToLeafIndex !== null) {
-			await this.rebuildLocalDagForContiguousLeaves(0, this.syncedToLeafIndex)
+	async initialize(): Promise<void> {
+		console.log('[pinner] Initializing...')
+		const highestContiguousLeafIndex = this.highestContiguousLeafIndex();
+		if (typeof highestContiguousLeafIndex === 'number' && highestContiguousLeafIndex >= 0) {
+			await this.rebuildLocalDag(0, highestContiguousLeafIndex)
+			console.log(`[pinner] Pinner initialized. Synced to leaf index ${this.syncedToLeafIndex}. Total leaves synced: ${this.syncedToLeafIndex + 1}`)
 		} else {
-			this.syncedToLeafIndex = 0
+			console.log(`[pinner] Pinner initialized. No leaves synced.`)
 		}
 	}
 
-	async rebuildLocalDagForContiguousLeaves(startLeaf = 0, endLeaf = this.highestContiguousLeafIndex()): Promise<void> {
-		console.log(`[pinner] Rebuilding local DAG for contiguous leaves from ${startLeaf} to ${endLeaf}`)
-		await rebuildLocalDagForContiguousLeaves(this, startLeaf, endLeaf)
+	async rebuildLocalDag(startLeaf: number, endLeaf: number): Promise<void> {
+		await rebuildLocalDag(this, startLeaf, endLeaf)
 	}
 
 	async getAccumulatorData(): Promise<AccumulatorMetadata> {
 		return await getAccumulatorData(this.provider, this.contractAddress)
 	}
 
+	/**
+	 * Processes a new leaf event from the blockchain:
+	 * - Calls MerkleMountainRange.addLeafWithTrail to add a new leaf to the MMR and get all intermediate node CIDs and data..
+	 * - Persists the resulting CIDs and associated data (leaf, combineResults, peaks, etc.) in the DB.
+	 * - Stores the blockNumber and previousInsertBlockNumber (if available) for provenance.
+	 * - Increments syncedToLeafIndex if successful.
+	 *
+	 * This is the ONLY function in the codebase allowed to increment this.syncedToLeafIndex.
+	 * 
+	 * @param params - The event data including:
+	 *   - leafIndex: The expected index for the new leaf.
+	 *   - blockNumber: (Optional) The block number associated with this leaf event.
+	 *   - data: The raw data for the new leaf.
+	 *   - previousInsertBlockNumber: (Optional) The block number of the previous insert event.
+	 */
 	async processLeafEvent(params: {
 		leafIndex: number
 		blockNumber?: number

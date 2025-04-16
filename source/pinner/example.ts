@@ -29,7 +29,7 @@ async function main() {
 	// set up the pinner
 	const provider = new ethers.JsonRpcProvider(providerUrl)
 	const pinner = await Pinner.init(contractAddress, provider)
-	await pinner.prepareDB()
+	await pinner.initialize() 
 	console.log(`Pinner has synced up to leaf index ${pinner.syncedToLeafIndex}`)
 
 	// see how far ahead the accumulator is from the pinner
@@ -58,7 +58,6 @@ async function main() {
 		if (answer === "1") {
 			console.log("Syncing from current index...")
 			// TODO: Add sync logic here
-			// Example: await pinner.syncForward(/* args */)
 		} else if (answer === "2") {
 			console.log("Checking for more recent data on IPFS...")
 			// TODO: Add IPFS check logic here

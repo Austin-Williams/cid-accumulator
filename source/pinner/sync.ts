@@ -3,14 +3,13 @@ import { decodeLeafInsert } from "../shared/codec.ts"
 import { retryRpcCall } from "../shared/rpc.ts"
 import { Pinner } from "./Pinner.ts"
 
-export async function rebuildLocalDagForContiguousLeaves(
+export async function rebuildLocalDag(
 	pinner: Pinner,
-	startLeaf = 0,
-	endLeaf = pinner.highestContiguousLeafIndex(),
+	startLeaf: number,
+	endLeaf: number | null,
 ): Promise<void> {
-	if (endLeaf === null || startLeaf > endLeaf) {
-		console.log("[pinner] No synced leaves to verify.")
-		return
+	if (endLeaf === null || endLeaf === undefined || startLeaf > endLeaf) {
+		throw new Error("[pinner] endLeaf must be a number and startLeaf must be less than or equal to endLeaf.")
 	}
 
 	console.log(`[pinner] Rebuilding and verifying local DAG from ${endLeaf - startLeaf} synced leaves.`)

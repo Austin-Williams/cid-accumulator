@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { rebuildLocalDagForContiguousLeaves, syncForward } from "../source/pinner/sync.ts"
+import { rebuildLocalDag, syncForward } from "../source/pinner/sync.ts"
 
 vi.mock("../source/shared/rpc.ts", () => ({
 	retryRpcCall: vi.fn(),
@@ -16,7 +16,7 @@ const decodeLeafInsert = _decodeLeafInsert as unknown as ReturnType<typeof vi.fn
 
 let pinner: any
 
-describe("rebuildLocalDagForContiguousLeaves", () => {
+describe("rebuildLocalDag", () => {
 	it("should skip update and insert if all row fields are present (needsUpdate false)", async () => {
 		const insertIntermediate = { run: vi.fn() }
 		const metaInsert = { run: vi.fn() }
@@ -54,7 +54,7 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 			mmr,
 			highestContiguousLeafIndex: vi.fn(() => 0),
 		}
-		await rebuildLocalDagForContiguousLeaves(pinner, 0, 0)
+		await rebuildLocalDag(pinner, 0, 0)
 		expect(update.run).not.toHaveBeenCalled()
 		expect(insertIntermediate.run).not.toHaveBeenCalled()
 	})
@@ -100,7 +100,7 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 			peakBaggingData: [new Uint8Array([2]), new Uint8Array([3])],
 		})
 		select.get.mockReturnValue({ data: Buffer.from([1]), root_cid: "root" })
-		await rebuildLocalDagForContiguousLeaves(pinner, 0, 0)
+		await rebuildLocalDag(pinner, 0, 0)
 		expect(insertIntermediate.run).toHaveBeenCalledWith("pb1", new Uint8Array([2]))
 		expect(insertIntermediate.run).toHaveBeenCalledWith("pb2", new Uint8Array([3]))
 	})
@@ -108,7 +108,7 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 	// --- NEW TEST: rootCID integrity check error ---
 	it("should throw if rootCID does not match", async () => {
 		select.get.mockReturnValue({ data: Buffer.from([1]), root_cid: "notroot" })
-		await expect(rebuildLocalDagForContiguousLeaves(pinner, 0, 0)).rejects.toThrow(
+		await expect(rebuildLocalDag(pinner, 0, 0)).rejects.toThrow(
 			"Integrity check failed at leafIndex 0: expected rootCID notroot, got root",
 		)
 	})
@@ -149,32 +149,25 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 		}
 	})
 
-	it("should skip if endLeaf is null", async () => {
-		pinner.highestContiguousLeafIndex = vi.fn(() => null)
-		const spy = vi.spyOn(console, "log").mockImplementation(() => {})
-		await rebuildLocalDagForContiguousLeaves(pinner)
-		expect(spy).toHaveBeenCalledWith("[pinner] No synced leaves to verify.")
-		spy.mockRestore()
-	})
+	it("should throw if endLeaf is null", async () => {
+		await expect(rebuildLocalDag(pinner, 0, null)).rejects.toThrow("[pinner] endLeaf must be a number and startLeaf must be less than or equal to endLeaf.");
+	});
 
-	it("should skip if startLeaf > endLeaf", async () => {
-		const spy = vi.spyOn(console, "log").mockImplementation(() => {})
-		await rebuildLocalDagForContiguousLeaves(pinner, 2, 1)
-		expect(spy).toHaveBeenCalledWith("[pinner] No synced leaves to verify.")
-		spy.mockRestore()
-	})
+	it("should throw if startLeaf > endLeaf", async () => {
+		await expect(rebuildLocalDag(pinner, 2, 1)).rejects.toThrow("[pinner] endLeaf must be a number and startLeaf must be less than or equal to endLeaf.");
+	});
 
 	it("should warn if leaf is missing", async () => {
 		select.get.mockReturnValue(undefined)
 		const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
-		await rebuildLocalDagForContiguousLeaves(pinner, 0, 0)
+		await rebuildLocalDag(pinner, 0, 0)
 		expect(warn).toHaveBeenCalledWith("[pinner] Leaf index 0 missing from DB unexpectedly.")
 		warn.mockRestore()
 	})
 
 	it("should update and insert intermediates if needed", async () => {
 		select.get.mockReturnValue({ data: Buffer.from([1]), root_cid: "root" })
-		await rebuildLocalDagForContiguousLeaves(pinner, 0, 0)
+		await rebuildLocalDag(pinner, 0, 0)
 		expect(update.run).toHaveBeenCalled()
 		expect(insertIntermediate.run).toHaveBeenCalledWith("c1", new Uint8Array([1]))
 	})
