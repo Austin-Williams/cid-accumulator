@@ -2,9 +2,12 @@ import 'dotenv/config'
 import { ethers } from 'ethers'
 import fs from 'fs/promises'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
-const CONTRACT_ABI_PATH = path.resolve(__dirname, '../source/contracts/abi/OwnedExample.json')
-const CONTRACT_BIN_PATH = path.resolve(__dirname, '../source/contracts/abi/OwnedExample.bin')
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+const CONTRACT_ARTIFACT_PATH = path.resolve(__dirname, '../out/OwnedExample.sol/OwnedExample.json')
 const OUTPUT_PATH = path.resolve(__dirname, './deployed-owned-example.json')
 
 async function main() {
@@ -14,18 +17,35 @@ async function main() {
     throw new Error('Missing env: RPC_PROVIDER_URL or MNEMONIC_FOR_SUBMITTER')
   }
 
-  const abi = JSON.parse(await fs.readFile(CONTRACT_ABI_PATH, 'utf8'))
-  let bytecode: string
+  // Read Foundry artifact for OwnedExample
+  let artifact: any
   try {
-    bytecode = (await fs.readFile(CONTRACT_BIN_PATH, 'utf8')).trim()
+    artifact = JSON.parse(await fs.readFile(CONTRACT_ARTIFACT_PATH, 'utf8'))
   } catch {
-    throw new Error('Missing OwnedExample.bin (compiled bytecode). Please compile the contract.')
+    throw new Error('Missing OwnedExample.sol/OwnedExample.json (Foundry artifact). Please compile the contract.')
+  }
+  const abi = artifact.abi
+  const bytecode = artifact.bytecode?.object
+  if (!abi || !bytecode) {
+    throw new Error('ABI or bytecode not found in Foundry artifact.')
   }
 
   const provider = new ethers.JsonRpcProvider(providerUrl)
   const wallet = ethers.Wallet.fromPhrase(mnemonic).connect(provider)
   const factory = new ethers.ContractFactory(abi, bytecode, wallet)
 
+  // Prompt user for confirmation before deploying
+  const { promptUserChoice } = await import('../source/shared/userPrompt.js')
+  const confirm = await promptUserChoice(
+    'About to deploy OwnedExample. Proceed? (yes/no): ',
+    ['yes', 'no'],
+    true
+  )
+  if (confirm.toLowerCase() !== 'yes') {
+    console.log('Aborting deployment.')
+    process.exit(1)
+  }
+	
   console.log('Deploying OwnedExample...')
   const contract = await factory.deploy()
   await contract.waitForDeployment()
