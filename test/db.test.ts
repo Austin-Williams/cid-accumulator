@@ -36,18 +36,18 @@ describe("db.ts", () => {
 		initializeSchema(db)
 
 		// Check that tables exist by querying sqlite_master
-		const tables = (db.prepare(
-			"SELECT name FROM sqlite_master WHERE type='table'"
-		).all() as { name: string }[]).map(row => row.name)
+		const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]).map(
+			(row) => row.name,
+		)
 
 		expect(tables).toContain("leaf_events")
 		expect(tables).toContain("intermediate_nodes")
 		expect(tables).toContain("meta")
 
 		// Check indexes
-		const indexes = (db.prepare(
-			"SELECT name FROM sqlite_master WHERE type='index'"
-		).all() as { name: string }[]).map(row => row.name)
+		const indexes = (db.prepare("SELECT name FROM sqlite_master WHERE type='index'").all() as { name: string }[]).map(
+			(row) => row.name,
+		)
 
 		expect(indexes).toContain("idx_block_number")
 		expect(indexes).toContain("idx_root_cid")
@@ -56,4 +56,3 @@ describe("db.ts", () => {
 		db.close()
 	})
 })
-

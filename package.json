@@ -7,7 +7,8 @@
 	"scripts": {
 		"test": "vitest",
 		"coverage": "vitest run --coverage",
-		"lint": "eslint --fix source/"
+		"lint": "eslint --fix source/ integration/ test/",
+		"format": "prettier --write 'source/**/*.{js,ts,tsx}' 'integration/**/*.{js,ts,tsx}' 'test/**/*.{js,ts,tsx}'"
 	},
 	"author": "",
 	"license": "MIT",

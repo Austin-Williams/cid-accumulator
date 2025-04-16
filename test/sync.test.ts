@@ -21,20 +21,22 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 		const insertIntermediate = { run: vi.fn() }
 		const metaInsert = { run: vi.fn() }
 		const update = { run: vi.fn() }
-		const select = { get: vi.fn().mockReturnValue({
-			data: Buffer.from([1]),
-			cid: "cid",
-			root_cid: "root",
-			combine_results: "something",
-			right_inputs: "somethingElse"
-		}) }
+		const select = {
+			get: vi.fn().mockReturnValue({
+				data: Buffer.from([1]),
+				cid: "cid",
+				root_cid: "root",
+				combine_results: "something",
+				right_inputs: "somethingElse",
+			}),
+		}
 		const db = {
 			prepare: vi.fn((sql: string) => {
 				if (sql.startsWith("SELECT")) return select
 				if (sql.startsWith("UPDATE")) return update
 				if (sql.startsWith("INSERT OR REPLACE INTO meta")) return metaInsert
 				if (sql.startsWith("INSERT")) return insertIntermediate
-			})
+			}),
 		}
 		const mmr = {
 			addLeafWithTrail: vi.fn().mockResolvedValue({
@@ -45,12 +47,12 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 				combineResultsData: [new Uint8Array([1])],
 				peakBaggingCIDs: [],
 				peakBaggingData: [],
-			})
+			}),
 		}
 		const pinner = {
 			db,
 			mmr,
-			highestContiguousLeafIndex: vi.fn(() => 0)
+			highestContiguousLeafIndex: vi.fn(() => 0),
 		}
 		await rebuildLocalDagForContiguousLeaves(pinner, 0, 0)
 		expect(update.run).not.toHaveBeenCalled()
@@ -66,7 +68,7 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 				if (sql.startsWith("SELECT")) return select
 				if (sql.startsWith("UPDATE")) return update
 				if (sql.startsWith("INSERT")) return insertIntermediate
-			})
+			}),
 		}
 		mmr = {
 			addLeafWithTrail: vi.fn().mockResolvedValue({
@@ -77,12 +79,12 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 				combineResultsData: [new Uint8Array([1])],
 				peakBaggingCIDs: [],
 				peakBaggingData: [],
-			})
+			}),
 		}
 		pinner = {
 			db,
 			mmr,
-			highestContiguousLeafIndex: vi.fn(() => 1)
+			highestContiguousLeafIndex: vi.fn(() => 1),
 		}
 	})
 
@@ -106,7 +108,9 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 	// --- NEW TEST: rootCID integrity check error ---
 	it("should throw if rootCID does not match", async () => {
 		select.get.mockReturnValue({ data: Buffer.from([1]), root_cid: "notroot" })
-		await expect(rebuildLocalDagForContiguousLeaves(pinner, 0, 0)).rejects.toThrow("Integrity check failed at leafIndex 0: expected rootCID notroot, got root")
+		await expect(rebuildLocalDagForContiguousLeaves(pinner, 0, 0)).rejects.toThrow(
+			"Integrity check failed at leafIndex 0: expected rootCID notroot, got root",
+		)
 	})
 
 	let pinner: any
@@ -125,7 +129,7 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 				if (sql.startsWith("SELECT")) return select
 				if (sql.startsWith("UPDATE")) return update
 				if (sql.startsWith("INSERT")) return insertIntermediate
-			})
+			}),
 		}
 		mmr = {
 			addLeafWithTrail: vi.fn().mockResolvedValue({
@@ -136,12 +140,12 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 				combineResultsData: [new Uint8Array([1])],
 				peakBaggingCIDs: [],
 				peakBaggingData: [],
-			})
+			}),
 		}
 		pinner = {
 			db,
 			mmr,
-			highestContiguousLeafIndex: vi.fn(() => 1)
+			highestContiguousLeafIndex: vi.fn(() => 1),
 		}
 	})
 
@@ -185,10 +189,10 @@ describe("syncFromEvents", () => {
 		const pinner = { provider, processLeafEvent, contract }
 		retryRpcCall.mockImplementation((fn: any) => {
 			const fnStr = fn.toString()
-			if (fnStr.includes('getBlockNumber')) return Promise.resolve(2)
+			if (fnStr.includes("getBlockNumber")) return Promise.resolve(2)
 			return Promise.resolve([
 				{ blockNumber: 1, logIndex: 0 }, // first log
-				{ blockNumber: 2, logIndex: 1 }  // second log
+				{ blockNumber: 2, logIndex: 1 }, // second log
 			])
 		})
 		// First call: leafIndex < expectedLeafIndex, second call: leafIndex > expectedLeafIndex
@@ -212,10 +216,8 @@ describe("syncFromEvents", () => {
 		const pinner = { provider, processLeafEvent, contract }
 		retryRpcCall.mockImplementation((fn: any) => {
 			const fnStr = fn.toString()
-			if (fnStr.includes('getBlockNumber')) return Promise.resolve(2)
-			return Promise.resolve([
-				{ blockNumber: 1, logIndex: 0 }
-			])
+			if (fnStr.includes("getBlockNumber")) return Promise.resolve(2)
+			return Promise.resolve([{ blockNumber: 1, logIndex: 0 }])
 		})
 		// leafIndex < expectedLeafIndex
 		decodeLeafInsert.mockReturnValue({ leafIndex: 0, previousInsertBlockNumber: 0, newData: "0x00" })
@@ -231,10 +233,8 @@ describe("syncFromEvents", () => {
 		const pinner = { provider, processLeafEvent, contract }
 		retryRpcCall.mockImplementation((fn: any) => {
 			const fnStr = fn.toString()
-			if (fnStr.includes('getBlockNumber')) return Promise.resolve(2)
-			return Promise.resolve([
-				{ blockNumber: 1, logIndex: 0 }
-			])
+			if (fnStr.includes("getBlockNumber")) return Promise.resolve(2)
+			return Promise.resolve([{ blockNumber: 1, logIndex: 0 }])
 		})
 		// leafIndex > expectedLeafIndex
 		decodeLeafInsert.mockReturnValue({ leafIndex: 2, previousInsertBlockNumber: 0, newData: "0x00" })
@@ -251,7 +251,7 @@ describe("syncFromEvents", () => {
 		const spy = vi.spyOn(filters, "LeafInsert")
 		retryRpcCall.mockImplementation((fn: any) => {
 			const fnStr = fn.toString()
-			if (fnStr.includes('getBlockNumber')) {
+			if (fnStr.includes("getBlockNumber")) {
 				return Promise.resolve(1)
 			}
 			// Actually call fn to trigger LeafInsert
@@ -271,27 +271,26 @@ describe("syncFromEvents", () => {
 		processLeafEvent = vi.fn().mockResolvedValue(undefined)
 		pinner = {
 			provider,
-			processLeafEvent
+			processLeafEvent,
 		}
 		// Mock contract.filters.LeafInsert for getLogs
 		pinner.contract = {
 			filters: {
-				LeafInsert: () => ({})
-			}
+				LeafInsert: () => ({}),
+			},
 		}
-
 	})
 
 	it("should process logs in batches", async () => {
 		// Only one batch: mock retryRpcCall to return block number 1 and two logs
 		retryRpcCall.mockImplementation((fn: any) => {
 			const fnStr = fn.toString()
-			if (fnStr.includes('getBlockNumber')) {
+			if (fnStr.includes("getBlockNumber")) {
 				return Promise.resolve(1)
 			}
 			return Promise.resolve([
 				{ blockNumber: 1, data: "0x01" },
-				{ blockNumber: 2, data: "0x02" }
+				{ blockNumber: 2, data: "0x02" },
 			])
 		})
 		decodeLeafInsert
@@ -306,12 +305,12 @@ describe("syncFromEvents", () => {
 		// Only one batch: mock retryRpcCall to return block number 1 and two logs
 		retryRpcCall.mockImplementation((fn: any) => {
 			const fnStr = fn.toString()
-			if (fnStr.includes('getBlockNumber')) {
+			if (fnStr.includes("getBlockNumber")) {
 				return Promise.resolve(1)
 			}
 			return Promise.resolve([
 				{ blockNumber: 1, data: "0x01" },
-				{ blockNumber: 2, data: "0x02" }
+				{ blockNumber: 2, data: "0x02" },
 			])
 		})
 		decodeLeafInsert

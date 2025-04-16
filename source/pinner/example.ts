@@ -1,27 +1,27 @@
-import { promptUserChoice } from '../shared/userPrompt.js'
-import 'dotenv/config'
-import { Pinner } from './Pinner.js'
-import { ethers } from 'ethers'
-import { getAccumulatorData } from '../shared/accumulator.js'
+import { promptUserChoice } from "../shared/userPrompt.js"
+import "dotenv/config"
+import { Pinner } from "./Pinner.js"
+import { ethers } from "ethers"
+import { getAccumulatorData } from "../shared/accumulator.js"
 
 async function main() {
 	// prompt user for target contract and provider url
-	let contractAddress = process.env.TARGET_CONTRACT_ADDRESS?.trim();
+	let contractAddress = process.env.TARGET_CONTRACT_ADDRESS?.trim()
 	if (!contractAddress) {
 		console.log("No TARGET_CONTRACT_ADDRESS found in environment variables.")
-		contractAddress = await promptUserChoice('Enter the target contract address: ', [], false);
+		contractAddress = await promptUserChoice("Enter the target contract address: ", [], false)
 	} else {
 		console.log(`Using contract address from environment variable: ${contractAddress}`)
 	}
-	if (!(contractAddress && contractAddress.startsWith('0x') && contractAddress.length === 42)) {
-		throw new Error('Invalid Ethereum address.');
+	if (!(contractAddress && contractAddress.startsWith("0x") && contractAddress.length === 42)) {
+		throw new Error("Invalid Ethereum address.")
 	}
 
-	let providerUrl = process.env.RPC_PROVIDER_URL?.trim();
+	let providerUrl = process.env.RPC_PROVIDER_URL?.trim()
 	if (!providerUrl) {
 		console.log("No RPC_PROVIDER_URL found in environment variables.")
-		providerUrl = await promptUserChoice("Enter the provider URL (default: 'http://127.0.0.1:8545'): ", [], false);
-		providerUrl = providerUrl.trim() || 'http://127.0.0.1:8545';
+		providerUrl = await promptUserChoice("Enter the provider URL (default: 'http://127.0.0.1:8545'): ", [], false)
+		providerUrl = providerUrl.trim() || "http://127.0.0.1:8545"
 	} else {
 		console.log(`Using provider URL from environment variable: ${providerUrl}`)
 	}
@@ -39,23 +39,23 @@ async function main() {
 
 	if (pinner.syncedToLeafIndex! < accData.leafCount) {
 		const answer = await promptUserChoice(
-			'Options:\n'
-			+ '1. Sync from here\n'
-			+ '2. Check for more recent data pinned to IPFS\n'
-			+ '3. Abort\n'
-			+ 'Enter your choice (1/2/3): ',
-			['1', '2', '3']
+			"Options:\n" +
+				"1. Sync from here\n" +
+				"2. Check for more recent data pinned to IPFS\n" +
+				"3. Abort\n" +
+				"Enter your choice (1/2/3): ",
+			["1", "2", "3"],
 		)
 
-		if (answer === '1') {
-			console.log('Syncing from current index...');
+		if (answer === "1") {
+			console.log("Syncing from current index...")
 			// TODO: Add sync logic here
-		} else if (answer === '2') {
-			console.log('Checking for more recent data on IPFS...');
+		} else if (answer === "2") {
+			console.log("Checking for more recent data on IPFS...")
 			// TODO: Add IPFS check logic here
 		} else {
-			console.log('Aborting operation.');
-			process.exit(0);
+			console.log("Aborting operation.")
+			process.exit(0)
 		}
 	} else {
 		// TODO: Start watching for new events

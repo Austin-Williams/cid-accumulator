@@ -15,7 +15,10 @@ export default [
 			"source/**/*.js",
 			"source/**/*.mjs",
 			"source/**/*.cjs",
+			"integration/**/*.ts",
+			"integration/**/*.js",
 			"test/**/*.ts",
+			"test/**/*.js",
 		],
 		languageOptions: {
 			parser: tsparser,

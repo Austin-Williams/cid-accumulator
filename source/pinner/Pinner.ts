@@ -79,7 +79,7 @@ export class Pinner {
 		}
 		setMeta("deployBlockNumber", String(deployBlockNumber))
 
-		console.log('[pinner] Pinner created. Pinner must have its DB prepared before use.', pinner)
+		console.log("[pinner] Pinner created. Pinner must have its DB prepared before use.")
 
 		return pinner
 	}
