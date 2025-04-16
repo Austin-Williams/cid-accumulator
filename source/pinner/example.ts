@@ -47,9 +47,18 @@ async function main() {
 			["1", "2", "3"],
 		)
 
+		// Confirm user choice before proceeding
+		const { promptYesNo } = await import("../shared/userPrompt.js")
+		const confirmed = await promptYesNo(`You chose option ${answer}. Are you sure you want to proceed?`)
+		if (!confirmed) {
+			console.log("Aborting operation.")
+			process.exit(0)
+		}
+
 		if (answer === "1") {
 			console.log("Syncing from current index...")
 			// TODO: Add sync logic here
+			// Example: await pinner.syncForward(/* args */)
 		} else if (answer === "2") {
 			console.log("Checking for more recent data on IPFS...")
 			// TODO: Add IPFS check logic here

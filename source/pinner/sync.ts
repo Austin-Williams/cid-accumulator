@@ -75,7 +75,7 @@ export async function rebuildLocalDagForContiguousLeaves(
 	setMeta.run("lastSyncedLeafIndex", String(endLeaf))
 }
 
-export async function syncFromEvents(
+export async function syncForward(
 	pinner: Pinner,
 	startBlock: number,
 	lastSyncedLeafIndex: number,

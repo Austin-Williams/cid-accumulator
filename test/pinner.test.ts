@@ -4,6 +4,7 @@ describe("Pinner", () => {
 	it("prepareDB should call rebuildLocalDagForContiguousLeaves if highestContiguousLeafIndex returns a number", async () => {
 		const { Pinner } = await import("../source/pinner/Pinner.ts")
 		const pinner = new Pinner()
+		pinner.syncedToLeafIndex = 0 // Ensure initialized for tests
 		const mockRebuild = vi.fn()
 		pinner.highestContiguousLeafIndex = vi.fn(() => 5)
 		pinner.rebuildLocalDagForContiguousLeaves = mockRebuild
@@ -15,6 +16,7 @@ describe("Pinner", () => {
 	it("prepareDB should set syncedToLeafIndex to 0 if highestContiguousLeafIndex returns null", async () => {
 		const { Pinner } = await import("../source/pinner/Pinner.ts")
 		const pinner = new Pinner()
+		pinner.syncedToLeafIndex = 0 // Ensure initialized for tests
 		const mockRebuild = vi.fn()
 		pinner.highestContiguousLeafIndex = vi.fn(() => null)
 		pinner.rebuildLocalDagForContiguousLeaves = mockRebuild
@@ -127,6 +129,7 @@ describe("Pinner", () => {
 			rootCIDWithTrail: vi.fn(),
 			rootCID: vi.fn(),
 		} as any
+		pinner.syncedToLeafIndex = 42 // Ensure logic matches test
 		await pinner.processLeafEvent({ data: "0x123", leafIndex: 42 } as any)
 
 		// Assert db.prepare called for meta
@@ -163,6 +166,7 @@ describe("Pinner", () => {
 			rootCID: vi.fn(),
 		} as any
 		pinner.db = { prepare } as any
+		pinner.syncedToLeafIndex = 99 // Ensure logic matches test
 		await pinner.processLeafEvent({ data: "0x123", leafIndex: 99 } as any)
 		expect(prepare).toHaveBeenCalledWith(expect.stringContaining("INSERT OR REPLACE INTO meta"))
 		expect(runMeta).toHaveBeenCalledWith("lastSyncedLeafIndex", "99")
@@ -244,6 +248,7 @@ describe("Pinner", () => {
 			const run = vi.fn()
 			const prepare = vi.fn(() => ({ run }))
 			const pinner = await Pinner.init("0xabc", { getNetwork: vi.fn().mockResolvedValue({ chainId: 123 }) } as any)
+			pinner.syncedToLeafIndex = 1 // Ensure logic matches leafIndex
 			pinner.mmr = {
 				addLeafWithTrail: vi.fn().mockResolvedValue({
 					leafCID: "cid",
@@ -270,6 +275,7 @@ describe("Pinner", () => {
 			const run = vi.fn()
 			const prepare = vi.fn(() => ({ run }))
 			const pinner = await Pinner.init("0xabc", { getNetwork: vi.fn().mockResolvedValue({ chainId: 123 }) } as any)
+			pinner.syncedToLeafIndex = 99 // Ensure logic matches leafIndex
 			const combineResultsCIDs = ["cid1", "cid2"]
 			const combineResultsData = ["data1", "data2"]
 			const peakBaggingCIDs = ["cid3"]
@@ -337,20 +343,20 @@ describe("Pinner", () => {
 		})
 	})
 
-	describe("syncFromEvents", () => {
-		it("should call syncFromEvents with correct arguments", async () => {
-			const syncFromEventsMock = vi.fn()
+	describe("syncForward", () => {
+		it("should call syncForward with correct arguments", async () => {
+			const syncForwardMock = vi.fn()
 			vi.doMock("../source/pinner/sync.ts", () => ({
-				syncFromEvents: syncFromEventsMock,
+				syncForward: syncForwardMock,
 				__esModule: true,
 			}))
 
 			const { Pinner } = await import("../source/pinner/Pinner.ts")
 			const pinner = new Pinner()
 
-			await pinner.syncFromEvents(10, 5, 100, 2)
+			await pinner.syncForward(10, 5, 100, 2)
 
-			expect(syncFromEventsMock).toHaveBeenCalledWith(pinner, 10, 5, 100, 2)
+			expect(syncForwardMock).toHaveBeenCalledWith(pinner, 10, 5, 100, 2)
 		})
 	})
 

@@ -12,6 +12,6 @@ describe("pinner/index.ts", () => {
 		expect(pinner).toBeInstanceOf(pinnerIndex.Pinner)
 
 		// Check that a function from sync.ts is present
-		expect(typeof pinnerIndex.syncFromEvents).toBe("function")
+		expect(typeof pinnerIndex.syncForward).toBe("function")
 	})
 })

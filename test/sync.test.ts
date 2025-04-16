@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { rebuildLocalDagForContiguousLeaves, syncFromEvents } from "../source/pinner/sync.ts"
+import { rebuildLocalDagForContiguousLeaves, syncForward } from "../source/pinner/sync.ts"
 
 vi.mock("../source/shared/rpc.ts", () => ({
 	retryRpcCall: vi.fn(),
@@ -180,7 +180,7 @@ describe("rebuildLocalDagForContiguousLeaves", () => {
 	})
 })
 
-describe("syncFromEvents", () => {
+describe("syncForward", () => {
 	it("should skip and then throw if logs have leafIndex < and > expectedLeafIndex in one batch (full branch coverage)", async () => {
 		const provider = { getBlockNumber: vi.fn().mockResolvedValue(2), getLogs: vi.fn() }
 		const processLeafEvent = vi.fn()
@@ -202,7 +202,7 @@ describe("syncFromEvents", () => {
 			if (callCount === 1) return { leafIndex: 0, previousInsertBlockNumber: 0, newData: "0x00" }
 			if (callCount === 2) return { leafIndex: 2, previousInsertBlockNumber: 0, newData: "0x00" }
 		})
-		await expect(syncFromEvents(pinner as any, 0, 0, 2)).rejects.toThrow("LeafIndex gap detected")
+		await expect(syncForward(pinner as any, 0, 0, 2)).rejects.toThrow("LeafIndex gap detected")
 		// First log is skipped, second throws, processLeafEvent is never called
 		expect(processLeafEvent).not.toHaveBeenCalled()
 	})
@@ -221,7 +221,7 @@ describe("syncFromEvents", () => {
 		})
 		// leafIndex < expectedLeafIndex
 		decodeLeafInsert.mockReturnValue({ leafIndex: 0, previousInsertBlockNumber: 0, newData: "0x00" })
-		await syncFromEvents(pinner as any, 0, 0, 2)
+		await syncForward(pinner as any, 0, 0, 2)
 		expect(processLeafEvent).not.toHaveBeenCalled()
 	})
 
@@ -238,7 +238,7 @@ describe("syncFromEvents", () => {
 		})
 		// leafIndex > expectedLeafIndex
 		decodeLeafInsert.mockReturnValue({ leafIndex: 2, previousInsertBlockNumber: 0, newData: "0x00" })
-		await expect(syncFromEvents(pinner as any, 0, 0, 2)).rejects.toThrow("LeafIndex gap detected")
+		await expect(syncForward(pinner as any, 0, 0, 2)).rejects.toThrow("LeafIndex gap detected")
 	})
 
 	// --- NEW TEST: contract filter object for getLogs ---
@@ -257,7 +257,7 @@ describe("syncFromEvents", () => {
 			// Actually call fn to trigger LeafInsert
 			return Promise.resolve(fn())
 		})
-		await syncFromEvents(pinner as any, 0, -1, 2)
+		await syncForward(pinner as any, 0, -1, 2)
 		expect(spy).toHaveBeenCalled()
 		expect(provider.getLogs).toHaveBeenCalledWith({ foo: "bar", fromBlock: 0, toBlock: 1 })
 	})
@@ -297,7 +297,7 @@ describe("syncFromEvents", () => {
 			.mockReturnValueOnce({ leafIndex: 0, previousInsertBlockNumber: 1, newData: "0x01", blockNumber: 1 })
 			.mockReturnValueOnce({ leafIndex: 1, previousInsertBlockNumber: 2, newData: "0x02", blockNumber: 2 })
 
-		await syncFromEvents(pinner, 0, -1, 2)
+		await syncForward(pinner, 0, -1, 2)
 		expect(processLeafEvent).toHaveBeenCalledTimes(2)
 	})
 
@@ -317,6 +317,6 @@ describe("syncFromEvents", () => {
 			.mockReturnValueOnce({ leafIndex: 0, previousInsertBlockNumber: 1, newData: "0x01", blockNumber: 1 })
 			.mockReturnValueOnce({ leafIndex: 2, previousInsertBlockNumber: 2, newData: "0x02", blockNumber: 2 }) // gap!
 
-		await expect(syncFromEvents(pinner, 0, -1, 2)).rejects.toThrow("LeafIndex gap detected")
+		await expect(syncForward(pinner, 0, -1, 2)).rejects.toThrow("LeafIndex gap detected")
 	})
 })

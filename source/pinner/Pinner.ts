@@ -4,7 +4,7 @@ import { bytesToHex } from "@noble/hashes/utils"
 
 import { MerkleMountainRange } from "../shared/mmr.ts"
 import { MINIMAL_ACCUMULATOR_ABI } from "../shared/constants.ts"
-import { rebuildLocalDagForContiguousLeaves, syncFromEvents } from "./sync.ts"
+import { rebuildLocalDagForContiguousLeaves } from "./sync.ts"
 import { AccumulatorMetadata } from "../shared/types.ts"
 import { getAccumulatorData } from "../shared/accumulator.ts"
 import { initializeSchema, openOrCreateDatabase, createMetaHandlers } from "./db.ts"
@@ -166,15 +166,26 @@ export class Pinner {
 		setMeta.run("lastSyncedLeafIndex", String(leafIndex))
 
 		console.log(`[pinner] Processed and inserted leaf ${leafIndex}`)
+		if (this.syncedToLeafIndex == null) {
+			throw new Error("syncedToLeafIndex is null in processLeafEvent. This should never happen.")
+		}
+
+		// Verify that leafIndex === this.syncedToLeafIndex and throw if not
+		if (leafIndex !== this.syncedToLeafIndex) {
+			throw new Error(`leafIndex (${leafIndex}) !== syncedToLeafIndex (${this.syncedToLeafIndex}) in processLeafEvent. This indicates a logic error.`)
+		}
+
+		this.syncedToLeafIndex++
 	}
 
-	async syncFromEvents(
+	async syncForward(
 		startBlock: number,
 		lastSyncedLeafIndex: number,
 		logBatchSize?: number,
 		throttleSeconds?: number,
 	): Promise<void> {
-		return syncFromEvents(this, startBlock, lastSyncedLeafIndex, logBatchSize, throttleSeconds)
+		const { syncForward } = await import("./sync.ts")
+		return syncForward(this, startBlock, lastSyncedLeafIndex, logBatchSize, throttleSeconds)
 	}
 
 	// Returns the highest leafIndex N such that all leafIndexes [0...N]
