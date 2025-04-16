@@ -127,7 +127,7 @@ describe("Pinner", () => {
 			rootCIDWithTrail: vi.fn(),
 			rootCID: vi.fn(),
 		} as any
-		pinner.syncedToLeafIndex = 42 // Ensure logic matches test
+		pinner.syncedToLeafIndex = 41 // Set to leafIndex - 1 to match increment logic
 		await pinner.processLeafEvent({ data: "0x123", leafIndex: 42 } as any)
 
 		// Assert db.prepare called for meta
@@ -170,7 +170,7 @@ describe("Pinner", () => {
 			rootCID: vi.fn(),
 		} as any
 		pinner.db = { prepare } as any
-		pinner.syncedToLeafIndex = 99 // Ensure logic matches test
+		pinner.syncedToLeafIndex = 98 // Set to leafIndex - 1 to match increment logic
 		await pinner.processLeafEvent({ data: "0x123", leafIndex: 99 } as any)
 		expect(prepare).toHaveBeenCalledWith(expect.stringContaining("INSERT OR REPLACE INTO meta"))
 		expect(runMeta).toHaveBeenCalledWith("lastSyncedLeafIndex", "99")
@@ -325,9 +325,9 @@ describe("Pinner", () => {
 			const { Pinner } = await import("../source/pinner/Pinner.ts")
 			const pinner = new Pinner()
 
-			await pinner.syncForward(10, 5, 100, 2)
+			await pinner.syncForward(10, 5, 100)
 
-			expect(syncForwardMock).toHaveBeenCalledWith(pinner, 10, 5, 100, 2)
+			expect(syncForwardMock).toHaveBeenCalledWith(pinner, 10, 5, 100)
 		})
 	})
 

@@ -7,46 +7,47 @@ import { getAccumulatorData } from "../shared/accumulator.js"
 async function main() {
 	const { contractAddress, provider } = await getContractAddressAndProvider()
 	const pinner = await Pinner.init(contractAddress, provider)
-	await handlePinnerSyncMenu(pinner, provider, contractAddress)
+	const userChoice = await handlePinnerSyncMenu(pinner, provider, contractAddress)
+	switch (userChoice) {
+		case 'abort':
+			console.log("Aborting operation.")
+			return
+		case 'sync forward':
+			// TODO: get latest block number from provider
+			// Then syncForward await pinner.syncForward(provider, contractAddress)
+			return
+		case 'check ipfs':
+			// TODO
+			return
+		case 'process live events':
+			// TODO
+			return
+	}
 }
 
-async function handlePinnerSyncMenu(pinner: Pinner, provider: ethers.JsonRpcProvider, contractAddress: string) {
+async function handlePinnerSyncMenu(pinner: Pinner, provider: ethers.JsonRpcProvider, contractAddress: string): Promise<'abort' | 'sync forward' | 'check ipfs' | 'process live events'> {
 	// see how far ahead the accumulator is from the pinner
 	const accData = await getAccumulatorData(provider, contractAddress)
 	console.log(`Latest leaf index on-chain: ${accData.leafCount}`)
 	console.log(`You are ${accData.leafCount - (pinner.syncedToLeafIndex ?? 0)} behind.`)
 
-	if ((pinner.syncedToLeafIndex ?? 0) < accData.leafCount) {
-		const answer = await promptUserChoice(
-			"Options:\n" +
-				"1. Sync from here\n" +
-				"2. Check for more recent data pinned to IPFS\n" +
-				"3. Abort\n" +
-				"Enter your choice (1/2/3): ",
-			["1", "2", "3"],
-		)
-
-		// Confirm user choice before proceeding
-		const { promptYesNo } = await import("../shared/userPrompt.js")
-		const confirmed = await promptYesNo(`You chose option ${answer}. Are you sure you want to proceed?`)
-		if (!confirmed) {
-			console.log("Aborting operation.")
-			process.exit(0)
-		}
-
-		if (answer === "1") {
-			console.log("Syncing from current index...")
-			// TODO: Add sync logic here
-		} else if (answer === "2") {
-			console.log("Checking for more recent data on IPFS...")
-			// TODO: Add IPFS check logic here
-		} else {
-			console.log("Aborting operation.")
-			process.exit(0)
-		}
-	} else {
-		// TODO: Start watching for new events
-	}
+	const answer = await promptUserChoice(
+		"Options:\n" +
+			"1. Sync from here\n" +
+			"2. Check for more recent data pinned to IPFS\n" +
+			"3. Start processing live events\n" +
+			"4. Abort\n" +
+			"Enter your choice (1/2/3/4): ",
+		["1", "2", "3", "4"],
+	)
+	// Confirm user choice before proceeding
+	const { promptYesNo } = await import("../shared/userPrompt.js")
+	const confirmed = await promptYesNo(`You chose option ${answer}. Are you sure you want to proceed?`)
+	if (!confirmed || answer == '4') return 'abort'
+	if (answer == '1') return 'sync forward'
+	if (answer == '2') return 'check ipfs'
+	if (answer == '3') return 'process live events'
+	return 'abort'
 }
 
 async function getContractAddressAndProvider() {

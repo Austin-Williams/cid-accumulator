@@ -48,7 +48,7 @@ export async function promptUserChoice(
 			console.log(`Invalid input. Acceptable values are: ${acceptableValues.join(", ")}`)
 			if (abortOnInvalid) {
 				rl.close()
-				console.log("Aborting.")
+				console.log("Invalid input. Aborting.")
 				process.exit(1)
 			}
 			// Otherwise, re-prompt

@@ -4,9 +4,6 @@ import { bytesToHex } from "@noble/hashes/utils"
 
 import { MerkleMountainRange } from "../shared/mmr.ts"
 import { MINIMAL_ACCUMULATOR_ABI } from "../shared/constants.ts"
-import { rebuildLocalDag } from "./sync.ts"
-import { AccumulatorMetadata } from "../shared/types.ts"
-import { getAccumulatorData } from "../shared/accumulator.ts"
 import { initializeSchema, openOrCreateDatabase, createMetaHandlers } from "./db.ts"
 
 import Database from "better-sqlite3"
@@ -144,7 +141,17 @@ export class Pinner {
 		previousInsertBlockNumber?: number
 	}): Promise<void> {
 		const { leafIndex, blockNumber, data, previousInsertBlockNumber } = params
-		/** TODO: check that the leafIndex matches the current syncedToLeafIndex + 1
+		// TODO: This will be the next thing we work on.
+		// we'll start by making a simple function (in shared/) that tries to retreive the log for a given index,
+		// and takes in an optional previousInsertBlockNumber param.
+		// Then we'll create another function (also in shared) that will call that repeatedly to walk back
+		// along the previousInsertBlockNumber chain until we reach the desired leafIndex (and throw if we 
+		// can't walk back along that chain for any reason). This function should return an array of those logs
+		// in order from oldest to newest.
+		// Then this current function that we are in now (processLeafEvent) will walk through that array and 
+		// and call processLeafEvent for each log.
+		// Lets be sure to do good console logging in this process so we can debug if needed.
+		/** TODO: check that the leafIndex matches this.syncedToLeafIndex + 1
 		*		if it does not, then try to follow the previousInsertBlockNumber chain back to 
 		* 	leadfIndex + 1 and then replay forward to here.
 		* 	If that walkback fails, throw an error here.
@@ -208,27 +215,27 @@ export class Pinner {
 			throw new Error("syncedToLeafIndex is null in processLeafEvent. This should never happen.")
 		}
 
+		this.syncedToLeafIndex++
+
 		// Verify that leafIndex === this.syncedToLeafIndex and throw if not
 		if (leafIndex !== this.syncedToLeafIndex) {
-			throw new Error(`leafIndex (${leafIndex}) !== syncedToLeafIndex (${this.syncedToLeafIndex}) in processLeafEvent. This indicates a logic error.`)
+			throw new Error(`[pinner] leafIndex (${leafIndex}) !== syncedToLeafIndex (${this.syncedToLeafIndex}) in processLeafEvent. This indicates a logic error.`)
 		}
-
-		this.syncedToLeafIndex++
 	}
 
+	// TODO: I think this is finished. Need to test it now using real data.
 	async syncForward(
 		startBlock: number,
-		lastSyncedLeafIndex: number,
 		logBatchSize?: number,
 		throttleSeconds?: number,
 	): Promise<void> {
 		const { syncForward } = await import("./sync.ts")
-		return syncForward(this, startBlock, lastSyncedLeafIndex, logBatchSize, throttleSeconds)
+		return syncForward(this, startBlock, logBatchSize, throttleSeconds)
 	}
 
 	// Returns the highest leafIndex N such that all leafIndexes [0...N]
 	// are present in the DB with no gaps.
-	// This does NOT guarantee that intermediate or root CIDs are present,
+	// This does NOT guarantee that intermediate or root CIDs are present in the DB,
 	// nor that the DAG structure has been resolved.
 	highestContiguousLeafIndex(): number | null {
 		const rows = this.db

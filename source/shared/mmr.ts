@@ -9,7 +9,7 @@ export class MerkleMountainRange {
 
 	/**
 	 * Adds a new leaf to the Merkle Mountain Range (MMR) and computes all intermediate nodes.
-	 * IT DOES NOT STORE THE RESULT IN THE DB, because the MMR does not have access to the DB
+	 * IT DOES NOT STORE THE RESULT IN THE DB, because the MMR is not concerned with the DB
 	 * @param blockData - The raw data for the new leaf node to be added.
 	 * @param expectedLeafIndex - (Optional) If provided, throws if the new leaf index does not match this value.
 	 * @param expectedNewRootCID - (Optional) If provided, throws if the resulting root CID does not match this value after insertion.

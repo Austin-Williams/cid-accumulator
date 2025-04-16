@@ -15,73 +15,39 @@ export async function rebuildLocalDag(
 	console.log(`[pinner] Rebuilding and verifying local DAG from ${endLeaf - startLeaf} synced leaves.`)
 
 	const select = pinner.db.prepare(
-		`SELECT data, cid, root_cid, combine_results, right_inputs FROM leaf_events WHERE leaf_index = ?`,
+		`SELECT data, block_number, previous_insert_block FROM leaf_events WHERE leaf_index = ?`,
 	)
-	const update = pinner.db.prepare(
-		`UPDATE leaf_events SET cid = ?, root_cid = ?, combine_results = ?, right_inputs = ? WHERE leaf_index = ?`,
-	)
-	const insertIntermediate = pinner.db.prepare(`INSERT OR IGNORE INTO intermediate_nodes (cid, data) VALUES (?, ?)`)
 
 	for (let leafIndex = startLeaf; leafIndex <= endLeaf; leafIndex++) {
 		const row = select.get(leafIndex) as
 			| {
 					data: Buffer
-					cid?: string
-					root_cid?: string
-					combine_results?: string
-					right_inputs?: string
+					block_number?: number
+					previous_insert_block?: number
 			  }
 			| undefined
 
 		if (!row) {
-			console.warn(`[pinner] Leaf index ${leafIndex} missing from DB unexpectedly.`)
-			continue
+			throw new Error(`[pinner] Leaf index ${leafIndex} missing from DB unexpectedly.`)
 		}
 
 		const data = new Uint8Array(row.data)
-		const {
-			leafCID,
-			rootCID,
-			combineResultsCIDs,
-			rightInputsCIDs,
-			combineResultsData,
-			peakBaggingCIDs,
-			peakBaggingData,
-		} = await pinner.mmr.addLeafWithTrail(data, leafIndex)
-
-		const needsUpdate = !row.cid || !row.root_cid || !row.combine_results || !row.right_inputs
-
-		if (needsUpdate) {
-			update.run(leafCID, rootCID, JSON.stringify(combineResultsCIDs), JSON.stringify(rightInputsCIDs), leafIndex)
-			console.log(`[pinner] Updated leaf ${leafIndex} with CID and DAG info.`)
-
-			for (let i = 0; i < combineResultsCIDs.length; i++) {
-				insertIntermediate.run(combineResultsCIDs[i], combineResultsData[i])
-			}
-			for (let i = 0; i < peakBaggingCIDs.length; i++) {
-				insertIntermediate.run(peakBaggingCIDs[i], peakBaggingData[i])
-			}
-		}
-
-		if (row.root_cid !== rootCID) {
-			throw new Error(
-				`Integrity check failed at leafIndex ${leafIndex}: expected rootCID ${row.root_cid}, got ${rootCID}`,
-			)
-		}
+		const blockNumber = row.block_number ?? undefined	
+		const previousInsertBlockNumber = row.previous_insert_block ?? undefined
+		const params = {leafIndex, data, blockNumber, previousInsertBlockNumber}
+		await pinner.processLeafEvent(params)
 	}
-
-	const setMeta = pinner.db.prepare(`INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)`)
-	setMeta.run("lastSyncedLeafIndex", String(endLeaf))
+	console.log(`[pinner] Rebuilt and verified local DAG from leafIndex ${startLeaf} to ${endLeaf}.`)
 }
 
 export async function syncForward(
 	pinner: Pinner,
 	startBlock: number,
-	lastSyncedLeafIndex: number,
 	logBatchSize?: number,
 	throttleSeconds?: number,
 ): Promise<void> {
 	const latestBlock = await retryRpcCall(() => pinner.provider.getBlockNumber())
+	console.log(`[pinner] Syncing forward from block ${startBlock} to ${latestBlock}...`)
 	const batchSize = logBatchSize ?? 10000
 
 	for (let from = startBlock; from <= latestBlock; from += batchSize) {
@@ -97,13 +63,12 @@ export async function syncForward(
 			}),
 		)
 
-		let expectedLeafIndex = lastSyncedLeafIndex + 1
 		for (const log of logs) {
 			const { leafIndex, previousInsertBlockNumber, newData } = decodeLeafInsert(log)
 
-			if (leafIndex < expectedLeafIndex) continue
-			if (leafIndex > expectedLeafIndex) {
-				throw new Error(`[pinner] LeafIndex gap detected. Expected ${expectedLeafIndex}, got ${leafIndex}`)
+			if (leafIndex < pinner.syncedToLeafIndex + 1) continue
+			if (leafIndex > pinner.syncedToLeafIndex + 1) {
+				throw new Error(`[pinner] LeafIndex gap detected. Expected ${pinner.syncedToLeafIndex + 1}, got ${leafIndex}`)
 			}
 
 			await pinner.processLeafEvent({
@@ -112,7 +77,7 @@ export async function syncForward(
 				data: new Uint8Array(Buffer.from(newData.slice(2), "hex")),
 				previousInsertBlockNumber,
 			})
-			expectedLeafIndex++
 		}
 	}
+	console.log(`[pinner] Synced up to block ${latestBlock}.`)
 }
