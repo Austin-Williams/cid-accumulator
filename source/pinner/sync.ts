@@ -3,11 +3,7 @@ import { decodeLeafInsert } from "../shared/codec.ts"
 import { retryRpcCall } from "../shared/rpc.ts"
 import { Pinner } from "./Pinner.ts"
 
-export async function rebuildLocalDag(
-	pinner: Pinner,
-	startLeaf: number,
-	endLeaf: number | null,
-): Promise<void> {
+export async function rebuildLocalDag(pinner: Pinner, startLeaf: number, endLeaf: number | null): Promise<void> {
 	if (endLeaf === null || endLeaf === undefined || startLeaf > endLeaf) {
 		throw new Error("[pinner] endLeaf must be a number and startLeaf must be less than or equal to endLeaf.")
 	}
@@ -32,9 +28,9 @@ export async function rebuildLocalDag(
 		}
 
 		const data = new Uint8Array(row.data)
-		const blockNumber = row.block_number ?? undefined	
+		const blockNumber = row.block_number ?? undefined
 		const previousInsertBlockNumber = row.previous_insert_block ?? undefined
-		const params = {leafIndex, data, blockNumber, previousInsertBlockNumber}
+		const params = { leafIndex, data, blockNumber, previousInsertBlockNumber }
 		await pinner.processLeafEvent(params)
 	}
 	console.log(`[pinner] Rebuilt and verified local DAG from leafIndex ${startLeaf} to ${endLeaf}.`)

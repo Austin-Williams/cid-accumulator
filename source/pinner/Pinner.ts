@@ -9,16 +9,17 @@ import { initializeSchema, openOrCreateDatabase, createMetaHandlers } from "./db
 import Database from "better-sqlite3"
 import path from "path"
 import fs from "fs"
+import { walkBackLeafInsertLogsOrThrow } from "../shared/logs.ts"
 
 export class Pinner {
-  /**
-   * Retrieves accumulator data from the chain for this pinner's provider and contractAddress.
-   */
-  async getAccumulatorData() {
-    // Importing here for easier mocking in tests
-    const { getAccumulatorData } = await import("../shared/accumulator.ts")
-    return getAccumulatorData(this.provider, this.contractAddress)
-  }
+	/**
+	 * Retrieves accumulator data from the chain for this pinner's provider and contractAddress.
+	 */
+	async getAccumulatorData() {
+		// Importing here for easier mocking in tests
+		const { getAccumulatorData } = await import("../shared/accumulator.ts")
+		return getAccumulatorData(this.provider, this.contractAddress)
+	}
 	public provider!: ethers.JsonRpcProvider
 	public contract!: ethers.Contract
 	public contractAddress!: string
@@ -85,11 +86,13 @@ export class Pinner {
 		}
 		setMeta("deployBlockNumber", String(deployBlockNumber))
 
-		console.log('[pinner] Initializing...')
-		const highestContiguousLeafIndex = pinner.highestContiguousLeafIndex();
-		if (typeof highestContiguousLeafIndex === 'number' && highestContiguousLeafIndex >= 0) {
+		console.log("[pinner] Initializing...")
+		const highestContiguousLeafIndex = pinner.highestContiguousLeafIndex()
+		if (typeof highestContiguousLeafIndex === "number" && highestContiguousLeafIndex >= 0) {
 			await pinner.rebuildLocalDag(0, highestContiguousLeafIndex)
-			console.log(`[pinner] Pinner initialized. Synced to leaf index ${pinner.syncedToLeafIndex}. Total leaves synced: ${pinner.syncedToLeafIndex + 1}`)
+			console.log(
+				`[pinner] Pinner initialized. Synced to leaf index ${pinner.syncedToLeafIndex}. Total leaves synced: ${pinner.syncedToLeafIndex + 1}`,
+			)
 		} else {
 			console.log(`[pinner] Pinner initialized. No leaves synced.`)
 		}
@@ -114,9 +117,9 @@ export class Pinner {
 	 */
 
 	async rebuildLocalDag(startLeaf: number, endLeaf: number): Promise<void> {
-	  // Delegate to the imported function for testability
-	  const { rebuildLocalDag } = await import("./sync.ts")
-	  return rebuildLocalDag(this, startLeaf, endLeaf)
+		// Delegate to the imported function for testability
+		const { rebuildLocalDag } = await import("./sync.ts")
+		return rebuildLocalDag(this, startLeaf, endLeaf)
 	}
 
 	/**
@@ -127,12 +130,12 @@ export class Pinner {
 	 * - Increments syncedToLeafIndex if successful.
 	 *
 	 * This is the ONLY function in the codebase allowed to increment this.syncedToLeafIndex.
-	 * 
+	 *
 	 * @param params - The event data including:
 	 *   - leafIndex: The expected index for the new leaf.
-	 *   - blockNumber: (Optional) The block number associated with this leaf event.
 	 *   - data: The raw data for the new leaf.
-	 *   - previousInsertBlockNumber: (Optional) The block number of the previous insert event.
+	 *   - blockNumber: (Optional) The block number associated with this leaf event.
+	 *   - previousInsertBlockNumber: (Optional) The block number of the previous insert event; Used for walking back to catch up on missing leaves.
 	 */
 	async processLeafEvent(params: {
 		leafIndex: number
@@ -141,22 +144,38 @@ export class Pinner {
 		previousInsertBlockNumber?: number
 	}): Promise<void> {
 		const { leafIndex, blockNumber, data, previousInsertBlockNumber } = params
-		// TODO: This will be the next thing we work on.
-		// we'll start by making a simple function (in shared/) that tries to retreive the log for a given index,
-		// and takes in an optional previousInsertBlockNumber param.
-		// Then we'll create another function (also in shared) that will call that repeatedly to walk back
-		// along the previousInsertBlockNumber chain until we reach the desired leafIndex (and throw if we 
-		// can't walk back along that chain for any reason). This function should return an array of those logs
-		// in order from oldest to newest.
-		// Then this current function that we are in now (processLeafEvent) will walk through that array and 
-		// and call processLeafEvent for each log.
-		// Lets be sure to do good console logging in this process so we can debug if needed.
-		/** TODO: check that the leafIndex matches this.syncedToLeafIndex + 1
-		*		if it does not, then try to follow the previousInsertBlockNumber chain back to 
-		* 	leadfIndex + 1 and then replay forward to here.
-		* 	If that walkback fails, throw an error here.
-		* This will make this function much more robust when processing live events.
-		*/
+		// If we detect a gap in leaves, try to fetch them and process them.
+		if (leafIndex > this.syncedToLeafIndex + 1) {
+			console.log(
+				`[pinner] Missing leafs between ${this.syncedToLeafIndex} and ${leafIndex}. Attmempting to fetch them...`,
+			)
+			if (previousInsertBlockNumber === undefined) {
+				throw new Error(`Missing previousInsertBlockNumber for leafIndex ${leafIndex}. Cannot fetch missing leaves.`)
+			}
+			const missingLeaves = await walkBackLeafInsertLogsOrThrow({
+				provider: this.provider,
+				contract: this.contract,
+				fromLeafIndex: leafIndex - 1,
+				fromLeafIndexBlockNumber: previousInsertBlockNumber,
+				toLeafIndex: this.syncedToLeafIndex + 1,
+			})
+			console.log(`[pinner] Fetched ${missingLeaves.length} missing leafs. Processing them...`)
+			// Extract the leafIndex and data from the logs
+			const events = missingLeaves.map((log) =>
+				this.contract.interface.decodeEventLog("LeafInsert", log.data, log.topics),
+			)
+			for (const event of events) {
+				await this.processLeafEvent({
+					leafIndex: event.leafIndex,
+					data: event.data,
+					blockNumber: event.blockNumber,
+					previousInsertBlockNumber: event.previousInsertBlockNumber,
+				})
+			}
+			console.log(`[pinner] Processed ${missingLeaves.length} missing leafs. All caught up.`)
+		}
+
+		// Add the new leaf to the MMR
 		const {
 			leafCID,
 			rootCID,
@@ -167,6 +186,7 @@ export class Pinner {
 			peakBaggingData,
 		} = await this.mmr.addLeafWithTrail(data, leafIndex)
 
+		// Persist the new leaf and related data in our DB
 		this.db
 			.prepare(
 				`
@@ -219,16 +239,14 @@ export class Pinner {
 
 		// Verify that leafIndex === this.syncedToLeafIndex and throw if not
 		if (leafIndex !== this.syncedToLeafIndex) {
-			throw new Error(`[pinner] leafIndex (${leafIndex}) !== syncedToLeafIndex (${this.syncedToLeafIndex}) in processLeafEvent. This indicates a logic error.`)
+			throw new Error(
+				`[pinner] leafIndex (${leafIndex}) !== syncedToLeafIndex (${this.syncedToLeafIndex}) in processLeafEvent. This indicates a logic error.`,
+			)
 		}
 	}
 
 	// TODO: I think this is finished. Need to test it now using real data.
-	async syncForward(
-		startBlock: number,
-		logBatchSize?: number,
-		throttleSeconds?: number,
-	): Promise<void> {
+	async syncForward(startBlock: number, logBatchSize?: number, throttleSeconds?: number): Promise<void> {
 		const { syncForward } = await import("./sync.ts")
 		return syncForward(this, startBlock, logBatchSize, throttleSeconds)
 	}

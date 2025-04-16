@@ -101,7 +101,7 @@ async function main() {
 		await fs.writeFile(OUTPUT_PATH, JSON.stringify(existingData, null, 2))
 	}
 
-	console.log('Finished submitting random data.')
+	console.log("Finished submitting random data.")
 }
 
 main().catch((e) => {

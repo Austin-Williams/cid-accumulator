@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 describe("Pinner", () => {
-
 	beforeEach(async () => {
 		// Reset module registry and mocks for each test
 		vi.resetModules()
@@ -66,7 +65,9 @@ describe("Pinner", () => {
 	it("should create new DB and schema if DB does not exist", async () => {
 		vi.resetModules()
 		vi.doMock("../source/pinner/db.ts", () => ({
-			openOrCreateDatabase: vi.fn(() => ({ prepare: vi.fn((sql?: string) => ({ run: vi.fn(), all: vi.fn(() => []) })) })),
+			openOrCreateDatabase: vi.fn(() => ({
+				prepare: vi.fn((sql?: string) => ({ run: vi.fn(), all: vi.fn(() => []) })),
+			})),
 			initializeSchema: vi.fn(),
 			createMetaHandlers: vi.fn(() => ({ getMeta: vi.fn(), setMeta: vi.fn() })),
 		}))
@@ -246,8 +247,6 @@ describe("Pinner", () => {
 		})
 	})
 
-
-
 	describe("getAccumulatorData", () => {
 		it("should call getAccumulatorData with provider and contractAddress", async () => {
 			const mockGetAccumulatorData = vi.fn().mockResolvedValue({ foo: "bar" })
@@ -290,14 +289,14 @@ describe("Pinner", () => {
 				prepare: vi.fn(() => ({
 					all: vi.fn(() => []),
 					run: vi.fn(),
-					get: vi.fn(() => ({ data: Buffer.from([]), root_cid: '', combine_results: '', right_inputs: '' })),
+					get: vi.fn(() => ({ data: Buffer.from([]), root_cid: "", combine_results: "", right_inputs: "" })),
 				})),
 			} as any
 			pinner.highestContiguousLeafIndex = vi.fn().mockReturnValue(5)
 			// Mock addLeafWithTrail to avoid leafCount errors
 			pinner.mmr.addLeafWithTrail = vi.fn().mockResolvedValue({
-				leafCID: '',
-				rootCID: '',
+				leafCID: "",
+				rootCID: "",
 				combineResultsCIDs: [],
 				combineResultsData: [],
 				rightInputsCIDs: [],
