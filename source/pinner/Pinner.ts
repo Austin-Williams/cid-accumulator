@@ -1,6 +1,5 @@
 import { ethers } from "ethers"
-import { keccak_256 } from "@noble/hashes/sha3"
-import { bytesToHex } from "@noble/hashes/utils"
+import { CID } from "multiformats/cid"
 
 import { MerkleMountainRange } from "../shared/mmr.ts"
 import { MINIMAL_ACCUMULATOR_ABI } from "../shared/constants.ts"
@@ -9,8 +8,8 @@ import { initializeSchema, openOrCreateDatabase, createMetaHandlers } from "./db
 import Database from "better-sqlite3"
 import path from "path"
 import fs from "fs"
-import { walkBackLeafInsertLogsOrThrow, findBlockForLeafIndex } from "../shared/logs.ts"
-import { start } from "repl"
+import { walkBackLeafInsertLogsOrThrow } from "../shared/logs.ts"
+
 
 export class Pinner {
 	/**
@@ -28,6 +27,7 @@ export class Pinner {
 	public db!: Database.Database
 	public mmr = new MerkleMountainRange()
 	public syncedToLeafIndex!: number
+	public syncedToBlockNumber!: number
 
 	constructor() {}
 
@@ -79,6 +79,7 @@ export class Pinner {
 		const [mmrMetaBits]: [bigint, any] = await pinner.contract.getAccumulatorData()
 		const bits = mmrMetaBits
 		pinner.contractDeployBlockNumber = Number((bits >> 229n) & 0x7ffffffn)
+		pinner.syncedToBlockNumber = pinner.contractDeployBlockNumber - 1
 
 		const storedDeployBlock = getMeta("deployBlockNumber")
 		if (storedDeployBlock && Number(storedDeployBlock) !== pinner.contractDeployBlockNumber) {
@@ -244,41 +245,20 @@ export class Pinner {
 				`[pinner] leafIndex (${leafIndex}) !== syncedToLeafIndex (${this.syncedToLeafIndex}) in processLeafEvent. This indicates a logic error.`,
 			)
 		}
+
+		if (blockNumber !== undefined && blockNumber > this.syncedToBlockNumber) {
+			this.syncedToBlockNumber = blockNumber
+		}
 	}
 
-	// TODO: I think this is finished. Need to test it now using real data.
 	async syncForward(params?: {
 		startBlock?: number
-		endBlock: number
+		endBlock?: number
 		logBatchSize?: number
 		throttleMs?: number
 	}): Promise<void> {
-		// Find the best blocknumber from which to sync forward
-		let { startBlock, endBlock, logBatchSize, throttleMs } = params ?? {
-			startBlock: undefined,
-			endBlock: undefined,
-			logBatchSize: undefined,
-			throttleMs: undefined,
-		}
-		startBlock = startBlock ?? this.contractDeployBlockNumber
-		startBlock = startBlock < this.contractDeployBlockNumber ? this.contractDeployBlockNumber : startBlock
-		let latestProcessedLeafStartBlock = await findBlockForLeafIndex({
-			provider: this.provider,
-			contract: this.contract,
-			leafIndex: this.syncedToLeafIndex,
-			fromBlock: this.contractDeployBlockNumber,
-			toBlock: endBlock,
-		})
-		latestProcessedLeafStartBlock = latestProcessedLeafStartBlock ?? this.contractDeployBlockNumber
-		const bestStartBlock: number = Math.max(startBlock, latestProcessedLeafStartBlock)
 		const { syncForward } = await import("./sync.ts")
-		return await syncForward({
-			pinner: this,
-			startBlock: bestStartBlock,
-			endBlock,
-			logBatchSize,
-			throttleMs,
-		})
+		return await syncForward({pinner: this, ...params})
 	}
 
 	// Returns the highest leafIndex N such that all leafIndexes [0...N]
@@ -303,5 +283,17 @@ export class Pinner {
 		}
 
 		return rows.length > 0 ? rows.length - 1 : null
+	}
+
+	async verifyRootCID(): Promise<void> {
+		console.log("[pinner] Verifying root CID...")
+		const contractRootCIDHex = await this.contract.getLatestCID()
+		const contractRootCIDBase32: string = CID.decode(Uint8Array.from(Buffer.from(contractRootCIDHex.slice(2), "hex"))).toString()
+		const pinnerRootCID = await this.mmr.rootCIDAsBase32()
+		if (pinnerRootCID !== contractRootCIDBase32) {
+			console.error(`[pinner] ❌ FAIL: Root CID mismatch.\n Contract root CID: ${contractRootCIDBase32}\nPinner root CID: ${pinnerRootCID}`)
+		} else {
+			console.log("[pinner] ✅ PASS: Root CID matches contract")
+		}
 	}
 }

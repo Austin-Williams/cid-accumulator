@@ -1,9 +1,10 @@
 import { CID } from "multiformats/cid"
 import { encodeBlock } from "./codec.ts"
+import { base58btc } from "multiformats/bases/base58"
 
 export class MerkleMountainRange {
 	private peaks: CID[] = []
-	private leafCount = 0
+	public leafCount = 0
 
 	constructor() {}
 
@@ -111,5 +112,10 @@ export class MerkleMountainRange {
 	async rootCID(): Promise<CID> {
 		const result = await this.rootCIDWithTrail()
 		return result.root
+	}
+
+	async rootCIDAsBase32(): Promise<string> {
+		const cid = await this.rootCID()
+		return cid.toString()
 	}
 }

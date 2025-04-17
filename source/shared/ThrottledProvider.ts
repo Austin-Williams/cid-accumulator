@@ -56,8 +56,9 @@ export class ThrottledProvider {
 				attempt++
 				this.logger(`[ThrottledProvider] Error on ${method} (attempt ${attempt}):`, err)
 				if (attempt > this.maxRetries) throw err
-				// Exponential backoff + jitter
-				await new Promise((r) => setTimeout(r, delay + Math.floor(Math.random() * this.jitterMs)))
+				const backoffMs = delay + Math.floor(Math.random() * this.jitterMs);
+				console.log(`[ThrottledProvider] Backoff: retrying ${method} in ${backoffMs}ms (attempt ${attempt})`);
+				await new Promise((r) => setTimeout(r, backoffMs))
 				delay *= this.backoffFactor
 			}
 		}

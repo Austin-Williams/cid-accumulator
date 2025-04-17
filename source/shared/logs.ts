@@ -1,8 +1,9 @@
 import { ethers } from "ethers"
-
+import { getAccumulatorData } from "./accumulator.ts"
 /**
  * Retrieves the LeafInsert log for a given leafIndex within a specified block range.
- *
+ * Ideally used with fromBlock == toBlock for efficiency.
+ * 
  * @param provider - An ethers.JsonRpcProvider instance
  * @param contract - The ethers.Contract instance for the accumulator
  * @param leafIndex - The leaf index to search for
@@ -44,13 +45,11 @@ export async function getLeafInsertLog(params: {
 			const chunkLogs = await provider.getLogs(options)
 			logs.push(...chunkLogs)
 		} catch (err) {
-			console.error("[shared/logs] getLogs error:", err)
+			console.error("[getLeafInsertLog] getLogs error:", err)
 			throw err
 		}
 		if (chunkTo === currentTo) break
 		currentFrom = chunkTo + 1
-		// Wait between calls to avoid rate limits
-		await new Promise((res) => setTimeout(res, 250))
 	}
 	// Filter logs by leafIndex
 	const matchingLogs = logs.filter((log) => {
@@ -63,7 +62,7 @@ export async function getLeafInsertLog(params: {
 	})
 	if (matchingLogs.length > 1) {
 		throw new Error(
-			`[shared/logs] Multiple logs found for leafIndex ${params.leafIndex} in range ${fromBlock}-${toBlock}`,
+			`[getLeafInsertLog] Multiple logs found for leafIndex ${params.leafIndex} in range ${fromBlock}-${toBlock}`,
 		)
 	}
 	if (matchingLogs.length === 1) {
@@ -117,7 +116,8 @@ export async function walkBackLeafInsertLogsOrThrow(params: {
 
 /**
  * Finds the block number in which the leaf with the given index was inserted.
- * Warning: Not ideal for free-teir RPC users. Use sparingly.
+ * WARNING: Not ideal for free-tier RPC users. Use sparingly.
+ * This is used to find the first block to start syncing forward from when no other options are available.
  * @param provider - ethers.JsonRpcProvider
  * @param contract - ethers.Contract
  * @param leafIndex - The leaf index to search for
@@ -129,9 +129,10 @@ export async function findBlockForLeafIndex(params: {
 	contract: ethers.Contract
 	leafIndex: number
 	fromBlock: number
-	toBlock?: number
 }): Promise<number | undefined> {
-	const { provider, contract, leafIndex, fromBlock, toBlock } = params
-	const log = await getLeafInsertLog({ provider, contract, leafIndex, fromBlock, toBlock })
+	const { provider, contract, leafIndex, fromBlock } = params
+	const accumulatorData = await getAccumulatorData(provider, await contract.getAddress())
+	const lastLeafBlockNumber = accumulatorData.previousInsertBlockNumber
+	const log = await getLeafInsertLog({ provider, contract, leafIndex, fromBlock, toBlock: lastLeafBlockNumber })
 	return log?.blockNumber
 }
