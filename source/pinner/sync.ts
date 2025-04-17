@@ -3,7 +3,6 @@ import { decodeLeafInsert } from "../shared/codec.ts"
 import { Pinner } from "./Pinner.ts"
 import { getAccumulatorData } from "../shared/accumulator.ts"
 import { findBlockForLeafIndex } from "../shared/logs.ts"
-import { CID } from "multiformats/cid"
 
 export async function rebuildLocalDag(pinner: Pinner, startLeaf: number, endLeaf: number | null): Promise<void> {
 	if (endLeaf === null || endLeaf === undefined || startLeaf > endLeaf) {
@@ -29,22 +28,31 @@ export async function rebuildLocalDag(pinner: Pinner, startLeaf: number, endLeaf
 			throw new Error(`[pinner] Leaf index ${leafIndex} missing from DB unexpectedly.`)
 		}
 
-		const data = new Uint8Array(row.data)
-		const blockNumber = row.block_number ?? undefined
-		const previousInsertBlockNumber = row.previous_insert_block ?? undefined
-		const params = { leafIndex, data, blockNumber, previousInsertBlockNumber }
+		const newData: Uint8Array = row.data
+		const blockNumber: number | undefined = row.block_number ?? undefined
+		const previousInsertBlockNumber: number | undefined = row.previous_insert_block ?? undefined
+		const params = {
+			leafIndex: leafIndex,
+			newData: newData,
+			blockNumber: blockNumber,
+			previousInsertBlockNumber: previousInsertBlockNumber
+		}
 		await pinner.processLeafEvent(params)
 	}
 	console.log(`[pinner] Rebuilt and verified local DAG from leafIndex ${startLeaf} to ${endLeaf}.`)
 }
 
-export async function syncForward(params: {
-	pinner: Pinner
-	logBatchSize?: number
-}): Promise<void> {
+export async function syncForward(params: { pinner: Pinner; logBatchSize?: number }): Promise<void> {
+	const meta = await params.pinner.getAccumulatorData()
+	const currentContractLeafCount = meta.leafCount
+	if (params.pinner.syncedToLeafIndex === currentContractLeafCount - 1) {
+		console.log(`[pinner] Already synced to leaf index ${params.pinner.syncedToLeafIndex}. Skipping sync.`)
+		return
+	}
+
 	let { pinner, logBatchSize } = params
 	const batchSize = logBatchSize ?? 1000
-	const { startBlock, endBlock } = await getSyncBlockRange(pinner)
+	const { startBlock, endBlock }: { startBlock: number; endBlock: number } = await getSyncBlockRange(pinner)
 	console.log(`[pinner] Syncing forward from block ${startBlock} to ${endBlock}...`)
 
 	for (let from = startBlock; from <= endBlock; from += batchSize) {
@@ -62,19 +70,14 @@ export async function syncForward(params: {
 		const logs: Log[] = await pinner.provider.getLogs(filter)
 
 		for (const log of logs) {
-			const { leafIndex, previousInsertBlockNumber, newData } = decodeLeafInsert(log)
+			const decodedEvent = decodeLeafInsert(log)
 
-			if (leafIndex < pinner.syncedToLeafIndex + 1) continue
-			if (leafIndex > pinner.syncedToLeafIndex + 1) {
-				throw new Error(`[pinner] LeafIndex gap detected. Expected ${pinner.syncedToLeafIndex + 1}, got ${leafIndex}`)
+			if (decodedEvent.leafIndex < pinner.syncedToLeafIndex + 1) continue
+			if (decodedEvent.leafIndex > pinner.syncedToLeafIndex + 1) {
+				throw new Error(`[pinner] LeafIndex gap detected. Expected ${pinner.syncedToLeafIndex + 1}, got ${decodedEvent.leafIndex}`)
 			}
 
-			await pinner.processLeafEvent({
-				leafIndex,
-				blockNumber: log.blockNumber,
-				data: new Uint8Array(Buffer.from(newData.slice(2), "hex")),
-				previousInsertBlockNumber,
-			})
+			await pinner.processLeafEvent(decodedEvent)
 		}
 	}
 	console.log(`[pinner] Sync complete.`)
@@ -83,27 +86,42 @@ export async function syncForward(params: {
 // Returns the best startBlock and endBlock for syncing based on DB, chain, and contract state
 async function getSyncBlockRange(pinner: Pinner): Promise<{ startBlock: number; endBlock: number }> {
 	const meta = await getAccumulatorData(pinner.provider, pinner.contractAddress)
-	let startBlock = pinner.syncedToBlockNumber
+	const endBlock: number = meta.previousInsertBlockNumber
+	
+	let startBlock: number = pinner.syncedToBlockNumber // first candidate for good start block
+
+	if (pinner.syncedToLeafIndex < 0) return { startBlock, endBlock }
+	
+	// try to find the block number for the last synced leaf
 	const select = pinner.db.prepare(`SELECT block_number FROM leaf_events WHERE leaf_index = ?`)
 	const row = select.get(pinner.syncedToLeafIndex) as { block_number?: number } | undefined
 	if (row && row.block_number) {
-		if (row.block_number > startBlock) startBlock = row.block_number
+		if (row.block_number > startBlock) startBlock = row.block_number // second candidate for good start block
 		console.log(`[pinner] Found block number ${startBlock} for leaf index ${pinner.syncedToLeafIndex}`)
 	} else {
 		console.log(`[pinner] No block number found in DB for leaf index ${pinner.syncedToLeafIndex}`)
-		console.log(`[pinner] Attempting to find the block for leaf index ${pinner.syncedToLeafIndex}...`)
+		console.log(`[pinner] Attempting to find the block for leaf index ${pinner.syncedToLeafIndex + 1}...`)
 		try {
-			const blockNumber = await findBlockForLeafIndex({ provider: pinner.provider, contract: pinner.contract, leafIndex: pinner.syncedToLeafIndex, fromBlock: meta.deployBlockNumber })
+			const blockNumber = await findBlockForLeafIndex({
+				provider: pinner.provider,
+				contract: pinner.contract,
+				leafIndex: pinner.syncedToLeafIndex + 1,
+				fromBlock: meta.deployBlockNumber,
+			})
 			if (blockNumber) {
-				if (blockNumber > startBlock) startBlock = blockNumber
-				console.log(`[pinner] Found block number ${startBlock} for latest leaf index ${pinner.syncedToLeafIndex}`)
+				if (blockNumber > startBlock) startBlock = blockNumber // third candidate for good start block
+				console.log(`[pinner] Found block number ${startBlock} for leaf index ${pinner.syncedToLeafIndex + 1}`)
 			} else {
-				console.log(`[pinner] Failed to find block number for latest leaf index ${pinner.syncedToLeafIndex}. Starting from contract's deploy block.`)
+				console.log(
+					`[pinner] Failed to find block number for leaf index ${pinner.syncedToLeafIndex + 1}.`,
+				)
 			}
 		} catch (e) {
-			console.error(`[pinner] Failed to find block number for latest leaf index ${pinner.syncedToLeafIndex}. Starting from contract's deploy block.`)
+			console.error(
+				`[pinner] Failed to find block number for leaf index ${pinner.syncedToLeafIndex + 1}.`,
+			)
 		}
 	}
-	const endBlock = meta.previousInsertBlockNumber
+
 	return { startBlock, endBlock }
 }

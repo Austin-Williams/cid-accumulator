@@ -8,18 +8,10 @@ import { initializeSchema, openOrCreateDatabase, createMetaHandlers } from "./db
 import Database from "better-sqlite3"
 import path from "path"
 import fs from "fs"
-import { walkBackLeafInsertLogsOrThrow } from "../shared/logs.ts"
-
+import { getLeafInsertLog, walkBackLeafInsertLogsOrThrow } from "../shared/logs.ts"
+import { LeafInsertEvent } from "../shared/types.ts"
 
 export class Pinner {
-	/**
-	 * Retrieves accumulator data from the chain for this pinner's provider and contractAddress.
-	 */
-	async getAccumulatorData() {
-		// Importing here for easier mocking in tests
-		const { getAccumulatorData } = await import("../shared/accumulator.ts")
-		return getAccumulatorData(this.provider, this.contractAddress)
-	}
 	public provider!: ethers.JsonRpcProvider
 	public contract!: ethers.Contract
 	public contractAddress!: string
@@ -104,6 +96,15 @@ export class Pinner {
 	}
 
 	/**
+	 * Retrieves accumulator data from the chain for this pinner's provider and contractAddress.
+	 */
+	async getAccumulatorData() {
+		// Importing here for easier mocking in tests
+		const { getAccumulatorData } = await import("../shared/accumulator.ts")
+		return getAccumulatorData(this.provider, this.contractAddress)
+	}
+
+	/**
 	 * Rebuilds and verifies the local Directed Acyclic Graph (DAG) for the pinner's Merkle Mountain Range (MMR)
 	 * between the specified leaf indices (inclusive).
 	 *
@@ -142,20 +143,20 @@ export class Pinner {
 	 */
 	async processLeafEvent(params: {
 		leafIndex: number
-		data: Uint8Array
+		newData: Uint8Array
 		blockNumber?: number
 		previousInsertBlockNumber?: number
 	}): Promise<void> {
-		const { leafIndex, blockNumber, data, previousInsertBlockNumber } = params
+		const { leafIndex, blockNumber, newData, previousInsertBlockNumber } = params
 		// If we detect a gap in leaves, try to fetch them and process them.
 		if (leafIndex > this.syncedToLeafIndex + 1) {
 			console.log(
-				`[pinner] Missing leafs between ${this.syncedToLeafIndex} and ${leafIndex}. Attmempting to fetch them...`,
+				`[pinner] Missing leafs ${this.syncedToLeafIndex + 1} to ${leafIndex -1}. Attmempting to fetch them...`,
 			)
 			if (previousInsertBlockNumber === undefined) {
 				throw new Error(`Missing previousInsertBlockNumber for leafIndex ${leafIndex}. Cannot fetch missing leaves.`)
 			}
-			const missingLeaves = await walkBackLeafInsertLogsOrThrow({
+			const missingLeaves: LeafInsertEvent[] = await walkBackLeafInsertLogsOrThrow({
 				provider: this.provider,
 				contract: this.contract,
 				fromLeafIndex: leafIndex - 1,
@@ -163,17 +164,9 @@ export class Pinner {
 				toLeafIndex: this.syncedToLeafIndex + 1,
 			})
 			console.log(`[pinner] Fetched ${missingLeaves.length} missing leafs. Processing them...`)
-			// Extract the leafIndex and data from the logs
-			const events = missingLeaves.map((log) =>
-				this.contract.interface.decodeEventLog("LeafInsert", log.data, log.topics),
-			)
-			for (const event of events) {
-				await this.processLeafEvent({
-					leafIndex: event.leafIndex,
-					data: event.data,
-					blockNumber: event.blockNumber,
-					previousInsertBlockNumber: event.previousInsertBlockNumber,
-				})
+
+			for (const event of missingLeaves) {
+				await this.processLeafEvent(event)
 			}
 			console.log(`[pinner] Processed ${missingLeaves.length} missing leafs. All caught up.`)
 		}
@@ -187,7 +180,7 @@ export class Pinner {
 			combineResultsData,
 			peakBaggingCIDs,
 			peakBaggingData,
-		} = await this.mmr.addLeafWithTrail(data, leafIndex)
+		} = await this.mmr.addLeafWithTrail(newData, leafIndex)
 
 		// Persist the new leaf and related data in our DB
 		this.db
@@ -210,7 +203,7 @@ export class Pinner {
 				leafIndex,
 				blockNumber ?? null,
 				leafCID,
-				Buffer.from(data),
+				newData,
 				previousInsertBlockNumber ?? null,
 				JSON.stringify(combineResultsCIDs),
 				JSON.stringify(rightInputsCIDs),
@@ -251,14 +244,46 @@ export class Pinner {
 		}
 	}
 
-	async syncForward(params?: {
-		startBlock?: number
-		endBlock?: number
-		logBatchSize?: number
-		throttleMs?: number
-	}): Promise<void> {
+	// Best when you are very far behind in syncing.
+	// Fewer RPC calls but each with a very large block range.
+	async syncForward(params?: { logBatchSize?: number }): Promise<void> {
 		const { syncForward } = await import("./sync.ts")
-		return await syncForward({pinner: this, ...params})
+		return await syncForward({ pinner: this, ...params })
+	}
+	// Best when you are close to the tip of the chain.
+	// Many more RPC calls but each with a single block in the block range and exactly one log returned.
+	async syncBackward(): Promise<void> {
+		// get most recent leaf index from contract
+		const contractMetadata = await this.getAccumulatorData()
+		// get highest contiguous leaf index from DB
+		let oldestLeafIndex: number = this.syncedToLeafIndex
+		if (oldestLeafIndex === null) {
+			throw new Error("[pinner] syncedToLeafIndex is null in syncBackward. This should never happen.")
+		}
+		if (oldestLeafIndex > contractMetadata.leafCount - 1) {
+			throw new Error(`[pinner] this.syncedToLeafIndex is ${oldestLeafIndex}, which is greater than the latest leaf index on chain (${contractMetadata.leafCount - 1}). This should never happen.`)
+		}
+		if (oldestLeafIndex === contractMetadata.leafCount - 1) {
+			console.log("[pinner] Already synced to the latest leaf index. No need to sync backward.")
+			return
+		}
+			
+		console.log(`[pinner] Syncing backward from leaf index ${contractMetadata.leafCount - 1} to leaf index ${oldestLeafIndex + 1}...`,)
+
+		// get the event for mostRecentLeafIndex
+		const mostRecentLog = await getLeafInsertLog({
+			provider: this.provider,
+			contract: this.contract,
+			targetLeafIndex: contractMetadata.leafCount - 1,
+			fromBlock: contractMetadata.previousInsertBlockNumber,
+			toBlock: contractMetadata.previousInsertBlockNumber,
+		})
+
+		if (!mostRecentLog) throw new Error("[pinner] Log for most recent leaf index not found on chain.")
+		
+		await this.processLeafEvent(mostRecentLog)
+
+		console.log("[pinner] Syncing backward complete.")
 	}
 
 	// Returns the highest leafIndex N such that all leafIndexes [0...N]
@@ -288,10 +313,14 @@ export class Pinner {
 	async verifyRootCID(): Promise<void> {
 		console.log("[pinner] Verifying root CID...")
 		const contractRootCIDHex = await this.contract.getLatestCID()
-		const contractRootCIDBase32: string = CID.decode(Uint8Array.from(Buffer.from(contractRootCIDHex.slice(2), "hex"))).toString()
+		const contractRootCIDBase32: string = CID.decode(
+			Uint8Array.from(Buffer.from(contractRootCIDHex.slice(2), "hex")),
+		).toString()
 		const pinnerRootCID = await this.mmr.rootCIDAsBase32()
 		if (pinnerRootCID !== contractRootCIDBase32) {
-			console.error(`[pinner] ❌ FAIL: Root CID mismatch.\n Contract root CID: ${contractRootCIDBase32}\nPinner root CID: ${pinnerRootCID}`)
+			console.error(
+				`[pinner] ❌ FAIL: Root CID mismatch.\n Contract root CID: ${contractRootCIDBase32}\nPinner root CID: ${pinnerRootCID}`,
+			)
 		} else {
 			console.log("[pinner] ✅ PASS: Root CID matches contract")
 		}

@@ -1,7 +1,5 @@
 import "dotenv/config"
 import { Pinner } from "../source/pinner/Pinner"
-import { CID } from "multiformats/cid"
-import { getAccumulatorData } from "../source/shared/accumulator.ts"
 import { getRPCProvider } from "../source/shared/rpc.ts"
 
 async function main() {
@@ -19,7 +17,8 @@ async function main() {
 	const pinner = await Pinner.init(CONTRACT_ADDRESS, provider)
 
 	console.log("[pinner] Syncing leaves from contract...")
-	await pinner.syncForward({ logBatchSize: 100 })
+	//await pinner.syncBackward()
+	await pinner.syncForward()
 
 	await pinner.verifyRootCID()
 }

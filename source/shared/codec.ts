@@ -1,5 +1,5 @@
 // shared/codec.ts
-import { Log } from "ethers"
+import { ethers, Log } from "ethers"
 import { CID } from "multiformats/cid"
 import * as dagCbor from "@ipld/dag-cbor"
 import { sha256 } from "multiformats/hashes/sha2"
@@ -27,7 +27,10 @@ export function decodeLeafInsert(log: Log): LeafInsertEvent {
 	return {
 		leafIndex: Number(leafIndex),
 		previousInsertBlockNumber: Number(previousInsertBlockNumber),
-		newData,
+		newData:
+			typeof newData === "string" && newData.startsWith("0x")
+				? new Uint8Array(Buffer.from(newData.slice(2), "hex"))
+				: new Uint8Array(newData),
 		combineResults,
 		rightInputs,
 	}

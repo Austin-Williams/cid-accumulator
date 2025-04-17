@@ -9,9 +9,10 @@
 export interface LeafInsertEvent {
 	leafIndex: number
 	previousInsertBlockNumber: number
-	newData: string
+	newData: Uint8Array
 	combineResults: string[]
 	rightInputs: string[]
+	blockNumber?: number
 }
 
 export interface AccumulatorMetadata {
