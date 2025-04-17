@@ -35,7 +35,7 @@ export async function rebuildLocalDag(pinner: Pinner, startLeaf: number, endLeaf
 			leafIndex: leafIndex,
 			newData: newData,
 			blockNumber: blockNumber,
-			previousInsertBlockNumber: previousInsertBlockNumber
+			previousInsertBlockNumber: previousInsertBlockNumber,
 		}
 		await pinner.processLeafEvent(params)
 	}
@@ -74,7 +74,9 @@ export async function syncForward(params: { pinner: Pinner; logBatchSize?: numbe
 
 			if (decodedEvent.leafIndex < pinner.syncedToLeafIndex + 1) continue
 			if (decodedEvent.leafIndex > pinner.syncedToLeafIndex + 1) {
-				throw new Error(`[pinner] LeafIndex gap detected. Expected ${pinner.syncedToLeafIndex + 1}, got ${decodedEvent.leafIndex}`)
+				throw new Error(
+					`[pinner] LeafIndex gap detected. Expected ${pinner.syncedToLeafIndex + 1}, got ${decodedEvent.leafIndex}`,
+				)
 			}
 
 			await pinner.processLeafEvent(decodedEvent)
@@ -87,11 +89,11 @@ export async function syncForward(params: { pinner: Pinner; logBatchSize?: numbe
 async function getSyncBlockRange(pinner: Pinner): Promise<{ startBlock: number; endBlock: number }> {
 	const meta = await getAccumulatorData(pinner.provider, pinner.contractAddress)
 	const endBlock: number = meta.previousInsertBlockNumber
-	
+
 	let startBlock: number = pinner.syncedToBlockNumber // first candidate for good start block
 
 	if (pinner.syncedToLeafIndex < 0) return { startBlock, endBlock }
-	
+
 	// try to find the block number for the last synced leaf
 	const select = pinner.db.prepare(`SELECT block_number FROM leaf_events WHERE leaf_index = ?`)
 	const row = select.get(pinner.syncedToLeafIndex) as { block_number?: number } | undefined
@@ -112,14 +114,10 @@ async function getSyncBlockRange(pinner: Pinner): Promise<{ startBlock: number; 
 				if (blockNumber > startBlock) startBlock = blockNumber // third candidate for good start block
 				console.log(`[pinner] Found block number ${startBlock} for leaf index ${pinner.syncedToLeafIndex + 1}`)
 			} else {
-				console.log(
-					`[pinner] Failed to find block number for leaf index ${pinner.syncedToLeafIndex + 1}.`,
-				)
+				console.log(`[pinner] Failed to find block number for leaf index ${pinner.syncedToLeafIndex + 1}.`)
 			}
 		} catch (e) {
-			console.error(
-				`[pinner] Failed to find block number for leaf index ${pinner.syncedToLeafIndex + 1}.`,
-			)
+			console.error(`[pinner] Failed to find block number for leaf index ${pinner.syncedToLeafIndex + 1}.`)
 		}
 	}
 

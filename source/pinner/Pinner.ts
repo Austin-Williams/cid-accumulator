@@ -20,12 +20,14 @@ export class Pinner {
 	public mmr = new MerkleMountainRange()
 	public syncedToLeafIndex!: number
 	public syncedToBlockNumber!: number
+	public ipfsNodeUrl!: string
 
 	constructor() {}
 
-	static async init(contractAddress: string, provider: ethers.JsonRpcProvider): Promise<Pinner> {
+	static async init(contractAddress: string, provider: ethers.JsonRpcProvider, ipfsNodeUrl: string): Promise<Pinner> {
 		const pinner = new Pinner()
 		pinner.syncedToLeafIndex = -1
+		pinner.ipfsNodeUrl = ipfsNodeUrl
 
 		pinner.provider = provider
 		const normalizedAddress = contractAddress.toLowerCase()
@@ -151,7 +153,7 @@ export class Pinner {
 		// If we detect a gap in leaves, try to fetch them and process them.
 		if (leafIndex > this.syncedToLeafIndex + 1) {
 			console.log(
-				`[pinner] Missing leafs ${this.syncedToLeafIndex + 1} to ${leafIndex -1}. Attmempting to fetch them...`,
+				`[pinner] Missing leafs ${this.syncedToLeafIndex + 1} to ${leafIndex - 1}. Attmempting to fetch them...`,
 			)
 			if (previousInsertBlockNumber === undefined) {
 				throw new Error(`Missing previousInsertBlockNumber for leafIndex ${leafIndex}. Cannot fetch missing leaves.`)
@@ -261,14 +263,18 @@ export class Pinner {
 			throw new Error("[pinner] syncedToLeafIndex is null in syncBackward. This should never happen.")
 		}
 		if (oldestLeafIndex > contractMetadata.leafCount - 1) {
-			throw new Error(`[pinner] this.syncedToLeafIndex is ${oldestLeafIndex}, which is greater than the latest leaf index on chain (${contractMetadata.leafCount - 1}). This should never happen.`)
+			throw new Error(
+				`[pinner] this.syncedToLeafIndex is ${oldestLeafIndex}, which is greater than the latest leaf index on chain (${contractMetadata.leafCount - 1}). This should never happen.`,
+			)
 		}
 		if (oldestLeafIndex === contractMetadata.leafCount - 1) {
 			console.log("[pinner] Already synced to the latest leaf index. No need to sync backward.")
 			return
 		}
-			
-		console.log(`[pinner] Syncing backward from leaf index ${contractMetadata.leafCount - 1} to leaf index ${oldestLeafIndex + 1}...`,)
+
+		console.log(
+			`[pinner] Syncing backward from leaf index ${contractMetadata.leafCount - 1} to leaf index ${oldestLeafIndex + 1}...`,
+		)
 
 		// get the event for mostRecentLeafIndex
 		const mostRecentLog = await getLeafInsertLog({
@@ -280,7 +286,7 @@ export class Pinner {
 		})
 
 		if (!mostRecentLog) throw new Error("[pinner] Log for most recent leaf index not found on chain.")
-		
+
 		await this.processLeafEvent(mostRecentLog)
 
 		console.log("[pinner] Syncing backward complete.")
@@ -324,5 +330,21 @@ export class Pinner {
 		} else {
 			console.log("[pinner] ✅ PASS: Root CID matches contract")
 		}
+	}
+
+	/**
+	 * Gracefully shuts down the pinner, closing any open resources.
+	 */
+	async shutdown(): Promise<void> {
+		if (this.db) {
+			try {
+				this.db.close()
+				console.log("[pinner] Database connection closed.")
+			} catch (err) {
+				console.warn("[pinner] Warning: Failed to close database:", err)
+			}
+		}
+		// TODO: Add additional shutdown logic here if needed (e.g., IPFS cleanup, etc.)
+		console.log("[pinner] Shutdown complete.")
 	}
 }

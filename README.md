@@ -73,7 +73,15 @@ For example, if you insert `2^20` entries (just over 1 million), here’s how of
 
 So the gas cost is determined only by that insert’s merge activity — **not** by the total size of the data set.
 
-### Service providers and clients
+### Full IPFS data pinner
+
+> 🚧 In Progress (not working yet)
+
+
+### Light weight client
 
 > 🚧 In Progess
 
+### Light weight (browser) IPFS data pinner
+
+> 🚧 In Progess

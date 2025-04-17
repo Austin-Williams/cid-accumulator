@@ -14,7 +14,7 @@ async function main() {
 
 	// Setup provider and contract
 	const provider = getRPCProvider(PROVIDER_URL)
-	const pinner = await Pinner.init(CONTRACT_ADDRESS, provider)
+	const pinner = await Pinner.init(CONTRACT_ADDRESS, provider, "http://127.0.0.1:5001")
 
 	console.log("[pinner] Syncing leaves from contract...")
 	//await pinner.syncBackward()

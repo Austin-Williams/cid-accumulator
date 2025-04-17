@@ -108,14 +108,15 @@ export async function walkBackLeafInsertLogsOrThrow(params: {
 	const logs: LeafInsertEvent[] = []
 
 	while (currentLeafIndex >= toLeafIndex) {
-		const log: LeafInsertEvent| null | null = await getLeafInsertLog({
+		const log: LeafInsertEvent | null | null = await getLeafInsertLog({
 			provider,
 			contract,
 			targetLeafIndex: currentLeafIndex,
 			fromBlock: currentLeafIndexBlockNumber,
 			toBlock: currentLeafIndexBlockNumber,
 		})
-		if (!log) throw new Error(`[walkBackLeafInsertLogsOrThrow] Missing LeafInsert log for leafIndex ${currentLeafIndex}`)
+		if (!log)
+			throw new Error(`[walkBackLeafInsertLogsOrThrow] Missing LeafInsert log for leafIndex ${currentLeafIndex}`)
 
 		logs.push(log)
 		if (currentLeafIndex === toLeafIndex) break
@@ -126,7 +127,8 @@ export async function walkBackLeafInsertLogsOrThrow(params: {
 		// Prepare for next iteration
 		currentLeafIndex--
 		currentLeafIndexBlockNumber = log.previousInsertBlockNumber
-		if (currentLeafIndex < toLeafIndex) throw new Error(`[walkBackLeafInsertLogsOrThrow] Walkback went past toLeafIndex (${toLeafIndex})`)
+		if (currentLeafIndex < toLeafIndex)
+			throw new Error(`[walkBackLeafInsertLogsOrThrow] Walkback went past toLeafIndex (${toLeafIndex})`)
 	}
 
 	return logs.reverse() // Oldest to newest
@@ -151,6 +153,12 @@ export async function findBlockForLeafIndex(params: {
 	const { provider, contract, leafIndex, fromBlock } = params
 	const accumulatorData = await getAccumulatorData(provider, await contract.getAddress())
 	const lastLeafBlockNumber = accumulatorData.previousInsertBlockNumber
-	const log = await getLeafInsertLog({ provider, contract, targetLeafIndex: leafIndex, fromBlock, toBlock: lastLeafBlockNumber })
+	const log = await getLeafInsertLog({
+		provider,
+		contract,
+		targetLeafIndex: leafIndex,
+		fromBlock,
+		toBlock: lastLeafBlockNumber,
+	})
 	return log?.blockNumber
 }
