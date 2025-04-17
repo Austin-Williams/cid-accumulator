@@ -12,7 +12,7 @@ import { ethers } from "ethers"
  * @returns The log for the given leafIndex, or null if not found.
  * @throws If multiple logs are found for the given leafIndex in the specified range.
  */
-const MAX_BLOCK_RANGE = 1000;
+const MAX_BLOCK_RANGE = 1000
 
 export async function getLeafInsertLog(params: {
 	provider: ethers.JsonRpcProvider
@@ -22,52 +22,54 @@ export async function getLeafInsertLog(params: {
 	toBlock?: number | undefined
 }): Promise<ethers.Log | null> {
 	let { provider, contract, leafIndex, fromBlock, toBlock } = params
-	const endBlock = typeof toBlock === "number" ? toBlock : undefined;
-	const logs: ethers.Log[] = [];
-	let currentFrom = fromBlock;
-	let currentTo = endBlock ?? fromBlock;
+	const endBlock = typeof toBlock === "number" ? toBlock : undefined
+	const logs: ethers.Log[] = []
+	let currentFrom = fromBlock
+	let currentTo = endBlock ?? fromBlock
 	if (endBlock === undefined) {
 		// If toBlock is "latest", fetch latest block number
-		currentTo = await provider.getBlockNumber();
+		currentTo = await provider.getBlockNumber()
 	}
 	while (currentFrom <= currentTo) {
-		const chunkTo = Math.min(currentFrom + MAX_BLOCK_RANGE - 1, currentTo);
-		const filter = contract.filters.LeafInsert();
+		const chunkTo = Math.min(currentFrom + MAX_BLOCK_RANGE - 1, currentTo)
+		const filter = contract.filters.LeafInsert()
 		const options: ethers.Filter = {
 			address: contract.target,
 			...filter,
 			fromBlock: currentFrom,
 			toBlock: chunkTo,
-		};
-		console.log(`[getLeafInsertLog] getLogs chunk: fromBlock=${currentFrom}, toBlock=${chunkTo}`);
-		try {
-			const chunkLogs = await provider.getLogs(options);
-			logs.push(...chunkLogs);
-		} catch (err) {
-			console.error("[shared/logs] getLogs error:", err);
-			throw err;
 		}
-		if (chunkTo === currentTo) break;
-		currentFrom = chunkTo + 1;
+		console.log(`[getLeafInsertLog] getLogs chunk: fromBlock=${currentFrom}, toBlock=${chunkTo}`)
+		try {
+			const chunkLogs = await provider.getLogs(options)
+			logs.push(...chunkLogs)
+		} catch (err) {
+			console.error("[shared/logs] getLogs error:", err)
+			throw err
+		}
+		if (chunkTo === currentTo) break
+		currentFrom = chunkTo + 1
 		// Wait between calls to avoid rate limits
-		await new Promise(res => setTimeout(res, 250));
+		await new Promise((res) => setTimeout(res, 250))
 	}
 	// Filter logs by leafIndex
-	const matchingLogs = logs.filter(log => {
+	const matchingLogs = logs.filter((log) => {
 		try {
-			const decoded = contract.interface.decodeEventLog("LeafInsert", log.data, log.topics);
-			return decoded.leafIndex !== undefined && decoded.leafIndex.toString() ===leafIndex.toString();
+			const decoded = contract.interface.decodeEventLog("LeafInsert", log.data, log.topics)
+			return decoded.leafIndex !== undefined && decoded.leafIndex.toString() === leafIndex.toString()
 		} catch (e) {
-			return false;
+			return false
 		}
-	});
+	})
 	if (matchingLogs.length > 1) {
-		throw new Error(`[shared/logs] Multiple logs found for leafIndex ${params.leafIndex} in range ${fromBlock}-${toBlock}`);
+		throw new Error(
+			`[shared/logs] Multiple logs found for leafIndex ${params.leafIndex} in range ${fromBlock}-${toBlock}`,
+		)
 	}
 	if (matchingLogs.length === 1) {
-		return matchingLogs[0];
+		return matchingLogs[0]
 	}
-	return null;
+	return null
 }
 
 /**
@@ -122,14 +124,14 @@ export async function walkBackLeafInsertLogsOrThrow(params: {
  * @param fromBlock - The block to start searching from (usually contract deploy block)
  * @returns The block number, or undefined if not found
  */
-export async function findBlockForLeafIndex( params: {
-  provider: ethers.JsonRpcProvider,
-  contract: ethers.Contract,
-  leafIndex: number,
-  fromBlock: number,
+export async function findBlockForLeafIndex(params: {
+	provider: ethers.JsonRpcProvider
+	contract: ethers.Contract
+	leafIndex: number
+	fromBlock: number
 	toBlock?: number
 }): Promise<number | undefined> {
 	const { provider, contract, leafIndex, fromBlock, toBlock } = params
-  const log = await getLeafInsertLog({ provider, contract, leafIndex, fromBlock, toBlock });
-  return log?.blockNumber;
+	const log = await getLeafInsertLog({ provider, contract, leafIndex, fromBlock, toBlock })
+	return log?.blockNumber
 }

@@ -82,7 +82,9 @@ export class Pinner {
 
 		const storedDeployBlock = getMeta("deployBlockNumber")
 		if (storedDeployBlock && Number(storedDeployBlock) !== pinner.contractDeployBlockNumber) {
-			throw new Error(`DB deployBlockNumber mismatch: expected ${storedDeployBlock}, got ${pinner.contractDeployBlockNumber}`)
+			throw new Error(
+				`DB deployBlockNumber mismatch: expected ${storedDeployBlock}, got ${pinner.contractDeployBlockNumber}`,
+			)
 		}
 		setMeta("deployBlockNumber", String(pinner.contractDeployBlockNumber))
 
@@ -245,12 +247,28 @@ export class Pinner {
 	}
 
 	// TODO: I think this is finished. Need to test it now using real data.
-	async syncForward(params?: { startBlock?: number, endBlock: number, logBatchSize?: number, throttleMs?: number }): Promise<void> {
+	async syncForward(params?: {
+		startBlock?: number
+		endBlock: number
+		logBatchSize?: number
+		throttleMs?: number
+	}): Promise<void> {
 		// Find the best blocknumber from which to sync forward
-		let { startBlock, endBlock, logBatchSize, throttleMs } = params ?? { startBlock: undefined, endBlock: undefined, logBatchSize: undefined, throttleMs: undefined }
+		let { startBlock, endBlock, logBatchSize, throttleMs } = params ?? {
+			startBlock: undefined,
+			endBlock: undefined,
+			logBatchSize: undefined,
+			throttleMs: undefined,
+		}
 		startBlock = startBlock ?? this.contractDeployBlockNumber
-		startBlock = (startBlock < this.contractDeployBlockNumber) ? this.contractDeployBlockNumber : startBlock
-		let latestProcessedLeafStartBlock = await findBlockForLeafIndex({ provider: this.provider, contract: this.contract, leafIndex: this.syncedToLeafIndex, fromBlock: this.contractDeployBlockNumber, toBlock: endBlock })
+		startBlock = startBlock < this.contractDeployBlockNumber ? this.contractDeployBlockNumber : startBlock
+		let latestProcessedLeafStartBlock = await findBlockForLeafIndex({
+			provider: this.provider,
+			contract: this.contract,
+			leafIndex: this.syncedToLeafIndex,
+			fromBlock: this.contractDeployBlockNumber,
+			toBlock: endBlock,
+		})
 		latestProcessedLeafStartBlock = latestProcessedLeafStartBlock ?? this.contractDeployBlockNumber
 		const bestStartBlock: number = Math.max(startBlock, latestProcessedLeafStartBlock)
 		const { syncForward } = await import("./sync.ts")
@@ -259,7 +277,7 @@ export class Pinner {
 			startBlock: bestStartBlock,
 			endBlock,
 			logBatchSize,
-			throttleMs
+			throttleMs,
 		})
 	}
 

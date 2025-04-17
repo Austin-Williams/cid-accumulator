@@ -36,10 +36,10 @@ export async function rebuildLocalDag(pinner: Pinner, startLeaf: number, endLeaf
 }
 
 export async function syncForward(params: {
-	pinner: Pinner,
-	startBlock: number,
-	endBlock?:number,
-	logBatchSize?: number,
+	pinner: Pinner
+	startBlock: number
+	endBlock?: number
+	logBatchSize?: number
 	throttleMs?: number
 }): Promise<void> {
 	let { pinner, startBlock, endBlock, logBatchSize, throttleMs } = params
