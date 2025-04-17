@@ -9,7 +9,8 @@ import { initializeSchema, openOrCreateDatabase, createMetaHandlers } from "./db
 import Database from "better-sqlite3"
 import path from "path"
 import fs from "fs"
-import { walkBackLeafInsertLogsOrThrow } from "../shared/logs.ts"
+import { walkBackLeafInsertLogsOrThrow, findBlockForLeafIndex } from "../shared/logs.ts"
+import { start } from "repl"
 
 export class Pinner {
 	/**
@@ -23,6 +24,7 @@ export class Pinner {
 	public provider!: ethers.JsonRpcProvider
 	public contract!: ethers.Contract
 	public contractAddress!: string
+	public contractDeployBlockNumber!: number
 	public db!: Database.Database
 	public mmr = new MerkleMountainRange()
 	public syncedToLeafIndex!: number
@@ -43,12 +45,10 @@ export class Pinner {
 		const chainId = Number(network.chainId)
 
 		const label = `${chainId}-${normalizedAddress}`
-		const labelBytes = new TextEncoder().encode(label)
-		const labelHash = bytesToHex(keccak_256(labelBytes)).slice(0, 8)
 
 		console.log(`[pinner] Initializing pinner for contract ${normalizedAddress} on chainId ${chainId}`)
 
-		const dbPath = path.join(".pinner", `pinner-${labelHash}.db`)
+		const dbPath = path.join(".pinner", `pinner-${label}.db`)
 		console.log(`[pinner] Looking for DB at path: ${dbPath}`)
 
 		const dbAlreadyExists = fs.existsSync(dbPath)
@@ -78,13 +78,13 @@ export class Pinner {
 
 		const [mmrMetaBits]: [bigint, any] = await pinner.contract.getAccumulatorData()
 		const bits = mmrMetaBits
-		const deployBlockNumber = Number((bits >> 229n) & 0x7ffffffn)
+		pinner.contractDeployBlockNumber = Number((bits >> 229n) & 0x7ffffffn)
 
 		const storedDeployBlock = getMeta("deployBlockNumber")
-		if (storedDeployBlock && Number(storedDeployBlock) !== deployBlockNumber) {
-			throw new Error(`DB deployBlockNumber mismatch: expected ${storedDeployBlock}, got ${deployBlockNumber}`)
+		if (storedDeployBlock && Number(storedDeployBlock) !== pinner.contractDeployBlockNumber) {
+			throw new Error(`DB deployBlockNumber mismatch: expected ${storedDeployBlock}, got ${pinner.contractDeployBlockNumber}`)
 		}
-		setMeta("deployBlockNumber", String(deployBlockNumber))
+		setMeta("deployBlockNumber", String(pinner.contractDeployBlockNumber))
 
 		console.log("[pinner] Initializing...")
 		const highestContiguousLeafIndex = pinner.highestContiguousLeafIndex()
@@ -230,7 +230,6 @@ export class Pinner {
 		const setMeta = this.db.prepare(`INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)`)
 		setMeta.run("lastSyncedLeafIndex", String(leafIndex))
 
-		console.log(`[pinner] Processed and inserted leaf ${leafIndex}`)
 		if (this.syncedToLeafIndex == null) {
 			throw new Error("syncedToLeafIndex is null in processLeafEvent. This should never happen.")
 		}
@@ -246,9 +245,22 @@ export class Pinner {
 	}
 
 	// TODO: I think this is finished. Need to test it now using real data.
-	async syncForward(startBlock: number, logBatchSize?: number, throttleSeconds?: number): Promise<void> {
+	async syncForward(params?: { startBlock?: number, endBlock: number, logBatchSize?: number, throttleMs?: number }): Promise<void> {
+		// Find the best blocknumber from which to sync forward
+		let { startBlock, endBlock, logBatchSize, throttleMs } = params ?? { startBlock: undefined, endBlock: undefined, logBatchSize: undefined, throttleMs: undefined }
+		startBlock = startBlock ?? this.contractDeployBlockNumber
+		startBlock = (startBlock < this.contractDeployBlockNumber) ? this.contractDeployBlockNumber : startBlock
+		let latestProcessedLeafStartBlock = await findBlockForLeafIndex({ provider: this.provider, contract: this.contract, leafIndex: this.syncedToLeafIndex, fromBlock: this.contractDeployBlockNumber, toBlock: endBlock })
+		latestProcessedLeafStartBlock = latestProcessedLeafStartBlock ?? this.contractDeployBlockNumber
+		const bestStartBlock: number = Math.max(startBlock, latestProcessedLeafStartBlock)
 		const { syncForward } = await import("./sync.ts")
-		return syncForward(this, startBlock, logBatchSize, throttleSeconds)
+		return await syncForward({
+			pinner: this,
+			startBlock: bestStartBlock,
+			endBlock,
+			logBatchSize,
+			throttleMs
+		})
 	}
 
 	// Returns the highest leafIndex N such that all leafIndexes [0...N]

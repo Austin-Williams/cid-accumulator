@@ -1,6 +1,5 @@
 import { Log } from "ethers"
 import { decodeLeafInsert } from "../shared/codec.ts"
-import { retryRpcCall } from "../shared/rpc.ts"
 import { Pinner } from "./Pinner.ts"
 
 export async function rebuildLocalDag(pinner: Pinner, startLeaf: number, endLeaf: number | null): Promise<void> {
@@ -8,7 +7,7 @@ export async function rebuildLocalDag(pinner: Pinner, startLeaf: number, endLeaf
 		throw new Error("[pinner] endLeaf must be a number and startLeaf must be less than or equal to endLeaf.")
 	}
 
-	console.log(`[pinner] Rebuilding and verifying local DAG from ${endLeaf - startLeaf} synced leaves.`)
+	console.log(`[pinner] Rebuilding and verifying local DAG from ${endLeaf - startLeaf} synced leaves...`)
 
 	const select = pinner.db.prepare(
 		`SELECT data, block_number, previous_insert_block FROM leaf_events WHERE leaf_index = ?`,
@@ -36,28 +35,31 @@ export async function rebuildLocalDag(pinner: Pinner, startLeaf: number, endLeaf
 	console.log(`[pinner] Rebuilt and verified local DAG from leafIndex ${startLeaf} to ${endLeaf}.`)
 }
 
-export async function syncForward(
+export async function syncForward(params: {
 	pinner: Pinner,
 	startBlock: number,
+	endBlock?:number,
 	logBatchSize?: number,
-	throttleSeconds?: number,
-): Promise<void> {
-	const latestBlock = await retryRpcCall(() => pinner.provider.getBlockNumber())
-	console.log(`[pinner] Syncing forward from block ${startBlock} to ${latestBlock}...`)
-	const batchSize = logBatchSize ?? 10000
+	throttleMs?: number
+}): Promise<void> {
+	let { pinner, startBlock, endBlock, logBatchSize, throttleMs } = params
+	let latestBlock: number = await pinner.provider.getBlockNumber()
+	endBlock = endBlock ?? latestBlock
 
-	for (let from = startBlock; from <= latestBlock; from += batchSize) {
-		if (throttleSeconds) await new Promise((r) => setTimeout(r, throttleSeconds * 1000))
-		const to = Math.min(from + batchSize - 1, latestBlock)
+	const batchSize = logBatchSize ?? 100
+
+	for (let from = startBlock; from <= endBlock; from += batchSize) {
+		if (throttleMs) await new Promise((r) => setTimeout(r, throttleMs))
+		const to = Math.min(from + batchSize - 1, endBlock)
 		console.log(`[pinner] Fetching logs from block ${from} to ${to}`)
-
-		const logs: Log[] = await retryRpcCall(() =>
-			pinner.provider.getLogs({
-				...pinner.contract.filters.LeafInsert(),
-				fromBlock: from,
-				toBlock: to,
-			}),
-		)
+		const filter = {
+			address: pinner.contractAddress,
+			...pinner.contract.filters.LeafInsert(),
+			fromBlock: from,
+			toBlock: to,
+		}
+		// print the filter
+		const logs: Log[] = await pinner.provider.getLogs(filter)
 
 		for (const log of logs) {
 			const { leafIndex, previousInsertBlockNumber, newData } = decodeLeafInsert(log)

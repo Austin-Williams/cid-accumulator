@@ -11,11 +11,11 @@ export function decodeLeafInsert(log: Log): LeafInsertEvent {
 	try {
 		parsed = MINIMAL_ACCUMULATOR_INTERFACE.parseLog(log)
 	} catch {
-		throw new Error(`Unexpected or unrecognized log: ${JSON.stringify(log)}`)
+		throw new Error(`Unexpected or unrecognized log: address=${log.address}, blockNumber=${log.blockNumber}, topics=${JSON.stringify(log.topics)}`)
 	}
 
 	if (!parsed || parsed.name !== "LeafInsert") {
-		throw new Error(`Unexpected or unrecognized log: ${JSON.stringify(log)}`)
+		throw new Error(`Unexpected or unrecognized log: address=${log.address}, blockNumber=${log.blockNumber}, topics=${JSON.stringify(log.topics)}`)
 	}
 
 	const { leafIndex, previousInsertBlockNumber, newData, combineResults, rightInputs } = parsed.args
