@@ -73,10 +73,31 @@ For example, if you insert `2^20` entries (just over 1 million), here’s how of
 
 So the gas cost is determined only by that insert’s merge activity — **not** by the total size of the data set.
 
-### Full IPFS data pinner
+### Backend Pinner Service
 
-> 🚧 In Progress (not working yet)
-Install IPFS Desktop from https://docs.ipfs.tech/install/ipfs-desktop
+Anyone can run a pinner service to pin the data emitted by the smart contract. This makes the data (trustlessly) available to front-end clients so they can download it directly from IPFS.
+
+**How to run a pinner service**
+
+1. Install [IPFS Desktop](https://docs.ipfs.tech/install/ipfs-desktop) and start it. You should see "Connected to IPFS" in the UI.
+
+2. Run the pinner service with:
+   ```sh
+   npx --no-install tsx ./source/pinner/runPinnerService.ts
+   ```
+
+**What the service does**
+
+You will be prompted for:
+- The address of the smart contract you want to pin data for.
+- The URL of the Ethereum RPC provider you want to use. (e.g. `http://127.0.0.1:8545`, or `https://rpc.ankr.com/...`)
+- The URL of the IPFS node you want to use. (e.g. `http://127.0.0.1:5001`)
+
+(You can optionally set these in the `.env` file with `TARGET_CONTRACT_ADDRESS`, `ETHEREUM_RPC_PROVIDER_URL`, and `IPFS_RPC_URL`, respectively)
+
+The service will start syncing from wherever it left off (if this is the first time running it, it will create a new local database to store events and sync from the beginning). As it syncs, it pins all relevant data to IPFS and stores the leaf insert events in the local database.
+
+Once it is caught up, it will start listening for new events and pin them as they come in.
 
 ### Light weight client
 

@@ -19,7 +19,10 @@ function isInternalNode(obj: unknown): obj is { L: CID; R: CID } {
 	)
 }
 
-export async function resolveMerkleTree(cid: CID, blockstore: { get(cid: CID): Promise<Uint8Array> }): Promise<Uint8Array[]> {
+export async function resolveMerkleTree(
+	cid: CID,
+	blockstore: { get(cid: CID): Promise<Uint8Array> },
+): Promise<Uint8Array[]> {
 	const raw = await blockstore.get(cid)
 	const node: IpldNode = dagCbor.decode(raw)
 
@@ -36,7 +39,7 @@ export async function resolveMerkleTree(cid: CID, blockstore: { get(cid: CID): P
 	}
 }
 
- // Minimal Blockstore adapter for kubo-rpc-client
+// Minimal Blockstore adapter for kubo-rpc-client
 export class IPFSBlockstore {
 	ipfs: ReturnType<typeof createKuboRPCClient>
 	constructor(ipfs: ReturnType<typeof createKuboRPCClient>) {

@@ -40,8 +40,8 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 // Toggle this to use the public gateway or local node
-const USE_GATEWAY = true; // Set to false to use local node
-const GATEWAY_URL = "https://dweb.link"; // Or "https://ipfs.io"
+const USE_GATEWAY = true // Set to false to use local node
+const GATEWAY_URL = "https://dweb.link" // Or "https://ipfs.io"
 
 async function main(cidStr: string) {
 	let blockstore: { get(cid: CID): Promise<Uint8Array> }
