@@ -1,6 +1,5 @@
 import { CID } from "multiformats/cid"
 import { encodeBlock } from "./codec.ts"
-import { base58btc } from "multiformats/bases/base58"
 
 export class MerkleMountainRange {
 	private peaks: CID[] = []
@@ -33,6 +32,7 @@ export class MerkleMountainRange {
 		combineResultsCIDs: string[]
 		combineResultsData: Uint8Array[]
 		rightInputsCIDs: string[]
+		leftInputsCIDs: string[]
 		peakBaggingCIDs: string[]
 		peakBaggingData: Uint8Array[]
 		trail: { cid: CID; data: Uint8Array }[]
@@ -51,6 +51,7 @@ export class MerkleMountainRange {
 		const combineResultsCIDs: string[] = []
 		const combineResultsData: Uint8Array[] = []
 		const rightInputsCIDs: string[] = []
+		const leftInputsCIDs: string[] = []
 
 		while ((this.leafCount >> height) & 1) {
 			const left = this.peaks.pop()
@@ -62,6 +63,7 @@ export class MerkleMountainRange {
 			combineResultsCIDs.push(merged.toString())
 			combineResultsData.push(bytes)
 			rightInputsCIDs.push(newPeak.toString())
+			leftInputsCIDs.push(left.toString())
 
 			newPeak = merged
 			height++
@@ -85,6 +87,7 @@ export class MerkleMountainRange {
 			combineResultsCIDs: combineResultsCIDs,
 			combineResultsData: combineResultsData,
 			rightInputsCIDs: rightInputsCIDs,
+			leftInputsCIDs: leftInputsCIDs,
 			peakBaggingCIDs: peakBaggingInfo.cids,
 			peakBaggingData: peakBaggingInfo.data,
 			trail: trail,
