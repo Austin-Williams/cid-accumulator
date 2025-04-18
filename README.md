@@ -73,7 +73,7 @@ For example, if you insert `2^20` entries (just over 1 million), here’s how of
 
 So the gas cost is determined only by that insert’s merge activity — **not** by the total size of the data set.
 
-### Backend Pinner Service
+### 📌 Backend Pinner Service
 
 Anyone can run a pinner service to pin the data emitted by the smart contract. This makes the data (trustlessly) available to front-end clients so they can download it directly from IPFS.
 
