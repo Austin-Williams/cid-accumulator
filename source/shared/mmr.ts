@@ -35,12 +35,15 @@ export class MerkleMountainRange {
 		rightInputsCIDs: string[]
 		peakBaggingCIDs: string[]
 		peakBaggingData: Uint8Array[]
+		trail: { cid: CID; data: Uint8Array }[]
 	}> {
 		if (expectedLeafIndex !== undefined && this.leafCount !== expectedLeafIndex) {
 			throw new Error(`Expected leafIndex ${this.leafCount} but got ${expectedLeafIndex}`)
 		}
+		const trail: { cid: CID; data: Uint8Array }[] = []
 
-		const { cid: leafCID } = await encodeBlock(blockData)
+		const { cid: leafCID, bytes: leafData } = await encodeBlock(blockData)
+		trail.push({ cid: leafCID, data: leafData })
 
 		let newPeak = leafCID
 		let height = 0
@@ -54,6 +57,7 @@ export class MerkleMountainRange {
 			if (!left) throw new Error("MMR structure error: no peak to merge")
 
 			const { cid: merged, bytes } = await encodeBlock({ L: left, R: newPeak })
+			trail.push({ cid: merged, data: bytes })
 
 			combineResultsCIDs.push(merged.toString())
 			combineResultsData.push(bytes)
@@ -67,8 +71,9 @@ export class MerkleMountainRange {
 		this.leafCount++
 
 		const peakBaggingInfo = await this.rootCIDWithTrail()
+		trail.push(...peakBaggingInfo.trail)
 
-		const rootCID = peakBaggingInfo
+		const rootCID = peakBaggingInfo.root
 
 		if (expectedNewRootCID !== undefined && peakBaggingInfo.root.toString() !== expectedNewRootCID) {
 			throw new Error(`Expected new root CID ${this.leafCount} but got ${expectedNewRootCID}`)
@@ -82,31 +87,39 @@ export class MerkleMountainRange {
 			rightInputsCIDs: rightInputsCIDs,
 			peakBaggingCIDs: peakBaggingInfo.cids,
 			peakBaggingData: peakBaggingInfo.data,
+			trail: trail,
 		}
 	}
 
-	async rootCIDWithTrail(): Promise<{ root: CID; cids: string[]; data: Uint8Array[] }> {
+	async rootCIDWithTrail(): Promise<{
+		root: CID
+		cids: string[]
+		data: Uint8Array[]
+		trail: { cid: CID; data: Uint8Array }[]
+	}> {
 		const cids: string[] = []
 		const data: Uint8Array[] = []
+		const trail: { cid: CID; data: Uint8Array }[] = []
 
 		if (this.peaks.length === 0) {
 			const empty = CID.parse("bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku")
-			return { root: empty, cids: [], data: [] }
+			return { root: empty, cids: [], data: [], trail: [] }
 		}
 
 		if (this.peaks.length === 1) {
-			return { root: this.peaks[0], cids: [], data: [] }
+			return { root: this.peaks[0], cids: [], data: [], trail: [] }
 		}
 
 		let current = this.peaks[0]
 		for (let i = 1; i < this.peaks.length; i++) {
 			const { cid, bytes } = await encodeBlock({ L: current, R: this.peaks[i] })
+			trail.push({ cid: cid, data: bytes })
 			cids.push(cid.toString())
 			data.push(bytes)
 			current = cid
 		}
 
-		return { root: current, cids, data }
+		return { root: current, cids, data, trail }
 	}
 
 	async rootCID(): Promise<CID> {

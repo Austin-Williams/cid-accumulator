@@ -6,7 +6,7 @@ This directory contains scripts and documentation for integration testing with t
 - Node.js and npm installed
 - .env file with:
   - `TARGET_CONTRACT_ADDRESS` (deployed contract address)
-  - `RPC_PROVIDER_URL` (e.g., Sepolia endpoint)
+  - `ETHEREUM_RPC_PROVIDER_URL` (e.g., Sepolia endpoint)
   - `MNEMONIC_FOR_SUBMITTER` (account to send transactions)
 
 ## Scripts

@@ -1,24 +1,22 @@
 import "dotenv/config"
-import { startHeliaNode } from "./ipfsNodeManager.ts"
 import { Pinner } from "./Pinner.ts"
 import { ethers } from "ethers"
 import { promptUserChoice } from "../shared/userPrompt.ts"
-
+import { create } from 'kubo-rpc-client'
 
 async function main() {
-	const { contractAddress, rpcUrl, heliaPersistence } = await getPinnerConfig();
-	const heliaController = await startHeliaNode(heliaPersistence);
+	const { contractAddress, ethereumRpcProviderUrl, ipfsApiUrl } = await getPinnerConfig()
 
-	const provider = new ethers.JsonRpcProvider(rpcUrl);
-	const pinner = await Pinner.init(contractAddress, provider, heliaController);
+	const provider = new ethers.JsonRpcProvider(ethereumRpcProviderUrl)
+	const kuboRPC = create({ url: ipfsApiUrl })
+	const pinner = await Pinner.init(contractAddress, provider, kuboRPC)
 
 	// Graceful shutdown
 	const shutdown = async () => {
-		console.log("\n[pinner] Shutting down gracefully...");
-		await pinner.shutdown?.();
-		await heliaController.stop();
-		process.exit(0);
-	};
+		console.log("\n[pinner] Shutting down gracefully...")
+		await pinner.shutdown?.()
+		process.exit(0)
+	}
 	process.on("SIGINT", shutdown)
 	process.on("SIGTERM", shutdown)
 
@@ -26,21 +24,14 @@ async function main() {
 	await pinner.syncForward()
 
 	console.log(
-		"[pinner] TODO: Event listening not yet implemented. The Pinner is initialized and ready for future logic."
-	);
+		"[pinner] TODO: Event listening not yet implemented. The Pinner is initialized and ready for future logic.",
+	)
 
-	console.log("[pinner] Running pinner service. Press Ctrl+C to exit.");
+	console.log("[pinner] Running pinner service. Press Ctrl+C to exit.")
 }
 
-
-type PinnerConfigIntent = {
-	contractAddress: string
-	rpcUrl: string
-	heliaPersistence: boolean
-}
-
-async function getPinnerConfig(): Promise<PinnerConfigIntent> {
-	console.log("[debug] getPinnerConfig called");
+async function getPinnerConfig(): Promise<{ contractAddress: string, ethereumRpcProviderUrl: string, ipfsApiUrl: string }> {
+	console.log("[debug] getPinnerConfig called")
 	// Print a visually clear header for configuration
 	console.log("\n==============================================")
 	console.log("      CID Accumulator Pinner Configuration")
@@ -55,39 +46,39 @@ async function getPinnerConfig(): Promise<PinnerConfigIntent> {
 		contractAddress = await promptUserChoice("Contract address [Ethereum, 0x...]: ", [], false)
 	}
 
-	// Gather RPC URL
-	let rpcUrl: string
-	if (process.env.RPC_PROVIDER_URL) {
-		rpcUrl = process.env.RPC_PROVIDER_URL
-		console.log(`Ethereum RPC URL loaded from .env: ${rpcUrl}`)
+	// Gather Ethereum RPC URL
+	let ethereumRpcProviderUrl: string
+	if (process.env.ETHEREUM_RPC_PROVIDER_URL) {
+		ethereumRpcProviderUrl = process.env.ETHEREUM_RPC_PROVIDER_URL
+		console.log(`Ethereum RPC URL loaded from .env: ${ethereumRpcProviderUrl}`)
 	} else {
-		rpcUrl = await promptUserChoice("Ethereum RPC URL [e.g. https://rpc.ankr.com/...]: ", [], false)
-	}
+		ethereumRpcProviderUrl = await promptUserChoice("Ethereum RPC URL [e.g. https://rpc.ankr.com/...]: ", [], false)
+	}	
 
-	// Ask if Helia node should be persistent
-	const persistenceChoice = await promptUserChoice("Should the Helia node be persistent? (y/n): ", ["y", "n"], false);
-	const heliaPersistence = persistenceChoice.trim().toLowerCase() === "y";
+	// Gather IPFS API URL
+	let ipfsApiUrl: string
+	if (process.env.IPFS_RPC_URL) {
+		ipfsApiUrl = process.env.IPFS_RPC_URL
+		console.log(`IPFS API URL loaded from .env: ${ipfsApiUrl}`)
+	} else {
+		ipfsApiUrl = await promptUserChoice("IPFS API URL [e.g. http://127.0.0.1:5001]: ", [], false)
+	}
 
 	// Display gathered configuration and prompt for confirmation
-	console.log("\n==============================================");
-	console.log("         Configuration Summary");
-	console.log("==============================================");
-	console.log(`Contract address : ${contractAddress}`);
-	console.log(`Ethereum RPC URL : ${rpcUrl}`);
-	console.log(`Helia node type  : ${heliaPersistence ? "Persistent (repo will be saved)" : "Temporary/In-memory (data lost on exit)"}`);
-	console.log("==============================================\n");
-	const confirmed = await promptUserChoice("Is this configuration correct? (y/n): ", ["y", "n"], false);
+	console.log("\n==============================================")
+	console.log("         Configuration Summary")
+	console.log("==============================================")
+	console.log(`Contract address : ${contractAddress}`)
+	console.log(`Ethereum RPC URL : ${ethereumRpcProviderUrl}`)
+	console.log(`IPFS API URL   : ${ipfsApiUrl}`)
+	console.log("==============================================\n")
+	const confirmed = await promptUserChoice("Is this configuration correct? (y/n): ", ["y", "n"], false)
 	if (confirmed.trim().toLowerCase() !== "y") {
-		console.log("Aborting: Please restart and enter the correct configuration.");
-		process.exit(1);
+		console.log("Aborting: Please restart and enter the correct configuration.")
+		process.exit(1)
 	}
-	return { contractAddress, rpcUrl, heliaPersistence }
+	return { contractAddress, ethereumRpcProviderUrl, ipfsApiUrl }
 }
-
-
-// No longer needed: IPFS node URL logic is gone.
-
-
 
 main().catch((e) => {
 	console.error("[pinner] Fatal error:", e)

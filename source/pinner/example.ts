@@ -66,9 +66,9 @@ async function getContractAddressAndProvider() {
 		throw new Error("Invalid Ethereum address.")
 	}
 
-	let providerUrl = process.env.RPC_PROVIDER_URL?.trim()
+	let providerUrl = process.env.ETHEREUM_RPC_PROVIDER_URL?.trim()
 	if (!providerUrl) {
-		console.log("No RPC_PROVIDER_URL found in environment variables.")
+		console.log("No ETHEREUM_RPC_PROVIDER_URL found in environment variables.")
 		providerUrl = await promptUserChoice("Enter the provider URL (default: 'http://127.0.0.1:8545'): ", [], false)
 		providerUrl = providerUrl.trim() || "http://127.0.0.1:8545"
 	} else {

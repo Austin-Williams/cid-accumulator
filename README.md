@@ -76,7 +76,7 @@ So the gas cost is determined only by that insert’s merge activity — **not**
 ### Full IPFS data pinner
 
 > 🚧 In Progress (not working yet)
-
+Install IPFS Desktop from https://docs.ipfs.tech/install/ipfs-desktop
 
 ### Light weight client
 

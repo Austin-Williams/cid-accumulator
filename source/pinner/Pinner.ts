@@ -1,5 +1,6 @@
 import { ethers } from "ethers"
 import { CID } from "multiformats/cid"
+import { KuboRPCClient } from 'kubo-rpc-client'
 
 import { MerkleMountainRange } from "../shared/mmr.ts"
 import { MINIMAL_ACCUMULATOR_ABI } from "../shared/constants.ts"
@@ -10,7 +11,6 @@ import path from "path"
 import fs from "fs"
 import { getLeafInsertLog, walkBackLeafInsertLogsOrThrow } from "../shared/logs.ts"
 import { LeafInsertEvent } from "../shared/types.ts"
-import { HeliaNodeController } from "./ipfsNodeManager.ts"
 
 export class Pinner {
 	public provider!: ethers.JsonRpcProvider
@@ -21,14 +21,18 @@ export class Pinner {
 	public mmr = new MerkleMountainRange()
 	public syncedToLeafIndex!: number
 	public syncedToBlockNumber!: number
-	public heliaNodeController!: HeliaNodeController
+	public kuboRPC!: KuboRPCClient
 
 	constructor() {}
 
-	static async init(contractAddress: string, provider: ethers.JsonRpcProvider, heliaNodeController: HeliaNodeController): Promise<Pinner> {
+	static async init(
+		contractAddress: string,
+		provider: ethers.JsonRpcProvider,
+		kuboRPCClient: KuboRPCClient,
+	): Promise<Pinner> {
 		const pinner = new Pinner()
 		pinner.syncedToLeafIndex = -1
-		pinner.heliaNodeController = heliaNodeController
+		pinner.kuboRPC = kuboRPCClient
 
 		pinner.provider = provider
 		const normalizedAddress = contractAddress.toLowerCase()
@@ -183,6 +187,7 @@ export class Pinner {
 			rightInputsCIDs,
 			peakBaggingCIDs,
 			peakBaggingData,
+			trail,
 		} = await this.mmr.addLeafWithTrail(newData, leafIndex)
 
 		// Persist the new leaf and related data in our local DB
@@ -233,8 +238,23 @@ export class Pinner {
 			throw new Error("syncedToLeafIndex is null in processLeafEvent. This should never happen.")
 		}
 
-		// TODO: Pin the data to IPFS
-	
+		// Pin the leaf CID, combineResultsCIDs, and peakBaggingCIDs using Helia
+
+		try {
+			// Pin each item and log result
+			for (const { cid, data } of trail) {
+				try {
+					const checkCID = await this.kuboRPC.block.put(data, { format: "dag-cbor", mhtype: "sha2-256", pin: true})
+					if (cid.toString() !== checkCID.toString()) throw new Error(`[pinner] CID mismatch: expected ${cid.toString()}, got ${checkCID.toString()}`)
+					this.kuboRPC.routing.provide(cid, {recursive: true})
+					console.log(`[pinner] Pinned and providing CID: ${cid.toString()}`)
+				} catch (e) {
+					console.error(`[pinner] Failed to add and pin CID: ${cid.toString()}`, e)
+				}
+			}
+		} catch (e) {
+			console.error("[pinner] Error during pinning:", e)
+		}
 
 		this.syncedToLeafIndex++
 

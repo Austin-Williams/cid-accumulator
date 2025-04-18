@@ -20,7 +20,7 @@ function sleep(ms: number) {
 
 async function main() {
 	let contractAddress = process.env.TEST_TARGET_CONTRACT_ADDRESS
-	let providerUrl = process.env.TEST_RPC_PROVIDER_URL
+	let providerUrl = process.env.ETHEREUM_RPC_PROVIDER_URL
 	let mnemonic = process.env.TEST_MNEMONIC_FOR_SUBMITTER
 
 	if (!contractAddress) {

@@ -11,10 +11,10 @@ const CONTRACT_ARTIFACT_PATH = path.resolve(__dirname, "../out/OwnedExample.sol/
 const OUTPUT_PATH = path.resolve(__dirname, "./deployed-owned-example.json")
 
 async function main() {
-	const providerUrl = process.env.TEST_RPC_PROVIDER_URL
-	const mnemonic = process.env.TEST_MNEMONIC_FOR_SUBMITTER
+	const providerUrl = process.env.ETHEREUM_RPC_PROVIDER_URL
+	const mnemonic = process.env.ETHEREUM_RPC_PROVIDER_URL
 	if (!providerUrl || !mnemonic) {
-		throw new Error("Missing env: RPC_PROVIDER_URL or MNEMONIC_FOR_SUBMITTER")
+		throw new Error("Missing env: ETHEREUM_RPC_PROVIDER_URL or MNEMONIC_FOR_SUBMITTER")
 	}
 
 	// Read Foundry artifact for OwnedExample
