@@ -1,21 +1,16 @@
 import "dotenv/config"
 import { Pinner } from "../source/pinner/Pinner"
-import { getRPCProvider } from "../source/shared/rpc.ts"
+import { create as createKuboRPC } from "kubo-rpc-client"
+import { ethers } from "ethers"
+import { getPinnerConfig } from "../source/pinner/runPinnerService"
 
 async function main() {
-	const CONTRACT_ADDRESS = process.env.TEST_TARGET_CONTRACT_ADDRESS
-	const PROVIDER_URL = process.env.ETHEREUM_RPC_PROVIDER_URL
-	console.log("[integration test] Using provider URL:", PROVIDER_URL)
+	const { contractAddress, ethereumRpcProviderUrl, ipfsApiUrl } = await getPinnerConfig()
+	console.log("[integration test] Using provider URL:", ethereumRpcProviderUrl)
 
-	if (!CONTRACT_ADDRESS || !PROVIDER_URL) {
-		console.error("ERROR: Set TEST_TARGET_CONTRACT_ADDRESS and ETHEREUM_RPC_PROVIDER_URL in your environment.")
-		process.exit(1)
-	}
-
-	// Setup provider and contract
-	const provider = getRPCProvider(PROVIDER_URL)
-	const heliaNodeController = await startHeliaNode(true)
-	const pinner = await Pinner.init(CONTRACT_ADDRESS, provider, heliaNodeController)
+	const provider = new ethers.JsonRpcProvider(ethereumRpcProviderUrl)
+	const kuboRPC = createKuboRPC({ url: ipfsApiUrl })
+	const pinner = await Pinner.init(contractAddress, provider, kuboRPC)
 
 	console.log("[pinner] Syncing leaves from contract...")
 	//await pinner.syncBackward()

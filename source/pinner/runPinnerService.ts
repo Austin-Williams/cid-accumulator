@@ -30,7 +30,7 @@ async function main() {
 	console.log("[pinner] Running pinner service. Press Ctrl+C to exit.")
 }
 
-async function getPinnerConfig(): Promise<{ contractAddress: string, ethereumRpcProviderUrl: string, ipfsApiUrl: string }> {
+export async function getPinnerConfig(): Promise<{ contractAddress: string, ethereumRpcProviderUrl: string, ipfsApiUrl: string }> {
 	console.log("[debug] getPinnerConfig called")
 	// Print a visually clear header for configuration
 	console.log("\n==============================================")
