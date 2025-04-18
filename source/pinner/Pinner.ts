@@ -1,6 +1,6 @@
-import { ethers } from "ethers"
+import { ethers, Log } from "ethers"
 import { CID } from "multiformats/cid"
-import { KuboRPCClient } from 'kubo-rpc-client'
+import { KuboRPCClient } from "kubo-rpc-client"
 
 import { MerkleMountainRange } from "../shared/mmr.ts"
 import { MINIMAL_ACCUMULATOR_ABI } from "../shared/constants.ts"
@@ -11,8 +11,11 @@ import path from "path"
 import fs from "fs"
 import { getLeafInsertLog, walkBackLeafInsertLogsOrThrow } from "../shared/logs.ts"
 import { LeafInsertEvent } from "../shared/types.ts"
+import { decodeLeafInsert } from "../shared/codec.ts"
 
 export class Pinner {
+	private eventListenerActive = false
+	private eventUnsubscribeFn: (() => void) | null = null
 	public provider!: ethers.JsonRpcProvider
 	public contract!: ethers.Contract
 	public contractAddress!: string
@@ -24,6 +27,87 @@ export class Pinner {
 	public kuboRPC!: KuboRPCClient
 
 	constructor() {}
+
+	/**
+	 * Listens for new LeafInsert events using either polling (queryFilter) or subscription (contract.on),
+	 * controlled by options. It is strongly recommended to sync the pinner before listening for events.
+	 * 
+	 * @param options { mode: 'poll' | 'subscribe', pollIntervalMs?: number }
+	 *   - mode: 'poll' (default, works with public RPCs) or 'subscribe' (for private nodes supporting filters)
+	 *   - pollIntervalMs: polling interval in ms (default 15000)
+	 */
+	async listenForEvents(options: { mode?: "poll" | "subscribe"; pollIntervalMs?: number } = {}) {
+		if (this.eventListenerActive) {
+			console.warn("[pinner] Already listening for events.")
+			return
+		}
+		const mode = options.mode ?? "subscribe"
+		const pollIntervalMs = options.pollIntervalMs ?? 15000
+		this.eventListenerActive = true
+
+		const eventHandler = async (event: Log) => {
+			try {
+				const decoded = decodeLeafInsert(event)
+				await this.processLeafEvent(decoded)
+				console.log(
+					`[pinner] Processed new leaf event: leafIndex=${decoded.leafIndex}, blockNumber=${event.blockNumber}`,
+				)
+			} catch (err) {
+				console.error("[pinner] Error processing new leaf event:", err)
+			}
+		}
+
+		if (mode === "subscribe") {
+			console.log("[pinner] Subscribing to on-chain LeafInsert events...")
+			const handler = (...args: any[]) => {
+				const event = args[args.length - 1] // ethers passes the event object last
+				eventHandler(event)
+			}
+			this.contract.on("LeafInsert", handler)
+			this.eventUnsubscribeFn = () => {
+				this.contract.off("LeafInsert", handler)
+				this.eventListenerActive = false
+				console.log("[pinner] Unsubscribed from LeafInsert events.")
+			}
+		} else {
+			console.log("[pinner] Polling for on-chain LeafInsert events...")
+			let lastBlock = await this.provider.getBlockNumber()
+			console.log(`[pinner] Starting event polling from block ${lastBlock}`)
+			const poll = async () => {
+				while (this.eventListenerActive) {
+					try {
+						const currentBlock = await this.provider.getBlockNumber()
+						if (currentBlock > lastBlock) {
+							const events = await this.contract.queryFilter("LeafInsert", lastBlock + 1, currentBlock)
+							for (const event of events) await eventHandler(event)
+							lastBlock = currentBlock
+							// Only update syncedToBlockNumber if there were NO leaf insert events (otherwise processLeafEvent will update it)
+							if (events.length === 0) this.syncedToBlockNumber = currentBlock
+						}
+					} catch (err) {
+						console.error("[pinner] Error polling for new leaf events:", err)
+					}
+					await new Promise((res) => setTimeout(res, pollIntervalMs))
+				}
+				console.log("[pinner] Stopped polling for LeafInsert events.")
+			}
+			poll()
+			this.eventUnsubscribeFn = () => {
+				this.eventListenerActive = false
+				console.log("[pinner] Stopped polling for LeafInsert events.")
+			}
+		}
+	}
+
+	/**
+	 * Call this to stop polling for new events.
+	 */
+	async stopListeningForEvents() {
+		if (this.eventUnsubscribeFn) {
+			this.eventUnsubscribeFn()
+			this.eventUnsubscribeFn = null
+		}
+	}
 
 	static async init(
 		contractAddress: string,
@@ -92,9 +176,7 @@ export class Pinner {
 		const highestContiguousLeafIndex = pinner.highestContiguousLeafIndex()
 		if (typeof highestContiguousLeafIndex === "number" && highestContiguousLeafIndex >= 0) {
 			await pinner.rebuildLocalDag(0, highestContiguousLeafIndex)
-			console.log(
-				`[pinner] Pinner initialized. Synced to leaf index ${pinner.syncedToLeafIndex}. Total leaves synced: ${pinner.syncedToLeafIndex + 1}`,
-			)
+			console.log(`[pinner] Pinner initialized. Synced to leaf index ${pinner.syncedToLeafIndex}.`)
 		} else {
 			console.log(`[pinner] Pinner initialized. No leaves synced.`)
 		}
@@ -238,20 +320,21 @@ export class Pinner {
 			throw new Error("syncedToLeafIndex is null in processLeafEvent. This should never happen.")
 		}
 
-		// Pin the leaf CID, combineResultsCIDs, and peakBaggingCIDs using Helia
+		// Pin and provide the leaf CID, combineResultsCIDs, and peakBaggingCIDs to IPFS
 
 		try {
 			// Pin each item and log result
 			for (const { cid, data } of trail) {
 				try {
-					const checkCID = await this.kuboRPC.block.put(data, { format: "dag-cbor", mhtype: "sha2-256", pin: true})
-					if (cid.toString() !== checkCID.toString()) throw new Error(`[pinner] CID mismatch: expected ${cid.toString()}, got ${checkCID.toString()}`)
-					this.kuboRPC.routing.provide(cid, {recursive: true})
-					console.log(`[pinner] Pinned and providing CID: ${cid.toString()}`)
+					const checkCID = await this.kuboRPC.block.put(data, { format: "dag-cbor", mhtype: "sha2-256", pin: true })
+					if (cid.toString() !== checkCID.toString())
+						throw new Error(`[pinner] CID mismatch: expected ${cid.toString()}, got ${checkCID.toString()}`)
+					this.kuboRPC.routing.provide(cid, { recursive: true })
 				} catch (e) {
 					console.error(`[pinner] Failed to add and pin CID: ${cid.toString()}`, e)
 				}
 			}
+			console.log(`[pinner] Pinned and providing all blocks related to leaf index ${leafIndex} with root CID: ${rootCID}`)
 		} catch (e) {
 			console.error("[pinner] Error during pinning:", e)
 		}

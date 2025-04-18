@@ -2,7 +2,7 @@ import "dotenv/config"
 import { Pinner } from "./Pinner.ts"
 import { ethers } from "ethers"
 import { promptUserChoice } from "../shared/userPrompt.ts"
-import { create } from 'kubo-rpc-client'
+import { create } from "kubo-rpc-client"
 
 async function main() {
 	const { contractAddress, ethereumRpcProviderUrl, ipfsApiUrl } = await getPinnerConfig()
@@ -14,23 +14,27 @@ async function main() {
 	// Graceful shutdown
 	const shutdown = async () => {
 		console.log("\n[pinner] Shutting down gracefully...")
+		await pinner.stopListeningForEvents()
 		await pinner.shutdown?.()
 		process.exit(0)
 	}
 	process.on("SIGINT", shutdown)
 	process.on("SIGTERM", shutdown)
 
-	// TODO: Implement syncBackward, startListeningForEvents, and full pinning logic here.
+	// Initial sync before listening for events
 	await pinner.syncForward()
 
-	console.log(
-		"[pinner] TODO: Event listening not yet implemented. The Pinner is initialized and ready for future logic.",
-	)
+	// Start listening for new events
+	await pinner.listenForEvents({mode: "poll"})
 
 	console.log("[pinner] Running pinner service. Press Ctrl+C to exit.")
 }
 
-export async function getPinnerConfig(): Promise<{ contractAddress: string, ethereumRpcProviderUrl: string, ipfsApiUrl: string }> {
+export async function getPinnerConfig(): Promise<{
+	contractAddress: string
+	ethereumRpcProviderUrl: string
+	ipfsApiUrl: string
+}> {
 	console.log("[debug] getPinnerConfig called")
 	// Print a visually clear header for configuration
 	console.log("\n==============================================")
@@ -53,7 +57,7 @@ export async function getPinnerConfig(): Promise<{ contractAddress: string, ethe
 		console.log(`Ethereum RPC URL loaded from .env: ${ethereumRpcProviderUrl}`)
 	} else {
 		ethereumRpcProviderUrl = await promptUserChoice("Ethereum RPC URL [e.g. https://rpc.ankr.com/...]: ", [], false)
-	}	
+	}
 
 	// Gather IPFS API URL
 	let ipfsApiUrl: string

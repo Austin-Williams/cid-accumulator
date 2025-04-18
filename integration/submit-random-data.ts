@@ -10,7 +10,7 @@ import { fileURLToPath } from "url"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const DELAY_SECONDS = 30 // Delay in seconds between submissions
+const DELAY_SECONDS = 10 // Delay in seconds between submissions
 const CONTRACT_ABI_PATH = path.resolve(__dirname, "../source/contracts/abi/OwnedExample.json")
 const OUTPUT_PATH = path.resolve(__dirname, "./submitted-data.json")
 
