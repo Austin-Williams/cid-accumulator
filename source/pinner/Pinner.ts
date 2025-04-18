@@ -10,6 +10,7 @@ import path from "path"
 import fs from "fs"
 import { getLeafInsertLog, walkBackLeafInsertLogsOrThrow } from "../shared/logs.ts"
 import { LeafInsertEvent } from "../shared/types.ts"
+import { HeliaNodeController } from "./ipfsNodeManager.ts"
 
 export class Pinner {
 	public provider!: ethers.JsonRpcProvider
@@ -20,14 +21,14 @@ export class Pinner {
 	public mmr = new MerkleMountainRange()
 	public syncedToLeafIndex!: number
 	public syncedToBlockNumber!: number
-	public ipfsNodeUrl!: string
+	public heliaNodeController!: HeliaNodeController
 
 	constructor() {}
 
-	static async init(contractAddress: string, provider: ethers.JsonRpcProvider, ipfsNodeUrl: string): Promise<Pinner> {
+	static async init(contractAddress: string, provider: ethers.JsonRpcProvider, heliaNodeController: HeliaNodeController): Promise<Pinner> {
 		const pinner = new Pinner()
 		pinner.syncedToLeafIndex = -1
-		pinner.ipfsNodeUrl = ipfsNodeUrl
+		pinner.heliaNodeController = heliaNodeController
 
 		pinner.provider = provider
 		const normalizedAddress = contractAddress.toLowerCase()
@@ -178,13 +179,13 @@ export class Pinner {
 			leafCID,
 			rootCID,
 			combineResultsCIDs,
-			rightInputsCIDs,
 			combineResultsData,
+			rightInputsCIDs,
 			peakBaggingCIDs,
 			peakBaggingData,
 		} = await this.mmr.addLeafWithTrail(newData, leafIndex)
 
-		// Persist the new leaf and related data in our DB
+		// Persist the new leaf and related data in our local DB
 		this.db
 			.prepare(
 				`
@@ -231,6 +232,9 @@ export class Pinner {
 		if (this.syncedToLeafIndex == null) {
 			throw new Error("syncedToLeafIndex is null in processLeafEvent. This should never happen.")
 		}
+
+		// TODO: Pin the data to IPFS
+	
 
 		this.syncedToLeafIndex++
 

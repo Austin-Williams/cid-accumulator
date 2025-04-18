@@ -1,6 +1,7 @@
 import "dotenv/config"
 import { Pinner } from "../source/pinner/Pinner"
 import { getRPCProvider } from "../source/shared/rpc.ts"
+import {startHeliaNode} from "../source/pinner/ipfsNodeManager.ts"
 
 async function main() {
 	const CONTRACT_ADDRESS = process.env.TEST_TARGET_CONTRACT_ADDRESS
@@ -14,7 +15,8 @@ async function main() {
 
 	// Setup provider and contract
 	const provider = getRPCProvider(PROVIDER_URL)
-	const pinner = await Pinner.init(CONTRACT_ADDRESS, provider, "http://127.0.0.1:5001")
+	const heliaNodeController = await startHeliaNode(true)
+	const pinner = await Pinner.init(CONTRACT_ADDRESS, provider, heliaNodeController)
 
 	console.log("[pinner] Syncing leaves from contract...")
 	//await pinner.syncBackward()
