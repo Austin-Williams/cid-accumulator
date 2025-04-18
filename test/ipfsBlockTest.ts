@@ -19,13 +19,40 @@ class IPFSBlockstore {
 	}
 }
 
+class PublicGatewayBlockstore {
+	gatewayBase: string
+	constructor(gatewayBase: string) {
+		this.gatewayBase = gatewayBase.replace(/\/$/, "")
+	}
+	async get(cid: CID): Promise<Uint8Array> {
+		const url = `${this.gatewayBase}/ipfs/${cid.toString()}`
+		const res = await fetch(url)
+		if (!res.ok) {
+			throw new Error(`Failed to fetch block ${cid} from gateway: ${res.status} ${res.statusText}`)
+		}
+		const buf = new Uint8Array(await res.arrayBuffer())
+		return buf
+	}
+}
+
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
+// Toggle this to use the public gateway or local node
+const USE_GATEWAY = true; // Set to false to use local node
+const GATEWAY_URL = "https://dweb.link"; // Or "https://ipfs.io"
+
 async function main(cidStr: string) {
-	const ipfs = createKuboRPCClient({ url: IPFS_API_URL })
-	const blockstore = new IPFSBlockstore(ipfs)
+	let blockstore: { get(cid: CID): Promise<Uint8Array> }
+	if (USE_GATEWAY) {
+		console.log(`Using public gateway blockstore: ${GATEWAY_URL}`)
+		blockstore = new PublicGatewayBlockstore(GATEWAY_URL)
+	} else {
+		console.log(`Using local IPFS node at ${IPFS_API_URL}`)
+		const ipfs = createKuboRPCClient({ url: IPFS_API_URL })
+		blockstore = new IPFSBlockstore(ipfs)
+	}
 	try {
 		// Robustly resolve the submitted-data.json path
 		const __filename = fileURLToPath(import.meta.url)
