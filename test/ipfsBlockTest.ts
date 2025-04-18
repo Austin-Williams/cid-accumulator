@@ -1,43 +1,71 @@
-import { create as createKuboClient } from "kubo-rpc-client"
-import * as dagCbor from "@ipld/dag-cbor"
-import { randomBytes } from "crypto"
+import { createKuboRPCClient } from "kubo-rpc-client"
+import "dotenv/config"
 import { CID } from "multiformats/cid"
 
-async function main() {
-	// 1. Generate 32 random bytes
-	const data = randomBytes(32)
-	// 2. DAG-CBOR encode as a simple object (CBOR requires an object root)
-	const encoded = dagCbor.encode({ data })
+// Use IPFS_RPC_URL from .env, fallback to default
+const IPFS_API_URL = process.env.IPFS_RPC_URL || "http://127.0.0.1:5001/api/v0"
+const CID_STRING = "bafyreiabiqywpfpmogug36awk6ljctuifcijcssyzyz66b3hug7r5ieupu"
 
-	// 3. Connect to local IPFS node
-	const ipfs = createKuboClient({ url: "http://127.0.0.1:5001/api/v0" })
+import { resolveMerkleTree } from "../source/shared/ipfs"
 
-	// 4. Add the block
-	const putRes = await ipfs.block.put(encoded, { mhtype: "sha2-256", format: "dag-cbor" })
-	// kubo-rpc-client returns { Key: <cid string> }
-	const cidStr = putRes.Key || putRes.cid || putRes.Cid || putRes.path || putRes.Hash || putRes
-	const cid = CID.parse(typeof cidStr === "string" ? cidStr : cidStr.toString())
-	console.log("Block CID:", cid.toString())
-
-	// 5. Pin the block
-	await ipfs.pin.add(cid.toString())
-	console.log("Pinned block:", cid.toString())
-
-	// 6. Retrieve the block
-	const retrievedBlock = await ipfs.block.get(cid.toString())
-	const decoded = dagCbor.decode(retrievedBlock)
-	console.log("Decoded block:", decoded)
-
-	// 7. Test: Compare original and retrieved data
-	if (Buffer.compare(data, decoded.data) === 0) {
-		console.log("SUCCESS: Data matches!")
-	} else {
-		console.error("FAIL: Data does not match.")
-		process.exit(1)
+// Minimal Blockstore adapter for kubo-rpc-client
+class IPFSBlockstore {
+	ipfs: ReturnType<typeof createKuboRPCClient>
+	constructor(ipfs: ReturnType<typeof createKuboRPCClient>) {
+		this.ipfs = ipfs
+	}
+	async get(cid: CID): Promise<Uint8Array> {
+		return await this.ipfs.block.get(cid)
 	}
 }
 
-main().catch((err) => {
-	console.error(err)
-	process.exit(1)
-})
+import fs from "node:fs"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+
+async function main(cidStr: string) {
+	const ipfs = createKuboRPCClient({ url: IPFS_API_URL })
+	const blockstore = new IPFSBlockstore(ipfs)
+	try {
+		// Robustly resolve the submitted-data.json path
+		const __filename = fileURLToPath(import.meta.url)
+		const __dirname = path.dirname(__filename)
+		const submittedPath = path.resolve(__dirname, "../integration/submitted-data.json")
+		const submittedData = JSON.parse(fs.readFileSync(submittedPath, "utf8"))
+		const expectedLeaves: string[] = submittedData.map((entry: any) => entry.randomBytes)
+
+		const cid = CID.parse(cidStr)
+		const leaves = await resolveMerkleTree(cid, blockstore)
+		const actualLeaves = leaves.map((leaf) =>
+			Array.from(leaf)
+				.map((b) => b.toString(16).padStart(2, "0"))
+				.join(""),
+		)
+
+		let allMatch = true
+		if (actualLeaves.length !== expectedLeaves.length) {
+			allMatch = false
+			console.error(`Leaf count mismatch: got ${actualLeaves.length}, expected ${expectedLeaves.length}`)
+		} else {
+			for (let i = 0; i < actualLeaves.length; ++i) {
+				if (actualLeaves[i] !== expectedLeaves[i]) {
+					allMatch = false
+					console.error(`Mismatch at index ${i}: got ${actualLeaves[i]}, expected ${expectedLeaves[i]}`)
+				}
+			}
+		}
+
+		if (allMatch) {
+			console.log("SUCCESS: All leaves match submitted-data.json in order.")
+			process.exit(0)
+		} else {
+			console.error("FAILURE: Leaves do not match submitted-data.json.")
+			process.exit(1)
+		}
+	} catch (err: any) {
+		console.error("Failed to resolve Merkle tree or compare:", err.message || err)
+		process.exit(2)
+	}
+}
+
+main(CID_STRING)

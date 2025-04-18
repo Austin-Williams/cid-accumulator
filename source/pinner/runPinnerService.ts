@@ -25,7 +25,7 @@ async function main() {
 	await pinner.syncForward()
 
 	// Start listening for new events
-	await pinner.listenForEvents({mode: "poll"})
+	await pinner.listenForEvents({ mode: "poll" })
 
 	console.log("[pinner] Running pinner service. Press Ctrl+C to exit.")
 }

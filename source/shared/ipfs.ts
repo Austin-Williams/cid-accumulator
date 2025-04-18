@@ -1,6 +1,6 @@
 import * as dagCbor from "@ipld/dag-cbor"
 import { CID } from "multiformats/cid"
-import type { Blockstore } from "interface-blockstore"
+import { createKuboRPCClient } from "kubo-rpc-client"
 
 export type IpldNode = Uint8Array | CID | { L: CID; R: CID }
 
@@ -19,7 +19,7 @@ function isInternalNode(obj: unknown): obj is { L: CID; R: CID } {
 	)
 }
 
-export async function resolveMerkleTree(cid: CID, blockstore: Blockstore): Promise<Uint8Array[]> {
+export async function resolveMerkleTree(cid: CID, blockstore: IPFSBlockstore): Promise<Uint8Array[]> {
 	const raw = await blockstore.get(cid)
 	const node: IpldNode = dagCbor.decode(raw)
 
@@ -33,5 +33,16 @@ export async function resolveMerkleTree(cid: CID, blockstore: Blockstore): Promi
 		return [...L, ...R]
 	} else {
 		throw new Error("Unexpected node structure")
+	}
+}
+
+export // Minimal Blockstore adapter for kubo-rpc-client
+class IPFSBlockstore {
+	ipfs: ReturnType<typeof createKuboRPCClient>
+	constructor(ipfs: ReturnType<typeof createKuboRPCClient>) {
+		this.ipfs = ipfs
+	}
+	async get(cid: CID): Promise<Uint8Array> {
+		return await this.ipfs.block.get(cid)
 	}
 }

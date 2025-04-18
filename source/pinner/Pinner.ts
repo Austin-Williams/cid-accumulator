@@ -31,7 +31,7 @@ export class Pinner {
 	/**
 	 * Listens for new LeafInsert events using either polling (queryFilter) or subscription (contract.on),
 	 * controlled by options. It is strongly recommended to sync the pinner before listening for events.
-	 * 
+	 *
 	 * @param options { mode: 'poll' | 'subscribe', pollIntervalMs?: number }
 	 *   - mode: 'poll' (default, works with public RPCs) or 'subscribe' (for private nodes supporting filters)
 	 *   - pollIntervalMs: polling interval in ms (default 15000)
@@ -334,7 +334,9 @@ export class Pinner {
 					console.error(`[pinner] Failed to add and pin CID: ${cid.toString()}`, e)
 				}
 			}
-			console.log(`[pinner] Pinned and providing all blocks related to leaf index ${leafIndex} with root CID: ${rootCID}`)
+			console.log(
+				`[pinner] Pinned and providing all blocks related to leaf index ${leafIndex} with root CID: ${rootCID}`,
+			)
 		} catch (e) {
 			console.error("[pinner] Error during pinning:", e)
 		}
