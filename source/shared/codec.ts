@@ -22,7 +22,7 @@ export function decodeLeafInsert(log: Log): LeafInsertEvent {
 		)
 	}
 
-	const { leafIndex, previousInsertBlockNumber, newData, combineResults, rightInputs } = parsed.args
+	const { leafIndex, previousInsertBlockNumber, newData, leftInputs } = parsed.args
 
 	return {
 		leafIndex: Number(leafIndex),
@@ -31,8 +31,7 @@ export function decodeLeafInsert(log: Log): LeafInsertEvent {
 			typeof newData === "string" && newData.startsWith("0x")
 				? new Uint8Array(Buffer.from(newData.slice(2), "hex"))
 				: new Uint8Array(newData),
-		combineResults,
-		rightInputs,
+		leftInputs,
 	}
 }
 

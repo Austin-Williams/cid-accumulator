@@ -14,7 +14,7 @@ async function main() {
 
 	console.log("[pinner] Syncing leaves from contract...")
 	//await pinner.syncBackward()
-	await pinner.syncForward()
+	//await pinner.syncForward()
 
 	await pinner.verifyRootCID()
 }

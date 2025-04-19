@@ -14,8 +14,7 @@ contract DagCborAccumulator {
 		uint32 indexed leafIndex,
 		uint32 previousInsertBlockNumber,
 		bytes newData,
-		bytes32[] combineResults,
-		bytes32[] rightInputs
+		bytes32[] leftInputs
 	);
 
 	// CONSTANTS
@@ -80,9 +79,8 @@ contract DagCborAccumulator {
 		uint8 peakCount = uint8((bits >> PEAK_COUNT_OFFSET) & PEAK_COUNT_MASK);
 
 		// Collect combine steps (max 32 possible for 32 peaks)
-		bytes32[32] memory combineResults;
-		bytes32[32] memory rightInputs;
-		uint8 combineCount = 0;
+		bytes32[32] memory leftInputs;
+		uint8 mergeCount = 0;
 
 		// Merge peaks of equal height
 		while (
@@ -94,10 +92,9 @@ contract DagCborAccumulator {
 
 			bytes32 combined = _combine(topHash, carryHash);
 
-			// Record the merge for logging
-			combineResults[combineCount] = combined;
-			rightInputs[combineCount] = carryHash;
-			combineCount++;
+			// Record the left input for this merge
+			leftInputs[mergeCount] = topHash;
+			unchecked {mergeCount++;}
 
 			carryHash = combined;
 			unchecked { carryHeight++; }
@@ -105,20 +102,18 @@ contract DagCborAccumulator {
 
 		peaks[peakCount] = carryHash; // SSTORE
 
-		// Shrink arrays to actual size
-		bytes32[] memory finalCombineResults = new bytes32[](combineCount);
-		bytes32[] memory finalRightInputs = new bytes32[](combineCount);
-		for (uint8 i = 0; i < combineCount; i++) {
-			finalCombineResults[i] = combineResults[i];
-			finalRightInputs[i] = rightInputs[i];
+		// Shrink array to actual size
+		bytes32[] memory finalLeftInputs = new bytes32[](mergeCount);
+		for (uint8 i = 0; i < mergeCount;) {
+			finalLeftInputs[i] = leftInputs[i];
+			unchecked { i++; }
 		}
 
 		emit LeafInsert(
 			uint32((bits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK),
 			uint32((bits >> PREVIOUS_INSERT_BLOCKNUM_OFFSET) & PREVIOUS_INSERT_BLOCKNUM_MASK),
 			newData,
-			finalCombineResults,
-			finalRightInputs
+			finalLeftInputs
 		);
 
 		// Update packed heights

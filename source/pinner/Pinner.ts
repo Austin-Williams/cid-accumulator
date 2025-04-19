@@ -235,6 +235,7 @@ export class Pinner {
 		newData: Uint8Array
 		blockNumber?: number
 		previousInsertBlockNumber?: number
+		leftInputs?: string[]
 	}): Promise<void> {
 		const { leafIndex, blockNumber, newData, previousInsertBlockNumber } = params
 		// If we detect a gap in leaves, try to fetch them and process them.

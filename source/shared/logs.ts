@@ -67,9 +67,7 @@ export async function getLeafInsertLog(params: {
 				throw new Error(`[logs fetch] previousInsertBlockNumber is undefined ${JSON.stringify(chunkLogs[0])}`)
 			if (decodedLeafInsert.newData === undefined)
 				throw new Error(`[logs fetch] newData is undefined ${JSON.stringify(chunkLogs[0])}`)
-			if (decodedLeafInsert.combineResults === undefined)
-				throw new Error(`[logs fetch] combineResults is undefined ${JSON.stringify(chunkLogs[0])}`)
-			if (decodedLeafInsert.rightInputs === undefined)
+			if (decodedLeafInsert.leftInputs === undefined)
 				throw new Error(`[logs fetch] rightInputs is undefined ${JSON.stringify(chunkLogs[0])}`)
 			if (chunkLogs[0].blockNumber === undefined)
 				throw new Error(`[logs fetch] blockNumber is undefined ${JSON.stringify(chunkLogs[0])}`)
@@ -78,8 +76,7 @@ export async function getLeafInsertLog(params: {
 				leafIndex: decodedLeafInsert.leafIndex,
 				previousInsertBlockNumber: decodedLeafInsert.previousInsertBlockNumber,
 				newData: decodedLeafInsert.newData,
-				combineResults: decodedLeafInsert.combineResults,
-				rightInputs: decodedLeafInsert.rightInputs,
+				leftInputs: decodedLeafInsert.leftInputs,
 				blockNumber: Number(chunkLogs[0].blockNumber),
 			}
 		}

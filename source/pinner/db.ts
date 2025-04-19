@@ -38,6 +38,7 @@ export function initializeSchema(db: Database.Database): void {
 			data BLOB NOT NULL,
 			previous_insert_block INTEGER,
 			combine_results TEXT,
+			left_inputs TEXT,
 			right_inputs TEXT,
 			root_cid TEXT,
 			pinned BOOLEAN DEFAULT 0
