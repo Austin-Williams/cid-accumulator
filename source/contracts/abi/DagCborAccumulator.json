@@ -1,0 +1,33 @@
+[
+    {
+        "type": "function",
+        "name": "getLatestCID",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bytes",
+                "internalType": "bytes"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "getAccumulatorData",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint256",
+                "internalType": "uint256"
+            },
+            {
+                "name": "",
+                "type": "bytes32[32]",
+                "internalType": "bytes32[32]"
+            }
+        ],
+        "stateMutability": "view"
+    }
+]

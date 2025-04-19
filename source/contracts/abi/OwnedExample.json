@@ -1,0 +1,33 @@
+[
+	{
+		"type": "constructor",
+		"inputs": [],
+		"stateMutability": "nonpayable"
+	},
+	{
+		"type": "function",
+		"name": "addData",
+		"inputs": [
+			{
+				"name": "data",
+				"type": "bytes",
+				"internalType": "bytes"
+			}
+		],
+		"outputs": [],
+		"stateMutability": "nonpayable"
+	},
+	{
+		"type": "function",
+		"name": "addDataMany",
+		"inputs": [
+			{
+				"name": "data",
+				"type": "bytes",
+				"internalType": "bytes"
+			}
+		],
+		"outputs": [],
+		"stateMutability": "nonpayable"
+	}
+]

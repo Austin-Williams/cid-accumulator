@@ -1,0 +1,51 @@
+[
+	{
+		"type": "constructor",
+		"inputs": [],
+		"stateMutability": "nonpayable"
+	},
+	{
+		"type": "function",
+		"name": "encodeRawBytes",
+		"inputs": [
+			{
+				"name": "data",
+				"type": "bytes",
+				"internalType": "bytes"
+			}
+		],
+		"outputs": [
+			{
+				"name": "",
+				"type": "bytes32",
+				"internalType": "bytes32"
+			}
+		],
+		"stateMutability": "pure"
+	},
+	{
+		"type": "function",
+		"name": "encodeLinkNode",
+		"inputs": [
+			{
+				"name": "leftHash",
+				"type": "bytes32",
+				"internalType": "bytes32"
+			},
+			{
+				"name": "rightHash",
+				"type": "bytes32",
+				"internalType": "bytes32"
+			}
+		],
+		"outputs": [
+			{
+				"name": "",
+				"type": "bytes32",
+				"internalType": "bytes32"
+			}
+		],
+		"stateMutability": "pure"
+	}
+]
+
