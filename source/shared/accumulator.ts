@@ -3,13 +3,7 @@ import { ethers } from "ethers"
 import { MINIMAL_ACCUMULATOR_ABI } from "./constants.ts"
 import { AccumulatorMetadata } from "./types.ts"
 
-export async function getAccumulatorData(
-	provider: ethers.JsonRpcProvider,
-	contractAddress: string,
-): Promise<AccumulatorMetadata> {
-	const contract = new ethers.Contract(contractAddress, MINIMAL_ACCUMULATOR_ABI, provider)
-	const [mmrMetaBits]: [bigint] = await contract.getAccumulatorData()
-
+export function parseAccumulatorMetaBits(mmrMetaBits: bigint): AccumulatorMetadata {
 	const bits = mmrMetaBits
 	const peakHeights: number[] = []
 	for (let i = 0; i < 32; i++) {
@@ -27,4 +21,13 @@ export async function getAccumulatorData(
 		previousInsertBlockNumber,
 		deployBlockNumber,
 	}
+}
+
+export async function getAccumulatorMmrMetaBits(
+	provider: ethers.JsonRpcProvider,
+	contractAddress: string,
+): Promise<AccumulatorMetadata> {
+	const contract = new ethers.Contract(contractAddress, MINIMAL_ACCUMULATOR_ABI, provider)
+	const [mmrMetaBits]: [bigint] = await contract.getAccumulatorData()
+	return parseAccumulatorMetaBits(mmrMetaBits)
 }

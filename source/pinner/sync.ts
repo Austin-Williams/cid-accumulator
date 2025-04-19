@@ -1,7 +1,7 @@
 import { Log } from "ethers"
 import { decodeLeafInsert } from "../shared/codec.ts"
 import { Pinner } from "./Pinner.ts"
-import { getAccumulatorData } from "../shared/accumulator.ts"
+import { getAccumulatorMmrMetaBits } from "../shared/accumulator.ts"
 import { findBlockForLeafIndex } from "../shared/logs.ts"
 
 export async function rebuildLocalDag(pinner: Pinner, startLeaf: number, endLeaf: number | null): Promise<void> {
@@ -43,7 +43,7 @@ export async function rebuildLocalDag(pinner: Pinner, startLeaf: number, endLeaf
 }
 
 export async function syncForward(params: { pinner: Pinner; logBatchSize?: number }): Promise<void> {
-	const meta = await params.pinner.getAccumulatorData()
+	const meta = await getAccumulatorMmrMetaBits(params.pinner.provider, params.pinner.contractAddress)
 	const currentContractLeafCount = meta.leafCount
 	if (params.pinner.syncedToLeafIndex === currentContractLeafCount - 1) {
 		console.log(`[pinner] Already synced to leaf index ${params.pinner.syncedToLeafIndex}. Skipping sync.`)
@@ -87,7 +87,7 @@ export async function syncForward(params: { pinner: Pinner; logBatchSize?: numbe
 
 // Returns the best startBlock and endBlock for syncing based on DB, chain, and contract state
 async function getSyncBlockRange(pinner: Pinner): Promise<{ startBlock: number; endBlock: number }> {
-	const meta = await getAccumulatorData(pinner.provider, pinner.contractAddress)
+	const meta = await getAccumulatorMmrMetaBits(pinner.provider, pinner.contractAddress)
 	const endBlock: number = meta.previousInsertBlockNumber
 
 	let startBlock: number = pinner.syncedToBlockNumber // first candidate for good start block
@@ -116,7 +116,7 @@ async function getSyncBlockRange(pinner: Pinner): Promise<{ startBlock: number; 
 			} else {
 				console.log(`[pinner] Failed to find block number for leaf index ${pinner.syncedToLeafIndex + 1}.`)
 			}
-		} catch (e) {
+		} catch {
 			console.error(`[pinner] Failed to find block number for leaf index ${pinner.syncedToLeafIndex + 1}.`)
 		}
 	}

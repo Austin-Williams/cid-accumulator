@@ -93,7 +93,7 @@ async function main() {
 			const fileContent = await fs.readFile(OUTPUT_PATH, "utf8")
 			existingData = JSON.parse(fileContent)
 			if (!Array.isArray(existingData)) existingData = []
-		} catch (err) {
+		} catch {
 			// File doesn't exist or is invalid, start fresh
 			existingData = []
 		}

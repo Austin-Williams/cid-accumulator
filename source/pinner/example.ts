@@ -2,11 +2,13 @@ import { promptUserChoice } from "../shared/userPrompt.js"
 import "dotenv/config"
 import { Pinner } from "./Pinner.js"
 import { ethers } from "ethers"
-import { getAccumulatorData } from "../shared/accumulator.js"
+import { getAccumulatorMmrMetaBits } from "../shared/accumulator.js"
+import { createKuboRPCClient } from "kubo-rpc-client"
 
 async function main() {
 	const { contractAddress, provider } = await getContractAddressAndProvider()
-	const pinner = await Pinner.init(contractAddress, provider)
+	const kuboRPCClient = createKuboRPCClient({}) // Pass options if needed
+	const pinner = await Pinner.init(contractAddress, provider, kuboRPCClient)
 	const userChoice = await handlePinnerSyncMenu(pinner, provider, contractAddress)
 	switch (userChoice) {
 		case "abort":
@@ -31,7 +33,7 @@ async function handlePinnerSyncMenu(
 	contractAddress: string,
 ): Promise<"abort" | "sync forward" | "check ipfs" | "process live events"> {
 	// see how far ahead the accumulator is from the pinner
-	const accData = await getAccumulatorData(provider, contractAddress)
+	const accData = await getAccumulatorMmrMetaBits(provider, contractAddress)
 	console.log(`Latest leaf index on-chain: ${accData.leafCount}`)
 	console.log(`You are ${accData.leafCount - (pinner.syncedToLeafIndex ?? 0)} behind.`)
 

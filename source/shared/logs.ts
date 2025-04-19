@@ -1,5 +1,5 @@
 import { ethers } from "ethers"
-import { getAccumulatorData } from "./accumulator.ts"
+import { getAccumulatorMmrMetaBits } from "./accumulator.ts"
 import { decodeLeafInsert } from "./codec.ts"
 import { LeafInsertEvent } from "./types.ts"
 /**
@@ -148,7 +148,7 @@ export async function findBlockForLeafIndex(params: {
 	fromBlock: number
 }): Promise<number | undefined> {
 	const { provider, contract, leafIndex, fromBlock } = params
-	const accumulatorData = await getAccumulatorData(provider, await contract.getAddress())
+	const accumulatorData = await getAccumulatorMmrMetaBits(provider, await contract.getAddress())
 	const lastLeafBlockNumber = accumulatorData.previousInsertBlockNumber
 	const log = await getLeafInsertLog({
 		provider,

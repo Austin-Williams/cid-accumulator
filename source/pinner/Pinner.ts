@@ -10,7 +10,7 @@ import Database from "better-sqlite3"
 import path from "path"
 import fs from "fs"
 import { getLeafInsertLog, walkBackLeafInsertLogsOrThrow } from "../shared/logs.ts"
-import { LeafInsertEvent } from "../shared/types.ts"
+import { LeafInsertEvent, AccumulatorMetadata } from "../shared/types.ts"
 import { decodeLeafInsert } from "../shared/codec.ts"
 
 export class Pinner {
@@ -187,10 +187,10 @@ export class Pinner {
 	/**
 	 * Retrieves accumulator data from the chain for this pinner's provider and contractAddress.
 	 */
-	async getAccumulatorData() {
+	async getAccumulatorMmrMetaBits(): Promise<AccumulatorMetadata> {
 		// Importing here for easier mocking in tests
-		const { getAccumulatorData } = await import("../shared/accumulator.ts")
-		return getAccumulatorData(this.provider, this.contractAddress)
+		const { getAccumulatorMmrMetaBits } = await import("../shared/accumulator.ts")
+		return getAccumulatorMmrMetaBits(this.provider, this.contractAddress)
 	}
 
 	/**
@@ -366,7 +366,7 @@ export class Pinner {
 	// Many more RPC calls but each with a single block in the block range and exactly one log returned.
 	async syncBackward(): Promise<void> {
 		// get most recent leaf index from contract
-		const contractMetadata = await this.getAccumulatorData()
+		const contractMetadata = await this.getAccumulatorMmrMetaBits()
 		// get highest contiguous leaf index from DB
 		let oldestLeafIndex: number = this.syncedToLeafIndex
 		if (oldestLeafIndex === null) {

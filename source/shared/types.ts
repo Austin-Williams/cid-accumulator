@@ -1,9 +1,9 @@
 export interface LeafInsertEvent {
-  leafIndex: number;
-  previousInsertBlockNumber: number;
-  newData: Uint8Array;
-  leftInputs: string[];
-  blockNumber?: number;
+	leafIndex: number
+	previousInsertBlockNumber: number
+	newData: Uint8Array
+	leftInputs: string[]
+	blockNumber?: number
 }
 
 export interface AccumulatorMetadata {
