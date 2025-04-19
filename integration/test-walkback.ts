@@ -1,11 +1,9 @@
 import { ethers } from "ethers"
 import { CID } from "multiformats/cid"
-import { bytes } from "multiformats"
 import { computePreviousRootCID } from "../source/client/computePreviousRootCID"
 import { parseAccumulatorMetaBits } from "../source/shared/accumulator"
 import { MINIMAL_ACCUMULATOR_ABI } from "../source/shared/constants"
-import { sha256 } from "multiformats/hashes/sha2"
-import { encodeLinkNode } from "../source/shared/codec"
+import { encodeLinkNode, cidFromBytes32HexString } from "../source/shared/codec"
 import dotenv from "dotenv"
 
 dotenv.config()
@@ -14,8 +12,6 @@ const RPC_ENV = process.env.ETHEREUM_RPC_PROVIDER_URL || process.env.ACCUMULATOR
 const CONTRACT_ENV = (process.env.TARGET_CONTRACT_ADDRESS ||
 	process.env.ACCUMULATOR_CONTRACT_ADDRESS ||
 	process.env.CONTRACT_ADDRESS) as string
-
-
 
 if (!RPC_ENV || !CONTRACT_ENV) {
 	console.error(
@@ -32,39 +28,30 @@ async function main() {
 	// Fetch accumulator metadata and peaks directly from contract
 	// getAccumulatorData returns [mmrMetaBits, peaks]
 	const [mmrMetaBits, peaksArr]: [bigint, string[]] = await contract.getAccumulatorData()
-	
 
 	// Use shared utility to parse metadata
 	const meta = parseAccumulatorMetaBits(mmrMetaBits)
-	
+
 	const { leafCount, previousInsertBlockNumber } = meta
 	if (typeof leafCount !== "number" || leafCount <= 0) throw new Error("No leaves in the accumulator.")
 	// Use on-chain peakHeights and peakCount for initial peaks
 	const { peakHeights, peakCount } = meta
 	// Only use the first peakCount peaks and heights (as contract does)
-	const initialPeakCIDs = (await Promise.all(peaksArr.slice(0, peakCount).map(cidFromBytes32))).map(
+	const initialPeakCIDs = (await Promise.all(peaksArr.slice(0, peakCount).map(cidFromBytes32HexString))).map(
 		(cid) => cid as CID<unknown, 113, 18, 1>,
 	)
 	const initialPeakHeights = peakHeights.slice(0, peakCount)
 	const initialPeaksWithHeights: { cid: CID<unknown, 113, 18, 1>; height: number }[] = initialPeakCIDs.map(
 		(cid, i) => ({ cid, height: initialPeakHeights[i] }),
 	)
-	
 
 	// Configure how many leaves to walk back
 	const NUM_STEPS = parseInt(process.env.WALKBACK_STEPS || "6", 10)
 	const fromLeafIndex = leafCount - 1
 	const toLeafIndex = Math.max(0, fromLeafIndex - NUM_STEPS + 1)
 
-	// CID construction from raw bytes32 hashes for both peaks and leftInputs
-	async function cidFromBytes32(bytes32hex: string) {
-		const digest = await sha256.digest(bytes.fromHex(bytes32hex).slice(0, 32))
-		return CID.create(1, 0x71, digest) // 0x71 = dag-cbor
-	}
-
 	let currentPeaksWithHeights = initialPeaksWithHeights
 
-	
 	let currentLeafIndex = fromLeafIndex
 	let currentBlockNumber = previousInsertBlockNumber
 	for (let step = 0; currentLeafIndex >= toLeafIndex; step++) {
@@ -81,23 +68,18 @@ async function main() {
 		if (!log) {
 			break
 		}
-		
+
 		const { newData, leftInputs, previousInsertBlockNumber, leafIndex } = log
-		// Robust CID construction from raw bytes32 hashes (assume dag-cbor + sha2-256, CIDv1)
-		// If your accumulator uses a different codec/hash, update these codes!
-		async function cidFromBytes32(bytes32hex: string) {
-			const digest = await sha256.digest(bytes.fromHex(bytes32hex).slice(0, 32))
-			return CID.create(1, 0x71, digest) // 0x71 = dag-cbor
-		}
-		const leftCIDs = (await Promise.all(leftInputs.map(cidFromBytes32))).map((cid) => cid as CID<unknown, 113, 18, 1>)
-		
+
+		const leftCIDs: CID[] = await Promise.all(leftInputs.map((input) => cidFromBytes32HexString(input.toString())))
+
 		try {
 			const { previousRootCID, previousPeaksWithHeights } = await computePreviousRootCID(
 				currentPeaksWithHeights,
 				newData,
 				leftCIDs,
 			)
-			
+
 			// --- On-chain check ---
 			// Fetch peaks at previousInsertBlockNumber
 			let onChainPeaks: string[] = []
@@ -109,7 +91,7 @@ async function main() {
 				const meta = parseAccumulatorMetaBits(mmrMetaBits)
 				const peakCount = meta.peakCount
 				onChainPeaks = peaksArr.slice(0, peakCount)
-				const onChainCIDs = await Promise.all(onChainPeaks.map(cidFromBytes32))
+				const onChainCIDs = await Promise.all(onChainPeaks.map(cidFromBytes32HexString))
 				// Compute on-chain root CID from onChainCIDs
 				let onChainRootCID: CID | null = null
 				if (onChainCIDs.length === 1) {

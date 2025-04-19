@@ -10,7 +10,7 @@ import Database from "better-sqlite3"
 import path from "path"
 import fs from "fs"
 import { getLeafInsertLog, walkBackLeafInsertLogsOrThrow } from "../shared/logs.ts"
-import { LeafInsertEvent, AccumulatorMetadata } from "../shared/types.ts"
+import { NormalizedLeafInsertEvent, AccumulatorMetadata } from "../shared/types.ts"
 import { decodeLeafInsert } from "../shared/codec.ts"
 
 export class Pinner {
@@ -47,7 +47,7 @@ export class Pinner {
 
 		const eventHandler = async (event: Log) => {
 			try {
-				const decoded = decodeLeafInsert(event)
+				const decoded = await decodeLeafInsert(event)
 				await this.processLeafEvent(decoded)
 				console.log(
 					`[pinner] Processed new leaf event: leafIndex=${decoded.leafIndex}, blockNumber=${event.blockNumber}`,
@@ -235,7 +235,7 @@ export class Pinner {
 		newData: Uint8Array
 		blockNumber?: number
 		previousInsertBlockNumber?: number
-		leftInputs?: string[]
+		leftInputs?: import("multiformats").CID[]
 	}): Promise<void> {
 		const { leafIndex, blockNumber, newData, previousInsertBlockNumber } = params
 		// If we detect a gap in leaves, try to fetch them and process them.
@@ -246,7 +246,7 @@ export class Pinner {
 			if (previousInsertBlockNumber === undefined) {
 				throw new Error(`Missing previousInsertBlockNumber for leafIndex ${leafIndex}. Cannot fetch missing leaves.`)
 			}
-			const missingLeaves: LeafInsertEvent[] = await walkBackLeafInsertLogsOrThrow({
+			const missingLeaves: NormalizedLeafInsertEvent[] = await walkBackLeafInsertLogsOrThrow({
 				provider: this.provider,
 				contract: this.contract,
 				fromLeafIndex: leafIndex - 1,

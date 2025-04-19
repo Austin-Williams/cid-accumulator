@@ -27,7 +27,7 @@ export interface PeakWithHeight {
 export async function computePreviousRootCID(
 	currentPeaksWithHeights: PeakWithHeight[],
 	newData: Uint8Array,
-	leftInputs: CID<unknown, 113, 18, 1>[],
+	leftInputs: CID[],
 ): Promise<{
 	previousRootCID: CID<unknown, 113, 18, 1>
 	previousPeaksWithHeights: PeakWithHeight[]
@@ -54,7 +54,12 @@ export async function computePreviousRootCID(
 			const left = leftInputs[i]
 			// The height of the merged node is one higher than its children
 			const mergedHeight = right.height + 1
-			const merged = (await hashNode(left as CID<unknown, 113, 18, 1>, right.cid as CID<unknown, 113, 18, 1>)) as CID<unknown,113,18,1>
+			const merged = (await hashNode(left as CID<unknown, 113, 18, 1>, right.cid as CID<unknown, 113, 18, 1>)) as CID<
+				unknown,
+				113,
+				18,
+				1
+			>
 			reconstructedParents.unshift(merged)
 			// Remove the merged parent (root) from peaks
 			if (peaks.length === 0) throw new Error("No peaks left to unmerge during reversal")

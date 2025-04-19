@@ -1,7 +1,7 @@
 import { ethers } from "ethers"
 import { getAccumulatorMmrMetaBits } from "./accumulator.ts"
 import { decodeLeafInsert } from "./codec.ts"
-import { LeafInsertEvent } from "./types.ts"
+import { NormalizedLeafInsertEvent } from "./types.ts"
 /**
  * Retrieves the LeafInsert log for a given leafIndex within a specified block range.
  * Ideally used with fromBlock == toBlock for efficiency.
@@ -23,7 +23,7 @@ export async function getLeafInsertLog(params: {
 	targetLeafIndex: number
 	fromBlock: number
 	toBlock?: number | undefined
-}): Promise<LeafInsertEvent | null> {
+}): Promise<NormalizedLeafInsertEvent | null> {
 	let { provider, contract, targetLeafIndex, fromBlock, toBlock } = params
 
 	// Determine the last block to search. If toBlock is not provided, use the latest block on the chain.
@@ -60,7 +60,7 @@ export async function getLeafInsertLog(params: {
 			)
 		if (chunkLogs.length === 1) {
 			// found it!
-			const decodedLeafInsert: LeafInsertEvent = decodeLeafInsert(chunkLogs[0])
+			const decodedLeafInsert: NormalizedLeafInsertEvent = await decodeLeafInsert(chunkLogs[0])
 			if (decodedLeafInsert.leafIndex === undefined)
 				throw new Error(`[logs fetch] leafIndex is undefined ${JSON.stringify(chunkLogs[0])}`)
 			if (decodedLeafInsert.previousInsertBlockNumber === undefined)
@@ -98,14 +98,14 @@ export async function walkBackLeafInsertLogsOrThrow(params: {
 	fromLeafIndex: number
 	fromLeafIndexBlockNumber: number //
 	toLeafIndex: number // inclusive; oldest leaf index to walk back to
-}): Promise<LeafInsertEvent[]> {
+}): Promise<NormalizedLeafInsertEvent[]> {
 	const { provider, contract, fromLeafIndex, fromLeafIndexBlockNumber, toLeafIndex } = params
 	let currentLeafIndex = fromLeafIndex
 	let currentLeafIndexBlockNumber = fromLeafIndexBlockNumber
-	const logs: LeafInsertEvent[] = []
+	const logs: NormalizedLeafInsertEvent[] = []
 
 	while (currentLeafIndex >= toLeafIndex) {
-		const log: LeafInsertEvent | null | null = await getLeafInsertLog({
+		const log: NormalizedLeafInsertEvent | null | null = await getLeafInsertLog({
 			provider,
 			contract,
 			targetLeafIndex: currentLeafIndex,

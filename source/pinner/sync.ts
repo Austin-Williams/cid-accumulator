@@ -70,7 +70,7 @@ export async function syncForward(params: { pinner: Pinner; logBatchSize?: numbe
 		const logs: Log[] = await pinner.provider.getLogs(filter)
 
 		for (const log of logs) {
-			const decodedEvent = decodeLeafInsert(log)
+			const decodedEvent = await decodeLeafInsert(log)
 
 			if (decodedEvent.leafIndex < pinner.syncedToLeafIndex + 1) continue
 			if (decodedEvent.leafIndex > pinner.syncedToLeafIndex + 1) {
