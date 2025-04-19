@@ -2,13 +2,16 @@ import * as dagCbor from "@ipld/dag-cbor"
 import { CID } from "multiformats/cid"
 import { createKuboRPCClient } from "kubo-rpc-client"
 
-export type IpldNode = Uint8Array | CID | { L: CID; R: CID }
+export type IpldNode =
+	| Uint8Array
+	| CID<unknown, 113, 18, 1>
+	| { L: CID<unknown, 113, 18, 1>; R: CID<unknown, 113, 18, 1> }
 
-function isIpldLink(obj: unknown): obj is CID {
+function isIpldLink(obj: unknown): obj is CID<unknown, 113, 18, 1> {
 	return obj instanceof CID
 }
 
-function isInternalNode(obj: unknown): obj is { L: CID; R: CID } {
+function isInternalNode(obj: unknown): obj is { L: CID<unknown, 113, 18, 1>; R: CID<unknown, 113, 18, 1> } {
 	return (
 		typeof obj === "object" &&
 		obj !== null &&
@@ -19,20 +22,48 @@ function isInternalNode(obj: unknown): obj is { L: CID; R: CID } {
 	)
 }
 
-export async function resolveMerkleTree(
-	cid: CID,
-	blockstore: { get(cid: CID): Promise<Uint8Array> },
+/**
+ * Recursively resolves a Merkle tree (DAG) from a given root CID using the provided blockstore.
+ *
+ * This function traverses the DAG in depth-first order, decoding each IPLD node using dag-cbor.
+ * It collects and returns all leaf node data (as Uint8Array) in a flat array.
+ *
+ * If any block referenced by the DAG is missing from the blockstore, the function will throw an Error
+ * with a descriptive message indicating which CID could not be found. This behavior is intentional:
+ * callers should be prepared to handle thrown errors if the DAG is incomplete or unavailable.
+ *
+ * @param cid - The root CID of the Merkle tree to resolve. Must be CID<unknown, 113, 18, 1>.
+ * @param blockstore - An object implementing a get(cid) method that returns the raw block data for a CID.
+ * @returns Promise<Uint8Array[]> Resolves to an array of all leaf node data found in the DAG.
+ * @throws Error if any block is missing or if an unexpected node structure is encountered.
+ *
+ * @example
+ * try {
+ *   const leaves = await resolveMerkleTreeOrThrow(rootCid, ipfsBlockstore)
+ *   // All leaves are present, do something with them
+ * } catch (err) {
+ *   // Handle the missing block or DAG structure error
+ * }
+ */
+export async function resolveMerkleTreeOrThrow(
+	cid: CID<unknown, 113, 18, 1>,
+	blockstore: { get(cid: CID<unknown, 113, 18, 1>): Promise<Uint8Array> },
 ): Promise<Uint8Array[]> {
-	const raw = await blockstore.get(cid)
+	let raw: Uint8Array
+	try {
+		raw = await blockstore.get(cid)
+	} catch (e) {
+		throw new Error(`Block with CID ${cid.toString()} not found in blockstore`)
+	}
 	const node: IpldNode = dagCbor.decode(raw)
 
 	if (node instanceof Uint8Array) {
 		return [node]
 	} else if (isIpldLink(node)) {
-		return await resolveMerkleTree(node, blockstore)
+		return await resolveMerkleTreeOrThrow(node, blockstore)
 	} else if (isInternalNode(node)) {
-		const L = await resolveMerkleTree(node.L, blockstore)
-		const R = await resolveMerkleTree(node.R, blockstore)
+		const L = await resolveMerkleTreeOrThrow(node.L, blockstore)
+		const R = await resolveMerkleTreeOrThrow(node.R, blockstore)
 		return [...L, ...R]
 	} else {
 		throw new Error("Unexpected node structure")

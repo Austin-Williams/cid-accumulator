@@ -1,9 +1,11 @@
+import { ethers } from "ethers"
 import type { IpfsAdapter } from "./interfaces/IpfsAdapter.ts"
 import type { StorageAdapter } from "./interfaces/StorageAdapter.ts"
 import { parseAccumulatorMetaBits } from "./shared/accumulator.ts"
 import { cidFromBytes32HexString } from "./shared/codec.ts"
 import type { DagNodeRecord, PeakWithHeight, LeafRecord } from "./shared/types.ts"
 import { CID } from "multiformats/cid"
+import { resolveMerkleTreeOrThrow } from "./shared/ipfs.ts"
 
 /**
  * AccumulatorNode: Unified entry point for accumulator logic in any environment.
@@ -13,7 +15,7 @@ import { CID } from "multiformats/cid"
 export class AccumulatorNode {
 	ipfs: IpfsAdapter
 	storage: StorageAdapter
-	contract: any // Should be ethers.Contract
+	contract: ethers.Contract // Should be ethers.Contract
 	// ...other fields (provider, contract, etc.)
 
 	constructor({
@@ -29,7 +31,6 @@ export class AccumulatorNode {
 		this.ipfs = ipfs
 		this.storage = storage
 		this.contract = contract
-		// ...initialize other fields
 	}
 
 	// --- DB Access Methods ---
@@ -57,7 +58,7 @@ export class AccumulatorNode {
 	/** Retrieve all DAG node records efficiently using async iteration. */
 	async getAllDagNodes(): Promise<DagNodeRecord[]> {
 		const dagNodes: DagNodeRecord[] = []
-		for await (const { key: key, value } of this.storage.iterate("dag:")) {
+		for await (const { key: _key, value } of this.storage.iterate("dag:")) {
 			if (value && (value.type === "leaf" || value.type === "link")) {
 				dagNodes.push(value)
 			}
@@ -65,7 +66,7 @@ export class AccumulatorNode {
 		return dagNodes
 	}
 
-	/** Retrieve the latest leaf index (highest stored) efficiently. */
+	/** Retrieve the latest leaf index (highest stored in DB) efficiently. */
 	async getLatestLeafIndex(): Promise<number | undefined> {
 		return await this.storage.getMaxKey("leaf:")
 	}
@@ -82,7 +83,11 @@ export class AccumulatorNode {
 	}> {
 		const [mmrMetaBits, peaksArr]: [bigint, string[]] = await this.contract.getAccumulatorData()
 		const meta = parseAccumulatorMetaBits(mmrMetaBits)
-		const peaksCids: CID[] = await Promise.all(peaksArr.slice(0, meta.peakCount).map(cidFromBytes32HexString))
+		const peaksCids: CID<unknown, 113, 18, 1>[] = await Promise.all(
+			peaksArr
+				.slice(0, meta.peakCount)
+				.map(async (x) => (await cidFromBytes32HexString(x)) as unknown as CID<unknown, 113, 18, 1>),
+		)
 		// Zip the peaks and peakHeights into PeakWithHeight[]
 		const peaksWithHeight: PeakWithHeight[] = peaksCids.map((cid, i) => ({ cid, height: meta.peakHeights[i] }))
 		return { ...meta, peaksWithHeight }
@@ -94,15 +99,49 @@ export class AccumulatorNode {
 	 */
 	async syncBackwardsFromLatest(): Promise<void> {
 		const meta = await this.getOnChainAccumulatorMeta()
-		let currentLeafIndex = meta.leafCount - 1
-		let currentBlock = meta.previousInsertBlockNumber
-		const minBlock = meta.deployBlockNumber
+		let _currentLeafIndex = meta.leafCount - 1
+		let _currentBlock = meta.previousInsertBlockNumber
+		const _minBlock = meta.deployBlockNumber
+		let currentPeaksWithHeights = meta.peaksWithHeight
+
+		// Compute the current root CID from the current peaks
+		const { bagPeaksWithHeights } = await import("./shared/computePreviousRootCID.ts")
+		const currentRootCID = await bagPeaksWithHeights(currentPeaksWithHeights)
+
+		// Try to resolve the entire DAG from the root CID
+		const success: boolean = await this.getAndResolveCID(currentRootCID)
+
+		if (success) {
+			console.log("Successfully resolved the entire DAG from the root CID.")
+			return
+		}
+
+		console.log("Root CID not fully available on IPFS. Beginning walkback loop...")
 		// TODO: Walk backwards from currentLeafIndex/currentBlock to minBlock
 		// For each leafIndex:
 		//   - Fetch event data from chain
 		//   - Compute rootCid, peaksWithHeights
 		//   - Store in DB
-		//   - Optionally check IPFS for rootCid
+	}
+
+	/**
+	 * Recursively attempts to resolve the entire DAG from a given root CID using the IPFS adapter.
+	 *
+	 * @param cid - The root CID to resolve.
+	 * @returns An object { success, leaves } where success is true if all nodes are available, false otherwise.
+	 *          leaves is an array of Uint8Array containing all leaf node data in the DAG (empty if not available).
+	 */
+	async getAndResolveCID(cid: CID<unknown, 113, 18, 1>): Promise<boolean> {
+		try {
+			const leaves = await resolveMerkleTreeOrThrow(cid, this.ipfs)
+			console.log(`Found and fully resolved root CID ${cid.toString()} on IPFS. Aquired ${leaves.length} leaves.`)
+			// Store all the leaves' newData values in the DB as LeafRecords
+			for (let i = 0; i < leaves.length; i++) await this.putLeafRecord(i, { newData: leaves[i] })
+			// Optionally: console.log(`Number of leaves: ${leaves.length}`)
+			return true
+		} catch {
+			return false
+		}
 	}
 
 	/**

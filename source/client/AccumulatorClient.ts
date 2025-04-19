@@ -1,6 +1,6 @@
 import { ethers } from "ethers"
 import { CID } from "multiformats/cid"
-import { PeakWithHeight } from "./computePreviousRootCID.ts"
+import { PeakWithHeight } from "../shared/types.ts"
 
 interface WalkbackInitState {
 	provider: ethers.JsonRpcProvider
@@ -93,15 +93,15 @@ export class AccumulatorClient {
 	 * @param options - Optional parameters: jumpStep (default 1000), minStep (default 1), maxSearch (default: all)
 	 */
 	async findLatestAvailableRootCidOnIpfs(
-		ipfsClient: any,
-		options?: {
+		_ipfsClient: any,
+		_options?: {
 			jumpStep?: number
 			minStep?: number
 			maxSearch?: number
 			ipfsCheckMethod?: "block" | "dag"
 		},
 	): Promise<{
-		cid: CID
+		cid: CID<unknown, 113, 18, 1>
 		state: any
 		forwardEvents: any[]
 	}> {

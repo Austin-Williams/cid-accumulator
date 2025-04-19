@@ -85,7 +85,7 @@ export async function encodeLinkNode(left: CID, right: CID): Promise<CID> {
 
 // Robust CID construction from raw bytes32-hex-string hashes (assume dag-cbor + sha2-256, CIDv1)
 // If your accumulator uses a different codec/hash, update these codes!
-export async function cidFromBytes32HexString(bytes32hexString: string) {
+export async function cidFromBytes32HexString(bytes32hexString: string): Promise<CID<unknown, 113, 18, 1>> {
 	const digest = await sha256.digest(fromHex(bytes32hexString).slice(0, 32))
 	return CID.create(1, 0x71, digest) // 0x71 = dag-cbor
 }
