@@ -4,7 +4,7 @@ export interface NormalizedLeafInsertEvent {
 	leafIndex: number
 	previousInsertBlockNumber: number
 	newData: Uint8Array
-	leftInputs: CID[]
+	leftInputs: CID<unknown, 113, 18, 1>[]
 	blockNumber?: number
 }
 
