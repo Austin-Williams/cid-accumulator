@@ -1,4 +1,5 @@
 import { Interface } from "ethers"
+import { CID } from "multiformats/cid"
 
 export const MINIMAL_ACCUMULATOR_ABI = [
 	{
@@ -66,3 +67,5 @@ export const MINIMAL_ACCUMULATOR_ABI = [
 ] as const
 
 export const MINIMAL_ACCUMULATOR_INTERFACE = new Interface(MINIMAL_ACCUMULATOR_ABI)
+
+export const EMPTY_CID: CID = CID.parse("bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku")

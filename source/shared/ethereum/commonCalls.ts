@@ -21,7 +21,7 @@ export async function getLatestCID(rpcUrl: string, contractAddress: string): Pro
 export async function getAccumulatorData(
 	rpcUrl: string,
 	contractAddress: string,
-	blockTag?: number
+	blockTag?: number,
 ): Promise<{ meta: AccumulatorMetadata; peaks: PeakWithHeight[] }> {
 	const blockTagHex: string = blockTag ? "0x" + blockTag.toString(16) : "latest"
 	const selector = getSelector("getAccumulatorData()")
@@ -75,7 +75,6 @@ export async function getLeafInsertLogs(
 	return parsedLogs
 }
 
-
 /**
  * Finds a LeafInsert log for a specific leaf index using eth_getLogs.
  * @param rpcUrl string
@@ -104,7 +103,8 @@ export async function getLeafInsertLogForTargetLeafIndex(
 			toBlock: toHexBlock(toBlock),
 		},
 	])
-	if (rawLogs.length > 1) throw new Error(`Multiple logs found for leaf index ${targetLeafIndex} in range ${fromBlock}-${toBlock}`)
+	if (rawLogs.length > 1)
+		throw new Error(`Multiple logs found for leaf index ${targetLeafIndex} in range ${fromBlock}-${toBlock}`)
 	if (rawLogs.length === 0) return null
 	return parseLeafInsertLog(rawLogs[0])
 }

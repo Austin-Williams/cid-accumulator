@@ -1,80 +1,43 @@
 import { CID } from "multiformats/cid"
-import * as dagCbor from "@ipld/dag-cbor"
-import { sha256 } from "multiformats/hashes/sha2"
-
-/**
- * Computes the previous root CID and previous peaks of the accumulator given:
- * @param currentPeaksWithHeights - Array of {cid, height} for current peaks
- * @param newData - The data of the inserted leaf (Uint8Array) whose merging created the currentPeaks
- * @param leftInputs - Array of CIDs, the left input to each merge (from bottom to top)
- * @param currentPeakHeights - Array of heights for the current peaks (should match currentPeaksWithHeights)
- * @returns An object with previousRootCID, previousPeaksWithHeights, and reconstructedParents (for chaining)
- */
+import {getRootCIDFromPeaks} from "./mmr.ts"
 import type { PeakWithHeight } from "./types.ts"
+import {EMPTY_CID} from "./constants.ts"
 
-export async function computePreviousRootCID(
+export async function computePreviousRootCIDAndPeaksWithHeights(
 	currentPeaksWithHeights: PeakWithHeight[],
 	newData: Uint8Array,
-	leftInputs: CID[],
-): Promise<{
-	previousRootCID: CID
-	previousPeaksWithHeights: PeakWithHeight[]
-	reconstructedParents: CID[]
-}> {
-	let peaks: PeakWithHeight[] = currentPeaksWithHeights.map((p) => ({
-		cid: p.cid as CID,
-		height: p.height,
-	}))
+	leftInputsDuringLatestMerge: CID[]
+): Promise<{ previousRootCID: CID; previousPeaksWithHeights: PeakWithHeight[] }> {
+	// Defensive copy
+	let peaks: PeakWithHeight[] = currentPeaksWithHeights.map(p => ({ cid: p.cid, height: p.height }));
 
-	if (leftInputs.length === 0) {
-		// Remove the new leaf CID from peaks
-		const newLeafCID = await hashLeaf(newData)
-		peaks = peaks.filter((p) => p.cid.toString() !== newLeafCID.toString())
-		return {
-			previousRootCID: await bagPeaksWithHeights(peaks),
-			previousPeaksWithHeights: peaks,
-			reconstructedParents: [],
-		}
+	if (currentPeaksWithHeights.length == 0) return { previousRootCID: EMPTY_CID, previousPeaksWithHeights: [] } // if there are no peaks now, there never were
+
+	if (leftInputsDuringLatestMerge.length === 0) {
+		// No merges, just remove the peak with height 0
+		const previousPeaksWithHeights = currentPeaksWithHeights.filter(p => p.height !== 0)
+		const previousRootCID: CID = await getRootCIDFromPeaks(previousPeaksWithHeights.map(p => p.cid))
+		return { previousRootCID, previousPeaksWithHeights }
 	}
 
-	const reconstructedParents: CID[] = []
-	let peaksCopy = [...peaks]
-	for (let i = leftInputs.length - 1; i >= 0; i--) {
-		const right = peaksCopy.shift()
-		const left = leftInputs[i]
-		const merged = await hashNode(left as CID, right!.cid as CID)
-		reconstructedParents.unshift(merged)
-		if (peaksCopy.length === 0) throw new Error("No peaks left to unmerge during reversal")
-		peaksCopy = peaksCopy.slice(1)
+	// Unmerge for each left input (reverse order)
+	let reconstructedPeaks: PeakWithHeight[] = [...peaks];
+	for (let i = leftInputsDuringLatestMerge.length - 1; i >= 0; i--) {
+		const mergedPeak = reconstructedPeaks.pop();
+		if (!mergedPeak) throw new Error("No mergedPeak to unmerge");
+		const childHeight = mergedPeak.height - 1;
+		// Push left and right children as new peaks
+		reconstructedPeaks.push({ cid: leftInputsDuringLatestMerge[i], height: childHeight });
+		reconstructedPeaks.push({ cid: mergedPeak.cid, height: childHeight });
 	}
-	peaks = peaksCopy
-	return {
-		previousRootCID: await bagPeaksWithHeights(peaks),
-		previousPeaksWithHeights: peaks,
-		reconstructedParents,
-	}
-}
 
-// Helper to bag peaks left-to-right (using PeakWithHeight[])
-export async function bagPeaksWithHeights(peaks: PeakWithHeight[]): Promise<CID> {
-	if (peaks.length === 0) throw new Error("No peaks to bag")
-	let root = peaks[0].cid as CID
-	for (let i = 1; i < peaks.length; ++i) {
-		root = await hashNode(root, peaks[i].cid as CID)
-	}
-	return root as CID
-}
+	// Remove the new leaf peak at height 0 (not present in previous state)
+	const { cid: newLeafCID } = await (await import("./codec.ts")).encodeBlock(newData);
+	reconstructedPeaks = reconstructedPeaks.filter(
+		(p) => !(p.height === 0 && p.cid.toString() === newLeafCID.toString())
+	)
 
-// Helper to hash a leaf (encode as dag-cbor, then hash, return CID)
-export async function hashLeaf(data: Uint8Array): Promise<CID> {
-	const encoded = dagCbor.encode(data)
-	const digest = await sha256.digest(encoded)
-	return CID.create(1, dagCbor.code, digest) as CID
-}
+	const previousRootCID: CID = await getRootCIDFromPeaks(reconstructedPeaks.map(p => p.cid))
 
-// Helper to hash an internal node (encode {L, R}, then hash, return CID)
-export async function hashNode(left: CID, right: CID): Promise<CID> {
-	const encoded = dagCbor.encode({ L: left, R: right })
-	const digest = await sha256.digest(encoded)
-	return CID.create(1, dagCbor.code, digest) as CID
+	return {previousRootCID, previousPeaksWithHeights: reconstructedPeaks}
 }
