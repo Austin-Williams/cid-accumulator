@@ -1,11 +1,26 @@
 import { CID } from "multiformats/cid"
 
+export interface RawEthLog {
+	address: string // Contract address
+	topics: string[] // Array of 32-byte hex strings
+	data: string // Hex string, ABI-encoded data
+	blockNumber: number // Block number (ethers.js auto-converts from hex)
+	transactionHash: string // Transaction hash
+	transactionIndex: number // Transaction index in block
+	blockHash: string // Block hash
+	logIndex: number // Log index in block
+	removed: boolean // True if removed due to reorg
+	// Some providers/libraries may add extra fields, but these are standard
+}
+
 export interface NormalizedLeafInsertEvent {
 	leafIndex: number
 	previousInsertBlockNumber: number
 	newData: Uint8Array
-	leftInputs: CID<unknown, 113, 18, 1>[]
-	blockNumber?: number
+	leftInputs: Uint8Array[] // "left hashes" as raw 32-byte hashes (not dag-cbor encoded CIDs).
+	blockNumber: number
+	transactionHash: string
+	removed: boolean
 }
 
 export interface AccumulatorMetadata {
@@ -19,7 +34,7 @@ export interface AccumulatorMetadata {
 /**
  * Represents a single MMR peak with its CID and height.
  */
-export type PeakWithHeight = { cid: CID<unknown, 113, 18, 1>; height: number }
+export type PeakWithHeight = { cid: CID; height: number }
 
 /**
  * Represents all relevant data for a leaf/event in the accumulator.

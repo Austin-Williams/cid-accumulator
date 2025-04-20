@@ -13,6 +13,7 @@
 	"author": "",
 	"license": "MIT",
 	"dependencies": {
+		"@noble/hashes": "^1.7.2",
 		"better-sqlite3": "^11.9.1",
 		"dotenv": "^16.5.0",
 		"ethers": "^6.13.5",

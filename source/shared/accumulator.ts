@@ -23,11 +23,23 @@ export function parseAccumulatorMetaBits(mmrMetaBits: bigint): AccumulatorMetada
 	}
 }
 
+import { callContractView } from "./ethereum/ethRpcFetch.ts"
+
+// getAccumulatorData() selector is first 4 bytes of keccak256("getAccumulatorData()")
+const GET_ACCUMULATOR_DATA_SELECTOR = "0x7b9fa2e0" // precomputed
+
 export async function getAccumulatorMmrMetaBits(
-	provider: ethers.JsonRpcProvider,
+	rpcUrl: string,
 	contractAddress: string,
 ): Promise<AccumulatorMetadata> {
-	const contract = new ethers.Contract(contractAddress, MINIMAL_ACCUMULATOR_ABI, provider)
-	const [mmrMetaBits]: [bigint] = await contract.getAccumulatorData()
+	const hexResult: string = await callContractView(
+		rpcUrl,
+		contractAddress,
+		GET_ACCUMULATOR_DATA_SELECTOR,
+		"latest"
+	)
+	// ABI: returns (uint256). Remove 0x, parse as BigInt
+	const hex = hexResult.startsWith("0x") ? hexResult.slice(2) : hexResult
+	const mmrMetaBits = BigInt("0x" + hex.padStart(64, "0"))
 	return parseAccumulatorMetaBits(mmrMetaBits)
 }

@@ -1,5 +1,5 @@
 // shared/rpc.ts
-import { ThrottledProvider } from "./ThrottledProvider.ts"
+import { ThrottledProvider } from "./ethereum/ThrottledProvider.ts"
 import { ethers } from "ethers"
 
 export function getRPCProvider(url: string): ethers.JsonRpcProvider {

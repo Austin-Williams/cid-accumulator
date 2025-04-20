@@ -2,7 +2,7 @@ import { CID } from "multiformats/cid"
 import { encodeBlock } from "./codec.ts"
 
 export class MerkleMountainRange {
-	private peaks: CID[] = []
+	public peaks: CID[] = []
 	public leafCount = 0
 
 	constructor() {}
