@@ -1,7 +1,7 @@
 import { ethers } from "ethers"
 import type { IpfsAdapter } from "./interfaces/IpfsAdapter.ts"
 import type { StorageAdapter } from "./interfaces/StorageAdapter.ts"
-import { parseAccumulatorMetaBits } from "./shared/accumulator.ts"
+import { parseAccumulatorMetaBits } from "./shared/ethereum/abiUtils.ts"
 import { cidFromBytes32HexString } from "./shared/codec.ts"
 import type { DagNodeRecord, PeakWithHeight, LeafRecord } from "./shared/types.ts"
 import { CID } from "multiformats/cid"

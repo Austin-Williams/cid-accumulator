@@ -6,6 +6,7 @@ import { sha256 } from "multiformats/hashes/sha2"
 import { MINIMAL_ACCUMULATOR_INTERFACE } from "../shared/constants.ts"
 import { NormalizedLeafInsertEvent } from "../shared/types.ts"
 import { fromHex } from "multiformats/bytes"
+import { create as createDigest } from "multiformats/hashes/digest"
 
 /**
  * Decodes a LeafInsert event log from ethers, normalizing all possible upstream types
@@ -87,5 +88,11 @@ export async function encodeLinkNode(left: CID, right: CID): Promise<CID> {
 // If your accumulator uses a different codec/hash, update these codes!
 export async function cidFromBytes32HexString(bytes32hexString: string): Promise<CID<unknown, 113, 18, 1>> {
 	const digest = await sha256.digest(fromHex(bytes32hexString).slice(0, 32))
+	return CID.create(1, 0x71, digest) // 0x71 = dag-cbor
+}
+
+// Convert contract peak hex (digest) to the exact CID form used by mmr.peaks (wrap digest, do not hash)
+export function contractPeakHexToMmrCid(bytes: Uint8Array) {
+	const digest = createDigest(0x12, bytes) // 0x12 = sha2-256
 	return CID.create(1, 0x71, digest) // 0x71 = dag-cbor
 }

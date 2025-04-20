@@ -15,11 +15,11 @@ import type { PeakWithHeight } from "./types.ts"
 export async function computePreviousRootCID(
 	currentPeaksWithHeights: PeakWithHeight[],
 	newData: Uint8Array,
-	leftInputs: CID<unknown, 113, 18, 1>[],
+	leftInputs: CID[],
 ): Promise<{
-	previousRootCID: CID<unknown, 113, 18, 1>
+	previousRootCID: CID
 	previousPeaksWithHeights: PeakWithHeight[]
-	reconstructedParents: CID<unknown, 113, 18, 1>[]
+	reconstructedParents: CID[]
 }> {
 	let peaks: PeakWithHeight[] = currentPeaksWithHeights.map((p) => ({
 		cid: p.cid as CID<unknown, 113, 18, 1>,
@@ -37,7 +37,7 @@ export async function computePreviousRootCID(
 		}
 	}
 
-	const reconstructedParents: CID<unknown, 113, 18, 1>[] = []
+	const reconstructedParents: CID[] = []
 	let peaksCopy = [...peaks]
 	for (let i = leftInputs.length - 1; i >= 0; i--) {
 		const right = peaksCopy.shift()
