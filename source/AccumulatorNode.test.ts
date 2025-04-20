@@ -1,33 +1,42 @@
-import { AccumulatorNode } from "./AccumulatorNode"
-import { ethers } from "ethers"
-import { CID } from "multiformats/cid"
-import { createIpfsAdapter } from "./adapters/ipfs/mockIpfsAdapter" // Replace with your real or mock adapter
-import { createSqliteAdapter } from "./adapters/storage/SqliteAdapter" // Replace with your real or mock adapter
+import "dotenv/config"
+import { AccumulatorNode } from "./AccumulatorNode.ts"
+import { KuboRpcAdapter } from "./adapters/ipfs/KuboRpcAdapter.ts"
+import { LevelDbAdapter } from "./adapters/storage/LevelDbAdapter.ts"
+import { create as createKuboClient } from "kubo-rpc-client"
+import { Level } from "level"
 
 // --- CONFIGURE THESE FOR YOUR ENVIRONMENT ---
-const RPC_URL = process.env.RPC_URL || "<YOUR_RPC_URL>"
-const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS || "<YOUR_CONTRACT_ADDRESS>"
+const RPC_URL = process.env.ETHEREUM_RPC_PROVIDER_URL || "<YOUR_RPC_URL>"
+const CONTRACT_ADDRESS = process.env.TARGET_CONTRACT_ADDRESS || "<YOUR_CONTRACT_ADDRESS>"
+const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001" // default Kubo daemon
+const LEVEL_PATH = process.env.LEVEL_PATH || "./test.leveldb" // default LevelDB path
 
 async function main() {
-	// Set up provider and contract
-	const provider = new ethers.JsonRpcProvider(RPC_URL)
-	const abi = require("./shared/abi.json") // Make sure ABI is available
-	const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, provider)
+	// Set up Kubo IPFS adapter
+	const kuboClient = createKuboClient(IPFS_API_URL)
+	const ipfs = new KuboRpcAdapter(kuboClient)
+	const db = new Level(LEVEL_PATH, { valueEncoding: "json" })
+	const storage = new LevelDbAdapter(db)
 
-	// Set up adapters
-	const ipfs = createIpfsAdapter() // Use your real or mock implementation
-	const storage = await createSqliteAdapter(":memory:") // Or point to a file for persistence
-
-	// Instantiate the node
-	const node = new AccumulatorNode({ ipfs, storage, contract })
+	// Instantiate the node with fetch-based contract config
+	const node = new AccumulatorNode({
+		ipfs,
+		storage,
+		ethereumRpcUrl: RPC_URL,
+		contractAddress: CONTRACT_ADDRESS,
+	})
 
 	// Run the backwards sync
 	try {
 		await node.syncBackwardsFromLatest(1000)
-		console.log("Sync complete!")
+		console.log("✅ AccumulatorNode backwards sync complete!")
 	} catch (e) {
-		console.error("Sync failed:", e)
+		console.error("❌ AccumulatorNode sync failed:", e)
+		process.exit(1)
 	}
 }
 
-main().catch(console.error)
+main().catch((e) => {
+	console.error("❌ Test runner error:", e)
+	process.exit(1)
+})

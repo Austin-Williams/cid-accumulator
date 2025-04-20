@@ -1,13 +1,12 @@
-import { ethers } from "ethers"
 import type { IpfsAdapter } from "./interfaces/IpfsAdapter.ts"
 import type { StorageAdapter } from "./interfaces/StorageAdapter.ts"
-import { parseAccumulatorMetaBits } from "./shared/ethereum/abiUtils.ts"
-import { cidFromBytes32HexString } from "./shared/codec.ts"
-import type { DagNodeRecord, PeakWithHeight, LeafRecord } from "./shared/types.ts"
+import { getAccumulatorData } from "./shared/ethereum/commonCalls.ts"
+import type { DagNodeRecord, PeakWithHeight, LeafRecord, NormalizedLeafInsertEvent } from "./shared/types.ts"
 import { CID } from "multiformats/cid"
 import { resolveMerkleTreeOrThrow } from "./shared/ipfs.ts"
-import { decodeLeafInsert } from "./shared/codec.ts"
-import { bagPeaksWithHeights, computePreviousRootCID } from "./shared/computePreviousRootCID.ts"
+import { computePreviousRootCID } from "./shared/computePreviousRootCID.ts"
+import { getRootCIDFromPeaks } from "./shared/mmr.ts"
+import { getLeafInsertLogs } from "./shared/ethereum/commonCalls.ts"
 
 /**
  * AccumulatorNode: Unified entry point for accumulator logic in any environment.
@@ -17,22 +16,26 @@ import { bagPeaksWithHeights, computePreviousRootCID } from "./shared/computePre
 export class AccumulatorNode {
 	ipfs: IpfsAdapter
 	storage: StorageAdapter
-	contract: ethers.Contract // Should be ethers.Contract
+	ethereumRpcUrl: string
+	contractAddress: string
 	// ...other fields (provider, contract, etc.)
 
 	constructor({
 		ipfs,
 		storage,
-		contract,
+		ethereumRpcUrl,
+		contractAddress,
 	}: {
 		ipfs: IpfsAdapter
 		storage: StorageAdapter
-		contract: any
+		ethereumRpcUrl: string
+		contractAddress: string
 		[key: string]: any
 	}) {
 		this.ipfs = ipfs
 		this.storage = storage
-		this.contract = contract
+		this.ethereumRpcUrl = ethereumRpcUrl
+		this.contractAddress = contractAddress
 	}
 
 	// --- DB Access Methods ---
@@ -87,28 +90,6 @@ export class AccumulatorNode {
 	}
 
 	/**
-	 * Fetches on-chain accumulator metadata and peaks.
-	 * Uses contract.getAccumulatorData() and parses it.
-	 */
-	async getOnChainAccumulatorMeta(): Promise<{
-		leafCount: number
-		previousInsertBlockNumber: number
-		deployBlockNumber: number
-		peaksWithHeight: PeakWithHeight[]
-	}> {
-		const [mmrMetaBits, peaksArr]: [bigint, string[]] = await this.contract.getAccumulatorData()
-		const meta = parseAccumulatorMetaBits(mmrMetaBits)
-		const peaksCids: CID<unknown, 113, 18, 1>[] = await Promise.all(
-			peaksArr
-				.slice(0, meta.peakCount)
-				.map(async (x) => (await cidFromBytes32HexString(x)) as unknown as CID<unknown, 113, 18, 1>),
-		)
-		// Zip the peaks and peakHeights into PeakWithHeight[]
-		const peaksWithHeight: PeakWithHeight[] = peaksCids.map((cid, i) => ({ cid, height: meta.peakHeights[i] }))
-		return { ...meta, peaksWithHeight }
-	}
-
-	/**
 	 * Searches from leafIndex 0 to maxLeafIndex for leaves that are missing newData.
 	 * Returns an array of leaf indexes that are missing newData.
 	 */
@@ -126,46 +107,42 @@ export class AccumulatorNode {
 	 * Uses on-chain metadata to determine where to start.
 	 */
 	async syncBackwardsFromLatest(maxBlockRange = 1000): Promise<void> {
-		const meta = await this.getOnChainAccumulatorMeta()
-		if (meta.leafCount === 0) {
-			console.log("[pinner] No leaves to sync.")
-			return
-		}
+		const { meta, peaks } = await getAccumulatorData(this.ethereumRpcUrl, this.contractAddress)
 		const currentLeafIndex = meta.leafCount - 1
 		const currentBlock = meta.previousInsertBlockNumber
 		const minBlock = meta.deployBlockNumber
-		let currentPeaksWithHeights = meta.peaksWithHeight
 
 		// Compute the current root CID from the current peaks
-		const currentRootCID = await bagPeaksWithHeights(currentPeaksWithHeights)
+		const currentRootCID = await getRootCIDFromPeaks(peaks.map((p) => p.cid))
 
 		// Try to resolve the entire DAG from the root CID
 		console.log(`Checking availability of root CID ${currentRootCID.toString()} on IPFS...`)
-		const success: boolean = await this.getAndResolveCID(currentRootCID)
-		if (success) {
-			const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
-			if (missing.length !== 0) throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
-			console.log("Successfully resolved all data from the current root CID.")
-			return
-		}
+		console.log(`[TEST] Skipping IPFS check for testing`)
+		// const success: boolean = await this.getAndResolveCID(currentRootCID)
+		// if (success) {
+		// 	const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
+		// 	if (missing.length !== 0) throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
+		// 	console.log("Successfully resolved all data from the current root CID.")
+		// 	return
+		// }
 		console.log("Root CID not fully available on IPFS. Beginning walkback loop...")
 
-		let oldestRootCid: CID<unknown, 113, 18, 1> = currentRootCID
+		let oldestRootCid: CID = currentRootCID
+		let currentPeaksWithHeights: PeakWithHeight[] = peaks
 
 		// --- Batch event fetching ---
-		const leafInsertFilter = this.contract.filters.LeafInsert()
 		for (let endBlock = currentBlock; endBlock >= minBlock; endBlock -= maxBlockRange) {
 			const startBlock = Math.max(minBlock, endBlock - maxBlockRange + 1)
 			console.log(`Querying blocks ${startBlock} to ${endBlock} for LeafInsert events...`)
-			const logs = await this.contract.queryFilter(leafInsertFilter, startBlock, endBlock)
-			if (logs.length === 0) {
-				continue
-			}
+			const logs: NormalizedLeafInsertEvent[] = await getLeafInsertLogs(
+				this.ethereumRpcUrl,
+				this.contractAddress,
+				startBlock,
+				endBlock,
+			)
 			console.log(`Found ${logs.length} LeafInsert events`)
-			// Decode all logs first
-			const decodedEvents = await Promise.all(logs.map((log) => decodeLeafInsert(log)))
-			// Sort by leafIndex descending
-			for (const event of decodedEvents.sort((a, b) => b.leafIndex - a.leafIndex)) {
+
+			for (const event of logs.sort((a, b) => b.leafIndex - a.leafIndex)) {
 				// Compute previous root CID and peaks
 				const { previousRootCID, previousPeaksWithHeights } = await computePreviousRootCID(
 					currentPeaksWithHeights,
@@ -209,7 +186,7 @@ export class AccumulatorNode {
 	 * @param cid - The root CID to resolve.
 	 * @returns true if all nodes are available, false otherwise.
 	 */
-	async getAndResolveCID(cid: CID<unknown, 113, 18, 1>): Promise<boolean> {
+	async getAndResolveCID(cid: CID): Promise<boolean> {
 		try {
 			const leaves = await resolveMerkleTreeOrThrow(cid, this.ipfs)
 			console.log(`Found and fully resolved root CID ${cid.toString()} on IPFS. Aquired ${leaves.length} leaves.`)

@@ -1,20 +1,11 @@
 import "dotenv/config"
 import { MerkleMountainRange } from "./shared/mmr.ts"
-import { parseAccumulatorMetaBits } from "./shared/accumulator.ts"
 import assert from "assert"
 import fs from "fs"
 import { RawEthLog } from "./shared/types.ts"
-import { parseLeafInsertLog } from "./shared/parseLeafInsertLog.ts"
-import { minimalRootFromPeaks } from "./minimalRootFromPeaks.ts"
-import { CID } from "multiformats/cid"
-import { create as createDigest } from "multiformats/hashes/digest"
+import { parseLeafInsertLog } from "./shared/ethereum/abiUtils.ts"
+import { getRootCIDFromPeaks } from "./shared/mmr.ts"
 import { getLatestCID, getAccumulatorData } from "./shared/ethereum/commonCalls.ts"
-
-// Convert contract peak hex (digest) to the exact CID form used by mmr.peaks (wrap digest, do not hash)
-function contractPeakHexToMmrCid(bytes: Uint8Array) {
-	const digest = createDigest(0x12, bytes) // 0x12 = sha2-256
-	return CID.create(1, 0x71, digest) // 0x71 = dag-cbor
-}
 
 async function main() {
 	const contractAddress =
@@ -40,7 +31,7 @@ async function main() {
 	// 3. Insert each leaf in order
 	for (let i = 0; i < events.length; ++i) {
 		const event: RawEthLog = events[i] // we're pretending we just got this event from the provider
-		const normalizedEvent = parseLeafInsertLog(event)
+		const normalizedEvent = await parseLeafInsertLog(event)
 		const newData = normalizedEvent.newData
 		if (!newData) throw new Error(`Missing newData in event ${i}`)
 		await mmr.addLeafWithTrail(newData, i)
@@ -70,18 +61,18 @@ async function main() {
 	// 1. Fetch contract peaks (hashes) and peak count
 	const accumulatorData = await getAccumulatorData(rpcUrl, contractAddress)
 
-	console.log("[DEBUG] mmr.peaks (CID objects):", mmr.peaks)
-	console.log(
-		"[DEBUG] mmr.peaks (base32):",
-		mmr.peaks.map((c) => c.toString()),
-	)
-	console.log(
-		"[DEBUG] mmr.peaks digests:",
-		mmr.peaks.map((cid, i) => Buffer.from(cid.multihash.digest).toString("hex")),
-	)
+	// console.log("[DEBUG] mmr.peaks (CID objects):", mmr.peaks)
+	// console.log(
+	// 	"[DEBUG] mmr.peaks (base32):",
+	// 	mmr.peaks.map((c) => c.toString()),
+	// )
+	// console.log(
+	// 	"[DEBUG] mmr.peaks digests:",
+	// 	mmr.peaks.map((cid, i) => Buffer.from(cid.multihash.digest).toString("hex")),
+	// )
 
 	// --- Test minimalRootFromPeaks on contractPeaksAsMmrCids ---
-	const minimalRootFromContractPeaks = await minimalRootFromPeaks(accumulatorData.peaks.map((pwh) => pwh.cid))
+	const minimalRootFromContractPeaks = await getRootCIDFromPeaks(accumulatorData.peaks.map((pwh) => pwh.cid))
 	// WORKS: const minimalRootFromContractPeaks = await minimalRootFromPeaks(contractPeaksAsMmrCids)
 
 	console.log("[DEBUG] minimalRootFromPeaks(contractPeaksAsMmrCids):", minimalRootFromContractPeaks.toString())

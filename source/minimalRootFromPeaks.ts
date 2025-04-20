@@ -6,7 +6,7 @@ import { encodeBlock } from "./shared/codec.ts"
  * @param peaks Array of CIDs (left-to-right order)
  * @returns The root CID (or the zero CID if peaks is empty)
  */
-export async function minimalRootFromPeaks(peaks: CID[]): Promise<CID> {
+export async function getRootCIDFromPeaks(peaks: CID[]): Promise<CID> {
 	if (peaks.length === 0) {
 		return CID.parse("bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku")
 	}

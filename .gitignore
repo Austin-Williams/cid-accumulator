@@ -155,3 +155,6 @@ script/
 
 # Pinner state
 .pinner/
+
+
+test.leveldb/

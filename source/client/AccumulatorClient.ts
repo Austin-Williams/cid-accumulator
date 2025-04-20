@@ -101,7 +101,7 @@ export class AccumulatorClient {
 			ipfsCheckMethod?: "block" | "dag"
 		},
 	): Promise<{
-		cid: CID<unknown, 113, 18, 1>
+		cid: CID
 		state: any
 		forwardEvents: any[]
 	}> {

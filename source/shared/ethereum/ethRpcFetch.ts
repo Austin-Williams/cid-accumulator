@@ -17,65 +17,18 @@ export async function ethRpcFetch(rpcUrl: string, method: string, params: any[],
 			id,
 		}),
 	})
-	const json = await res.json()
-	if (json.error) throw new Error(json.error.message)
+	const text = await res.text()
+	let json
+	try {
+		json = JSON.parse(text)
+	} catch (e) {
+		throw new Error(`Failed to parse JSON from Ethereum RPC response: ${text}`)
+	}
+	if (json.error) {
+		console.error("Ethereum RPC error:", JSON.stringify(json.error, null, 2))
+		throw new Error(json.error.message || JSON.stringify(json.error))
+	}
 	return json.result
-}
-
-/**
- * Finds LeafInsert events using eth_getLogs.
- * @param rpcUrl string
- * @param contractAddress string
- * @param eventTopic string (keccak256 hash of event signature)
- * @param fromBlock string (hex or "latest")
- * @param toBlock string (hex or "latest")
- * @returns Promise<any[]> (array of log objects)
- */
-export async function getLeafInsertLogs(
-	rpcUrl: string,
-	contractAddress: string,
-	eventTopic: string,
-	fromBlock: string,
-	toBlock: string,
-) {
-	return ethRpcFetch(rpcUrl, "eth_getLogs", [
-		{
-			address: contractAddress,
-			topics: [eventTopic],
-			fromBlock,
-			toBlock,
-		},
-	])
-}
-
-/**
- * Finds a LeafInsert log for a specific leaf index using eth_getLogs.
- * @param rpcUrl string
- * @param contractAddress string
- * @param eventTopic string (keccak256 hash of event signature)
- * @param fromBlock string (hex or "latest")
- * @param toBlock string (hex or "latest")
- * @param targetLeafIndex number (the leaf index to filter for)
- * @returns Promise<any[]> (array of log objects for that leaf index)
- */
-export async function getLeafInsertLogForTargetLeafIndex(
-	rpcUrl: string,
-	contractAddress: string,
-	eventTopic: string,
-	fromBlock: string,
-	toBlock: string,
-	targetLeafIndex: number,
-) {
-	const leafIndexTopic = "0x" + targetLeafIndex.toString(16).padStart(64, "0")
-	const topics = [eventTopic, leafIndexTopic]
-	return ethRpcFetch(rpcUrl, "eth_getLogs", [
-		{
-			address: contractAddress,
-			topics,
-			fromBlock,
-			toBlock,
-		},
-	])
 }
 
 /**

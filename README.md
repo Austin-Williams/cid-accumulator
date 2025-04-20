@@ -93,7 +93,7 @@ You will be prompted for:
 - The URL of the Ethereum RPC provider you want to use. (e.g. `http://127.0.0.1:8545`, or `https://rpc.ankr.com/...`)
 - The URL of the IPFS node you want to use. (e.g. `http://127.0.0.1:5001`)
 
-(You can optionally set these in the `.env` file with `TARGET_CONTRACT_ADDRESS`, `ETHEREUM_RPC_PROVIDER_URL`, and `IPFS_RPC_URL`, respectively)
+(You can optionally set these in the `.env` file with `TARGET_CONTRACT_ADDRESS`, `ETHEREUM_RPC_PROVIDER_URL`, and `IPFS_API_URL`, respectively)
 
 The service will start syncing from wherever it left off (if this is the first time running it, it will create a new local database to store events and sync from the beginning). As it syncs, it pins all relevant data to IPFS and stores the leaf insert events in the local database.
 

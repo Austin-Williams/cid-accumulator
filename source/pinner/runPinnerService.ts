@@ -61,8 +61,8 @@ export async function getPinnerConfig(): Promise<{
 
 	// Gather IPFS API URL
 	let ipfsApiUrl: string
-	if (process.env.IPFS_RPC_URL) {
-		ipfsApiUrl = process.env.IPFS_RPC_URL
+	if (process.env.IPFS_API_URL) {
+		ipfsApiUrl = process.env.IPFS_API_URL
 		console.log(`IPFS API URL loaded from .env: ${ipfsApiUrl}`)
 	} else {
 		ipfsApiUrl = await promptUserChoice("IPFS API URL [e.g. http://127.0.0.1:5001]: ", [], false)

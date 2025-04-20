@@ -2,8 +2,8 @@ import { createKuboRPCClient } from "kubo-rpc-client"
 import "dotenv/config"
 import { CID } from "multiformats/cid"
 
-// Use IPFS_RPC_URL from .env, fallback to default
-const IPFS_API_URL = process.env.IPFS_RPC_URL || "http://127.0.0.1:5001/api/v0"
+// Use IPFS_API_URL from .env, fallback to default
+const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001/api/v0"
 const CID_STRING = "bafyreiabiqywpfpmogug36awk6ljctuifcijcssyzyz66b3hug7r5ieupu"
 
 import { resolveMerkleTree } from "../source/shared/ipfs"

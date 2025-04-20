@@ -2,16 +2,13 @@ import * as dagCbor from "@ipld/dag-cbor"
 import { CID } from "multiformats/cid"
 import { createKuboRPCClient } from "kubo-rpc-client"
 
-export type IpldNode =
-	| Uint8Array
-	| CID<unknown, 113, 18, 1>
-	| { L: CID<unknown, 113, 18, 1>; R: CID<unknown, 113, 18, 1> }
+export type IpldNode = Uint8Array | CID | { L: CID; R: CID }
 
-function isIpldLink(obj: unknown): obj is CID<unknown, 113, 18, 1> {
+function isIpldLink(obj: unknown): obj is CID {
 	return obj instanceof CID
 }
 
-function isInternalNode(obj: unknown): obj is { L: CID<unknown, 113, 18, 1>; R: CID<unknown, 113, 18, 1> } {
+function isInternalNode(obj: unknown): obj is { L: CID; R: CID } {
 	return (
 		typeof obj === "object" &&
 		obj !== null &&
@@ -32,7 +29,7 @@ function isInternalNode(obj: unknown): obj is { L: CID<unknown, 113, 18, 1>; R: 
  * with a descriptive message indicating which CID could not be found. This behavior is intentional:
  * callers should be prepared to handle thrown errors if the DAG is incomplete or unavailable.
  *
- * @param cid - The root CID of the Merkle tree to resolve. Must be CID<unknown, 113, 18, 1>.
+ * @param cid - The root CID of the Merkle tree to resolve. Must be CID.
  * @param blockstore - An object implementing a get(cid) method that returns the raw block data for a CID.
  * @returns Promise<Uint8Array[]> Resolves to an array of all leaf node data found in the DAG.
  * @throws Error if any block is missing or if an unexpected node structure is encountered.
@@ -46,8 +43,8 @@ function isInternalNode(obj: unknown): obj is { L: CID<unknown, 113, 18, 1>; R: 
  * }
  */
 export async function resolveMerkleTreeOrThrow(
-	cid: CID<unknown, 113, 18, 1>,
-	blockstore: { get(cid: CID<unknown, 113, 18, 1>): Promise<Uint8Array> },
+	cid: CID,
+	blockstore: { get(cid: CID): Promise<Uint8Array> },
 ): Promise<Uint8Array[]> {
 	let raw: Uint8Array
 	try {

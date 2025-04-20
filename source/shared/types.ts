@@ -17,7 +17,8 @@ export interface NormalizedLeafInsertEvent {
 	leafIndex: number
 	previousInsertBlockNumber: number
 	newData: Uint8Array
-	leftInputs: Uint8Array[] // "left hashes" as raw 32-byte hashes (not dag-cbor encoded CIDs).
+	// leftInputs: Uint8Array[] // "left hashes" as raw 32-byte hashes (not dag-cbor encoded CIDs).
+	leftInputs: CID[]
 	blockNumber: number
 	transactionHash: string
 	removed: boolean
@@ -43,8 +44,8 @@ export type LeafRecord = {
 	newData: Uint8Array
 	event?: NormalizedLeafInsertEvent
 	blockNumber?: number
-	rootCid?: CID<unknown, 113, 18, 1>
-	peaksWithHeights?: PeakWithHeight[]
+	rootCid?: CID
+	peaksWithHeights?: PeakWithHeight[] // This is the set of active peaks of the mmr AFTER this leaf/event is inserted.
 	// ...other fields as needed
 }
 
@@ -52,7 +53,7 @@ export type LeafRecord = {
  * Represents a DAG node (leaf or link) in the accumulator.
  */
 export type DagNodeRecord = {
-	cid: CID<unknown, 113, 18, 1>
+	cid: CID
 	data: Uint8Array
 	type: "leaf" | "link"
 	leafIndex?: number

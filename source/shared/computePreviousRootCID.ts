@@ -22,7 +22,7 @@ export async function computePreviousRootCID(
 	reconstructedParents: CID[]
 }> {
 	let peaks: PeakWithHeight[] = currentPeaksWithHeights.map((p) => ({
-		cid: p.cid as CID<unknown, 113, 18, 1>,
+		cid: p.cid as CID,
 		height: p.height,
 	}))
 
@@ -42,7 +42,7 @@ export async function computePreviousRootCID(
 	for (let i = leftInputs.length - 1; i >= 0; i--) {
 		const right = peaksCopy.shift()
 		const left = leftInputs[i]
-		const merged = await hashNode(left as CID<unknown, 113, 18, 1>, right!.cid as CID<unknown, 113, 18, 1>)
+		const merged = await hashNode(left as CID, right!.cid as CID)
 		reconstructedParents.unshift(merged)
 		if (peaksCopy.length === 0) throw new Error("No peaks left to unmerge during reversal")
 		peaksCopy = peaksCopy.slice(1)
@@ -56,28 +56,25 @@ export async function computePreviousRootCID(
 }
 
 // Helper to bag peaks left-to-right (using PeakWithHeight[])
-export async function bagPeaksWithHeights(peaks: PeakWithHeight[]): Promise<CID<unknown, 113, 18, 1>> {
+export async function bagPeaksWithHeights(peaks: PeakWithHeight[]): Promise<CID> {
 	if (peaks.length === 0) throw new Error("No peaks to bag")
-	let root = peaks[0].cid as CID<unknown, 113, 18, 1>
+	let root = peaks[0].cid as CID
 	for (let i = 1; i < peaks.length; ++i) {
-		root = await hashNode(root, peaks[i].cid as CID<unknown, 113, 18, 1>)
+		root = await hashNode(root, peaks[i].cid as CID)
 	}
-	return root as CID<unknown, 113, 18, 1>
+	return root as CID
 }
 
 // Helper to hash a leaf (encode as dag-cbor, then hash, return CID)
-export async function hashLeaf(data: Uint8Array): Promise<CID<unknown, 113, 18, 1>> {
+export async function hashLeaf(data: Uint8Array): Promise<CID> {
 	const encoded = dagCbor.encode(data)
 	const digest = await sha256.digest(encoded)
-	return CID.create(1, dagCbor.code, digest) as CID<unknown, 113, 18, 1>
+	return CID.create(1, dagCbor.code, digest) as CID
 }
 
 // Helper to hash an internal node (encode {L, R}, then hash, return CID)
-export async function hashNode(
-	left: CID<unknown, 113, 18, 1>,
-	right: CID<unknown, 113, 18, 1>,
-): Promise<CID<unknown, 113, 18, 1>> {
+export async function hashNode(left: CID, right: CID): Promise<CID> {
 	const encoded = dagCbor.encode({ L: left, R: right })
 	const digest = await sha256.digest(encoded)
-	return CID.create(1, dagCbor.code, digest) as CID<unknown, 113, 18, 1>
+	return CID.create(1, dagCbor.code, digest) as CID
 }
