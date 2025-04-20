@@ -4,7 +4,7 @@ import { getAccumulatorData } from "./shared/ethereum/commonCalls.ts"
 import type { DagNodeRecord, PeakWithHeight, LeafRecord, NormalizedLeafInsertEvent } from "./shared/types.ts"
 import { CID } from "multiformats/cid"
 import { resolveMerkleTreeOrThrow } from "./shared/ipfs.ts"
-import { computePreviousRootCID } from "./shared/computePreviousRootCID.ts"
+import { computePreviousRootCIDAndPeaksWithHeights } from "./shared/computePreviousRootCID.ts"
 import { getRootCIDFromPeaks } from "./shared/mmr.ts"
 import { getLeafInsertLogs } from "./shared/ethereum/commonCalls.ts"
 
@@ -112,20 +112,21 @@ export class AccumulatorNode {
 		const currentBlock = meta.previousInsertBlockNumber
 		const minBlock = meta.deployBlockNumber
 
+		console.log(`\u{1F9EE} [AccumulatorNode] Syncing backwards from block #${meta.previousInsertBlockNumber} to block #${meta.deployBlockNumber} (${meta.previousInsertBlockNumber - meta.deployBlockNumber} blocks), grabbing ${maxBlockRange} blocks per RPC call.`)
+
 		// Compute the current root CID from the current peaks
 		const currentRootCID = await getRootCIDFromPeaks(peaks.map((p) => p.cid))
 
 		// Try to resolve the entire DAG from the root CID
-		console.log(`Checking availability of root CID ${currentRootCID.toString()} on IPFS...`)
-		console.log(`[TEST] Skipping IPFS check for testing`)
-		// const success: boolean = await this.getAndResolveCID(currentRootCID)
-		// if (success) {
-		// 	const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
-		// 	if (missing.length !== 0) throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
-		// 	console.log("Successfully resolved all data from the current root CID.")
-		// 	return
-		// }
-		console.log("Root CID not fully available on IPFS. Beginning walkback loop...")
+		console.log(`\u{1F9EE} [AccumulatorNode] Checking availability of root CID ${currentRootCID.toString()} on IPFS...`)
+		const success: boolean = await this.getAndResolveCID(currentRootCID)
+		if (success) {
+			const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
+			if (missing.length !== 0) throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
+			console.log("\u{1F9EE} [AccumulatorNode] Successfully resolved all data from the current root CID.")
+			return
+		}
+		console.log("\u{1F9EE} [AccumulatorNode] Root CID not fully available on IPFS. Beginning walkback loop...")
 
 		let oldestRootCid: CID = currentRootCID
 		let currentPeaksWithHeights: PeakWithHeight[] = peaks
@@ -133,18 +134,18 @@ export class AccumulatorNode {
 		// --- Batch event fetching ---
 		for (let endBlock = currentBlock; endBlock >= minBlock; endBlock -= maxBlockRange) {
 			const startBlock = Math.max(minBlock, endBlock - maxBlockRange + 1)
-			console.log(`Querying blocks ${startBlock} to ${endBlock} for LeafInsert events...`)
+			console.log(`\u{1F9EE} [AccumulatorNode] Querying blocks ${startBlock} to ${endBlock} for LeafInsert events...`)
 			const logs: NormalizedLeafInsertEvent[] = await getLeafInsertLogs(
 				this.ethereumRpcUrl,
 				this.contractAddress,
 				startBlock,
 				endBlock,
 			)
-			console.log(`Found ${logs.length} LeafInsert events`)
+			console.log(`\u{1F9EE} [AccumulatorNode] Found ${logs.length} LeafInsert events`)
 
 			for (const event of logs.sort((a, b) => b.leafIndex - a.leafIndex)) {
 				// Compute previous root CID and peaks
-				const { previousRootCID, previousPeaksWithHeights } = await computePreviousRootCID(
+				const { previousRootCID, previousPeaksWithHeights } = await computePreviousRootCIDAndPeaksWithHeights(
 					currentPeaksWithHeights,
 					event.newData,
 					event.leftInputs,
@@ -160,23 +161,24 @@ export class AccumulatorNode {
 				currentPeaksWithHeights = previousPeaksWithHeights
 				oldestRootCid = previousRootCID
 			}
+
 			// After the batch, check if the oldest root CID is available on IPFS
-			console.log(`Checking availability of root CID ${oldestRootCid.toString()} on IPFS...`)
+			console.log(`\u{1F9EE} [AccumulatorNode] Checking availability of root CID ${oldestRootCid.toString()} on IPFS...`)
 			const success = await this.getAndResolveCID(oldestRootCid)
 			if (success) {
 				const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
 				if (missing.length !== 0)
 					throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
-				console.log(`Successfully resolved all data from old root CID ${oldestRootCid.toString()}.`)
+				console.log(`\u{1F9EE} [AccumulatorNode] Successfully resolved all data from old root CID ${oldestRootCid.toString()}.`)
 				return
 			}
-			console.log("Root CID not fully available on IPFS. Continuing to walkback...")
+			console.log("\u{1F9EE} [AccumulatorNode] Root CID not fully available on IPFS. Continuing to walkback...")
 		}
 		// If we get here, we've fully synced backwards using only event data (no data found on IPFS)
-		console.log("Fully synced backwards using only event data (no data found on IPFS)")
+		console.log("\u{1F9EE} [AccumulatorNode] Fully synced backwards using only event data (no data found on IPFS)")
 		const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
 		if (missing.length !== 0) throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
-		console.log("Successfully resolved all data from contract events.")
+		console.log("\u{1F9EE} [AccumulatorNode] Successfully resolved all data from contract events.")
 	}
 
 	/**
