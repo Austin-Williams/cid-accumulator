@@ -59,4 +59,3 @@ export async function computePreviousRootCIDAndPeaksWithHeights(
 
 	return { previousRootCID, previousPeaksWithHeights: reconstructedPeaks }
 }
-

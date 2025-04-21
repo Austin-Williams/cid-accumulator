@@ -12,7 +12,6 @@ const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001" // defa
 const LEVEL_PATH = process.env.LEVEL_PATH || "./test.leveldb" // default LevelDB path
 
 async function main() {
-
 	// Set up Kubo IPFS adapter
 	const kuboClient = createKuboClient(IPFS_API_URL)
 	const ipfs = new KuboRpcAdapter(kuboClient)
@@ -42,15 +41,15 @@ async function main() {
 
 		// 4. Fetch on-chain latest root CID using minimal ABI and decode as CID
 		const ethers = (await import("ethers")).ethers
-		const { MINIMAL_ACCUMULATOR_ABI } = await import("./shared/constants.ts");
-		const { CID } = await import("multiformats/cid");
+		const { MINIMAL_ACCUMULATOR_ABI } = await import("./shared/constants.ts")
+		const { CID } = await import("multiformats/cid")
 		const provider = new ethers.JsonRpcProvider(RPC_URL)
 		const contract = new ethers.Contract(CONTRACT_ADDRESS, MINIMAL_ACCUMULATOR_ABI, provider)
-		const onChainRootHex: string = await contract.getLatestCID();
-		const onChainRootBytes = Uint8Array.from(Buffer.from(onChainRootHex.replace(/^0x/, ""), "hex"));
-		const onChainRootCID = CID.decode(onChainRootBytes);
-		const onChainRootBase32 = onChainRootCID.toString();
-		console.log(`[Accumulator TEST] On-chain latest root CID: ${onChainRootBase32}`);
+		const onChainRootHex: string = await contract.getLatestCID()
+		const onChainRootBytes = Uint8Array.from(Buffer.from(onChainRootHex.replace(/^0x/, ""), "hex"))
+		const onChainRootCID = CID.decode(onChainRootBytes)
+		const onChainRootBase32 = onChainRootCID.toString()
+		console.log(`[Accumulator TEST] On-chain latest root CID: ${onChainRootBase32}`)
 
 		if (localRoot === onChainRootBase32) {
 			console.log("[Accumulator TEST] ✅ Local and on-chain root CIDs match!")
@@ -59,8 +58,8 @@ async function main() {
 		}
 
 		// 5. Re-pin all data to IPFS and ensure no errors
-		await node.rePinAllDataToIPFS();
-		console.log("[Accumulator TEST] ✅ Successfully re-pinned all data to IPFS!");
+		await node.rePinAllDataToIPFS()
+		console.log("[Accumulator TEST] ✅ Successfully re-pinned all data to IPFS!")
 	} catch (e) {
 		console.error("❌ AccumulatorNode test failed:", e)
 		process.exit(1)

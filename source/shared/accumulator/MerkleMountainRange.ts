@@ -17,16 +17,13 @@ export class MerkleMountainRange {
 	 *   - leafCID: The CID of the newly added leaf.
 	 *   - rootCID: The new root CID after insertion.
 	 *   - trail: An array of CID and data pairs for all intermediate nodes.
-	 * 		
+	 *
 	 * 	trail[0] is the new leaf's CID
 	 * 	trail[trail.length - 1] is the new root CID
-	 */	
-	async addLeafWithTrail(
-		leafIndex: number,
-		newData: Uint8Array,
-	): Promise<MMRLeafInsertTrail> {
+	 */
+	async addLeafWithTrail(leafIndex: number, newData: Uint8Array): Promise<MMRLeafInsertTrail> {
 		if (this.leafCount !== leafIndex) throw new Error(`Expected leafIndex ${this.leafCount} but got ${leafIndex}`)
-		
+
 		const trail: MMRLeafInsertTrail = []
 
 		const { cid: leafCID, bytes: leafData } = await encodeBlock(newData)
@@ -58,7 +55,7 @@ export class MerkleMountainRange {
 	async rootCIDWithTrail(): Promise<{
 		root: CID
 		cids: string[] // TODO: redundant, remove
-		data: Uint8Array[]  // TODO: redundant, remove
+		data: Uint8Array[] // TODO: redundant, remove
 		trail: { cid: CID; data: Uint8Array }[]
 	}> {
 		const cids: string[] = []

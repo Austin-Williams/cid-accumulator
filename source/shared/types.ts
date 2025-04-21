@@ -53,4 +53,4 @@ export type LeafRecord = {
 	[key: string]: unknown // Allow extra properties for type tagging
 }
 
-export type CIDDataPair = {cid: CID; data: Uint8Array;}
+export type CIDDataPair = { cid: CID; data: Uint8Array }

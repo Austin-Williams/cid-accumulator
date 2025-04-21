@@ -8,4 +8,3 @@ export interface StorageAdapter {
 	 */
 	iterate(prefix: string): AsyncIterable<{ key: string; value: string }>
 }
-
