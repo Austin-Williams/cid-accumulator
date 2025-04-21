@@ -26,7 +26,9 @@ import {
 	hexStringToCID,
 	StringToPeakWithHeightArray,
 	stringToCIDDataPair,
+	getLeafRecordFromNormalizedLeafInsertEvent
 } from "../utils/codec.ts"
+import { walkBackLeafInsertLogsOrThrow } from "../utils/walkBackLogsOrThrow.ts"
 
 /**
  * AccumulatorNode: Unified entry point for accumulator logic in any environment.
@@ -58,6 +60,34 @@ export class AccumulatorNode {
 		this.contractAddress = contractAddress
 		this.mmr = new MerkleMountainRange()
 		this.highestCommittedLeafIndex = -1
+	}
+
+	async processNewLeafEvent(event: NormalizedLeafInsertEvent): Promise<void> {
+		// return if we have already processed this leaf
+		if (event.leafIndex <= this.highestCommittedLeafIndex) return
+
+		// if event.leafIndex > highestCommittedLeafIndex + 1:
+		if (event.leafIndex > this.highestCommittedLeafIndex + 1) {
+			console.log(`[Accumulator] \u{1F4CC} Missing event for leaf indexes ${this.highestCommittedLeafIndex + 1} to ${event.leafIndex - 1}. Getting them now...`)
+			// Walk back through the previousInsertBlockNumber's to get the missing leaves
+			const pastEvents: NormalizedLeafInsertEvent[] = await walkBackLeafInsertLogsOrThrow(
+				this.ethereumRpcUrl,
+				this.contractAddress,
+				event.leafIndex - 1,
+				event.previousInsertBlockNumber,
+				this.highestCommittedLeafIndex + 1
+			)
+			for (let i=0; i<pastEvents.length; i++) {
+				await this.processNewLeafEvent(pastEvents[i])
+			}
+			console.log(`[Accumulator] \u{1F44D} Got the missing events.`)
+		}
+
+		// Store the event in the DB
+		await this.#putLeafRecordInDB(event.leafIndex, getLeafRecordFromNormalizedLeafInsertEvent(event))
+
+		// Commit the leaf to the MMR
+		await this.commitLeaf(event.leafIndex, event.newData)
 	}
 
 	/**
@@ -98,7 +128,7 @@ export class AccumulatorNode {
 		const trail = await this.mmr.addLeafWithTrail(leafIndex, newData)
 		// Store trail in local DB (efficient append-only)
 		await this.appendTrailToDB(trail)
-		// Pin and provide full trail to IPFS
+		// Pin and provide trail to IPFS
 		for (const { cid, data } of trail) {
 			await this.ipfs.put(cid, data)
 			await this.ipfs.pin(cid)
@@ -336,6 +366,7 @@ export class AccumulatorNode {
 	/**
 	 * Appends all trail pairs to the DB in an efficient, sequential manner.
 	 * Each pair is stored as dag:trail:<index>. The max index is tracked by dag:trail:maxIndex.
+	 * Does not store a CID/Data pair if it is already in the DB
 	 */
 	async appendTrailToDB(trail: MMRLeafInsertTrail): Promise<void> {
 		let maxIndex = Number((await this.storage.get("dag:trail:maxIndex")) ?? -1)

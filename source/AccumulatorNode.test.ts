@@ -20,7 +20,6 @@ async function main() {
 	const storage = new LevelDbAdapter(db)
 	// const storage = new MemoryAdapter()
 
-
 	// Instantiate the node with fetch-based contract config
 	const node = new AccumulatorNode({
 		ipfs,

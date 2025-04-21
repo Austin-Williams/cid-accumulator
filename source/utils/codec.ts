@@ -2,10 +2,9 @@
 import { CID } from "multiformats/cid"
 import * as dagCbor from "@ipld/dag-cbor"
 import { sha256 } from "multiformats/hashes/sha2"
-import { CIDDataPair, NormalizedLeafInsertEvent } from "../types/types.ts"
+import { CIDDataPair, LeafRecord, NormalizedLeafInsertEvent } from "../types/types.ts"
 import { fromHex } from "multiformats/bytes"
 import { create as createDigest } from "multiformats/hashes/digest"
-
 
 export async function encodeBlock(value: unknown): Promise<{ cid: CID; bytes: Uint8Array }> {
 	const encoded = dagCbor.encode(value)
@@ -110,5 +109,13 @@ export function StringToNormalizedLeafInsertEvent(str: string): NormalizedLeafIn
 		blockNumber: obj.blockNumber,
 		transactionHash: obj.transactionHash,
 		removed: obj.removed,
+	}
+}
+
+export function getLeafRecordFromNormalizedLeafInsertEvent(event: NormalizedLeafInsertEvent): LeafRecord {
+	return {
+		newData: event.newData,
+		event,
+		blockNumber: event.blockNumber,
 	}
 }

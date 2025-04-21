@@ -6,7 +6,7 @@ import type { StorageAdapter } from "../../interfaces/StorageAdapter.ts"
 export class MemoryAdapter implements StorageAdapter {
 	private store: Map<string, any> = new Map()
 
-	async get(key: string): Promise<string | undefined>  {
+	async get(key: string): Promise<string | undefined> {
 		return this.store.get(key)
 	}
 
@@ -33,11 +33,11 @@ export class MemoryAdapter implements StorageAdapter {
 	// --- Dummy IpfsAdapter methods for compatibility ---
 	async pin(_cid: any): Promise<void> {
 		// No-op for memory adapter
-		return;
+		return
 	}
 
 	async provide(_cid: any): Promise<void> {
 		// No-op for memory adapter
-		return;
+		return
 	}
 }
