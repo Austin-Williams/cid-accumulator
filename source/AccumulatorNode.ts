@@ -93,18 +93,24 @@ export class AccumulatorNode {
 	 * It provides a progress update every 100 CIDs.
 	 */
 	async rePinAllDataToIPFS(): Promise<void> {
-		console.log(`[Accumulator] \u{1F4CC} Re-pinning all data to IPFS...`)
-		let count = 0;
-		for await (const { cid, data } of this.iterateTrailPairs()) {
-			await this.ipfs.put(cid, data)
-			await this.ipfs.pin(cid)
-			await this.ipfs.provide(cid)
+		const toIndex = Number((await this.storage.get('dag:trail:maxIndex') ?? - 1))
+		if (toIndex === -1) return
+		console.log(`[Accumulator] \u{1F4CC} Re-pinning all ${toIndex + 1} CIDs to IPFS...`)
+
+		let count = 0
+		for (let i = 0; i <= toIndex; i++) {
+			const pair: CIDDataPair | null = await this.getCIDDataPairFromDB(i)
+			if (!pair) throw new Error(`[Accumulator] Expected CIDDataPair for leaf ${i}`)
+
+			await this.ipfs.put(pair.cid, pair.data);
+			await this.ipfs.pin(pair.cid);
+			await this.ipfs.provide(pair.cid);
 			count++;
 			if (count % 100 === 0) {
-				console.log(`[Accumulator] \u{1F4CC} Re-pinned ${count} CIDs to IPFS...`)
+				console.log(`[Accumulator] \u{1F4CC} Re-pinned ${count} CIDs to IPFS...`);
 			}
 		}
-		console.log(`[Accumulator] \u{2705} Re-pinned all ${count} CIDs to IPFS. Done!`)
+		console.log(`[Accumulator] \u{2705} Re-pinned all ${count} CIDs to IPFS. Done!`);
 	}
 
 	//Store a leaf record in the DB by leafIndex, splitting fields into separate keys.
@@ -304,10 +310,22 @@ export class AccumulatorNode {
 	async appendTrailToDB(trail: MMRLeafInsertTrail): Promise<void> {
 		let maxIndex = Number((await this.storage.get('dag:trail:maxIndex') ?? - 1))
 		for (const pair of trail) {
+			const cidStr = pair.cid.toString();
+			const seenKey = `cid:${cidStr}`;
+			const alreadyStored = await this.storage.get(seenKey);
+			if (alreadyStored) continue;
+
 			maxIndex++;
 			await this.storage.put(`dag:trail:index:${maxIndex}`, CIDDataPairToString(pair));
+			await this.storage.put(seenKey, "1");
 		}
 		await this.storage.put('dag:trail:maxIndex', maxIndex.toString());
+	}
+
+	async getCIDDataPairFromDB(index: number): Promise<CIDDataPair | null> {
+		const value = await this.storage.get(`dag:trail:index:${index}`)
+		if (value && typeof value === 'string') return stringToCIDDataPair(value)
+		return null
 	}
 
 	/**

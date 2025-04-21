@@ -16,15 +16,15 @@ export class KuboRpcAdapter implements IpfsAdapter {
 	}
 	async put(_cid: CID, data: Uint8Array): Promise<void> {
 		// Kubo block.put does not accept a CID argument, so we must only put the data
-		await this.client.block.put(data)
+		await this.client.block.put(data, { format: "dag-cbor", mhtype: "sha2-256", pin: true })
 	}
 	async pin(_cid: CID): Promise<void> {
-		await this.client.pin.add(_cid)
+		return // Kubo automatically pins during the put
 	}
-	async provide(_cid: CID): Promise<void> {
+	async provide(cid: CID): Promise<void> {
 		// Kubo provides pinned blocks automatically, but you can force a DHT provide
 		if (this.client.routing && this.client.routing.provide) {
-			this.client.routing.provide(_cid, { recursive: true })
+			this.client.routing.provide(cid, { recursive: true })
 		}
 	}
 }
