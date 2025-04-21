@@ -1,72 +1,11 @@
 // shared/codec.ts
-import { Log } from "ethers"
 import { CID } from "multiformats/cid"
 import * as dagCbor from "@ipld/dag-cbor"
 import { sha256 } from "multiformats/hashes/sha2"
-import { MINIMAL_ACCUMULATOR_INTERFACE } from "../shared/constants.ts"
-import { CIDDataPair, NormalizedLeafInsertEvent } from "../shared/types.ts"
+import { CIDDataPair, NormalizedLeafInsertEvent } from "../types/types.ts"
 import { fromHex } from "multiformats/bytes"
 import { create as createDigest } from "multiformats/hashes/digest"
 
-/**
- * Decodes a LeafInsert event log from ethers, normalizing all possible upstream types
- * (bigint, string, number, etc) to a strictly typed LeafInsertEvent output.
- * This ensures downstream code always receives predictable types, regardless of
- * quirks in ABI parsing or provider behavior.
- */
-// export async function decodeLeafInsert(log: Log): Promise<NormalizedLeafInsertEvent> {
-// 	// ethers parseLog returns LogDescription | null, not our custom type. We check for null, then assert type for strict downstream typing.
-// 	let parsed: any = null
-// 	try {
-// 		parsed = MINIMAL_ACCUMULATOR_INTERFACE.parseLog(log)
-// 	} catch {
-// 		throw new Error(
-// 			`Unexpected or unrecognized log: address=${log.address}, blockNumber=${log.blockNumber}, topics=${JSON.stringify(log.topics)}`,
-// 		)
-// 	}
-
-// 	if (!parsed || parsed.name !== "LeafInsert") {
-// 		throw new Error(
-// 			`Unexpected or unrecognized log: address=${log.address}, blockNumber=${log.blockNumber}, topics=${JSON.stringify(log.topics)}`,
-// 		)
-// 	}
-
-// 	const { leafIndex, previousInsertBlockNumber, newData, leftInputs } = parsed.args
-
-// 	// Strictly parse leafIndex and previousInsertBlockNumber to number
-// 	const leafIndexNum =
-// 		typeof leafIndex === "bigint" ? Number(leafIndex) : typeof leafIndex === "string" ? Number(leafIndex) : leafIndex
-
-// 	const prevBlockNum =
-// 		typeof previousInsertBlockNumber === "bigint"
-// 			? Number(previousInsertBlockNumber)
-// 			: typeof previousInsertBlockNumber === "string"
-// 				? Number(previousInsertBlockNumber)
-// 				: previousInsertBlockNumber
-
-// 	// Strictly parse newData to Uint8Array
-// 	let newDataBytes: Uint8Array
-// 	if (typeof newData === "string") {
-// 		if (!newData.startsWith("0x")) throw new Error("newData string must be hex-prefixed")
-// 		newDataBytes = new Uint8Array(Buffer.from(newData.slice(2), "hex"))
-// 	} else {
-// 		newDataBytes = new Uint8Array(newData)
-// 	}
-
-// 	// Strictly parse leftInputs to CID[]
-// 	if (!Array.isArray(leftInputs)) throw new Error("leftInputs must be an array")
-// 	const leftCids = leftInputs.map((v) => {
-// 		if (typeof v !== "string") throw new Error("leftInputs must be string[]")
-// 		return cidFromBytes32HexString(v)
-// 	})
-
-// 	return {
-// 		leafIndex: leafIndexNum,
-// 		previousInsertBlockNumber: prevBlockNum,
-// 		newData: newDataBytes,
-// 		leftInputs: await Promise.all(leftCids),
-// 	}
-// }
 
 export async function encodeBlock(value: unknown): Promise<{ cid: CID; bytes: Uint8Array }> {
 	const encoded = dagCbor.encode(value)

@@ -1,6 +1,7 @@
 import "dotenv/config"
-import { AccumulatorNode } from "./AccumulatorNode.ts"
+import { AccumulatorNode } from "./accumulator/AccumulatorNode.ts"
 import { KuboRpcAdapter } from "./adapters/ipfs/KuboRpcAdapter.ts"
+// import {MemoryAdapter} from "./adapters/storage/MemoryAdapter.ts"
 import { LevelDbAdapter } from "./adapters/storage/LevelDbAdapter.ts"
 import { create as createKuboClient } from "kubo-rpc-client"
 import { Level } from "level"
@@ -17,6 +18,8 @@ async function main() {
 	const ipfs = new KuboRpcAdapter(kuboClient)
 	const db = new Level(LEVEL_PATH)
 	const storage = new LevelDbAdapter(db)
+	// const storage = new MemoryAdapter()
+
 
 	// Instantiate the node with fetch-based contract config
 	const node = new AccumulatorNode({
@@ -43,7 +46,9 @@ async function main() {
 		const ethers = (await import("ethers")).ethers
 		const { MINIMAL_ACCUMULATOR_ABI } = await import("./shared/constants.ts")
 		const { CID } = await import("multiformats/cid")
-		const provider = new ethers.JsonRpcProvider(RPC_URL)
+		const { ThrottledProvider } = await import("./ethereum/ThrottledProvider.ts")
+		const rawProvider = new ethers.JsonRpcProvider(RPC_URL)
+		const provider = new ThrottledProvider(rawProvider)
 		const contract = new ethers.Contract(CONTRACT_ADDRESS, MINIMAL_ACCUMULATOR_ABI, provider)
 		const onChainRootHex: string = await contract.getLatestCID()
 		const onChainRootBytes = Uint8Array.from(Buffer.from(onChainRootHex.replace(/^0x/, ""), "hex"))

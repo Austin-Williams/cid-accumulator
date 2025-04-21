@@ -4,24 +4,40 @@ import type { StorageAdapter } from "../../interfaces/StorageAdapter.ts"
  * MemoryAdapter implements StorageAdapter for tests/in-memory use.
  */
 export class MemoryAdapter implements StorageAdapter {
-	private store: Map<string, any>
-	constructor() {
-		this.store = new Map()
-	}
-	async put(key: string, value: any): Promise<void> {
-		this.store.set(key, value)
-	}
-	async get(key: string): Promise<any | undefined> {
+	private store: Map<string, any> = new Map()
+
+	async get(key: string): Promise<string | undefined>  {
 		return this.store.get(key)
 	}
+
+	async put(key: string, value: string): Promise<void> {
+		this.store.set(key, value)
+	}
+
 	async delete(key: string): Promise<void> {
 		this.store.delete(key)
 	}
-	async *iterate(prefix: string): AsyncIterable<{ key: string; value: any }> {
+
+	async clear(): Promise<void> {
+		this.store.clear()
+	}
+
+	async *iterate(prefix: string): AsyncIterable<{ key: string; value: string }> {
 		for (const [key, value] of this.store.entries()) {
 			if (key.startsWith(prefix)) {
 				yield { key, value }
 			}
 		}
+	}
+
+	// --- Dummy IpfsAdapter methods for compatibility ---
+	async pin(_cid: any): Promise<void> {
+		// No-op for memory adapter
+		return;
+	}
+
+	async provide(_cid: any): Promise<void> {
+		// No-op for memory adapter
+		return;
 	}
 }

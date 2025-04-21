@@ -1,6 +1,6 @@
 import { keccak_256 } from "@noble/hashes/sha3"
-import { AccumulatorMetadata, RawEthLog, NormalizedLeafInsertEvent } from "../types.ts"
-import { contractPeakHexToMmrCid } from "../codec.ts"
+import { AccumulatorMetadata, RawEthLog, NormalizedLeafInsertEvent } from "../types/types.ts"
+import { contractPeakHexToMmrCid } from "../utils/codec.ts"
 import { CID } from "multiformats/cid"
 
 export function getSelector(signature: string): string {

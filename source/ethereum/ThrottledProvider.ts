@@ -1,4 +1,4 @@
-import { ethers } from "ethers"
+// Note: This class is now generic and does not require ethers.js
 
 export interface ThrottledProviderOptions {
 	minDelayMs?: number // Minimum delay between calls
@@ -9,7 +9,7 @@ export interface ThrottledProviderOptions {
 }
 
 export class ThrottledProvider {
-	private provider: ethers.JsonRpcProvider
+	public provider: any
 	private minDelayMs: number
 	private maxRetries: number
 	private jitterMs: number
@@ -17,7 +17,11 @@ export class ThrottledProvider {
 	private logger: (...args: any[]) => void
 	private lastCallTimestamp: number = 0
 
-	constructor(provider: ethers.JsonRpcProvider, opts: ThrottledProviderOptions = {}) {
+	/**
+	 * @param provider - Any compatible JSON-RPC provider (ethers.js, viem, etc)
+	 * @param opts - Throttling and retry options
+	 */
+	constructor(provider: any, opts: ThrottledProviderOptions = {}) {
 		this.provider = provider
 		this.minDelayMs = opts.minDelayMs ?? 200
 		this.maxRetries = opts.maxRetries ?? 5

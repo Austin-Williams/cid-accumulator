@@ -24,7 +24,8 @@ export class KuboRpcAdapter implements IpfsAdapter {
 	async provide(cid: CID): Promise<void> {
 		// Kubo provides pinned blocks automatically, but you can force a DHT provide
 		if (this.client.routing && this.client.routing.provide) {
-			this.client.routing.provide(cid, { recursive: true })
+			// Fire and forget: do not block on the async iterable
+			void this.client.routing.provide(cid, { recursive: true })
 		}
 	}
 }

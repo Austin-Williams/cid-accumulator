@@ -77,20 +77,3 @@ export class IPFSBlockstore {
 		return await this.ipfs.block.get(cid)
 	}
 }
-
-// Minimal Blockstore adapter for public IPFS gateway (e.g. gatewayBase=https://dweb.link)
-export class PublicGatewayBlockstore {
-	gatewayBase: string
-	constructor(gatewayBase: string) {
-		this.gatewayBase = gatewayBase.replace(/\/$/, "")
-	}
-	async get(cid: CID): Promise<Uint8Array> {
-		const url = `${this.gatewayBase}/ipfs/${cid.toString()}`
-		const res = await fetch(url)
-		if (!res.ok) {
-			throw new Error(`Failed to fetch block ${cid} from gateway: ${res.status} ${res.statusText}`)
-		}
-		const buf = new Uint8Array(await res.arrayBuffer())
-		return buf
-	}
-}

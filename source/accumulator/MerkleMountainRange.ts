@@ -1,6 +1,6 @@
 import { CID } from "multiformats/cid"
-import { encodeBlock } from "../codec.ts"
-import { MMRLeafInsertTrail } from "../types.ts"
+import { encodeBlock } from "../utils/codec.ts"
+import { MMRLeafInsertTrail } from "../types/types.ts"
 
 export class MerkleMountainRange {
 	public peaks: CID[] = []
@@ -9,17 +9,10 @@ export class MerkleMountainRange {
 	constructor() {}
 
 	/**
-	 * Adds a new leaf to the Merkle Mountain Range (MMR) and computes all intermediate nodes.
-	 * IT DOES NOT STORE THE RESULT IN THE DB, because the MMR is not concerned with the DB
+	 * Adds a new leaf to the MMR and computes all intermediate nodes.
 	 * @param newData - The raw data for the new leaf node to be added.
 	 * @param leafIndex - The expected leaf index for the new leaf.
-	 * @returns An object containing:
-	 *   - leafCID: The CID of the newly added leaf.
-	 *   - rootCID: The new root CID after insertion.
-	 *   - trail: An array of CID and data pairs for all intermediate nodes.
-	 *
-	 * 	trail[0] is the new leaf's CID
-	 * 	trail[trail.length - 1] is the new root CID
+	 * @returns An array of CID and data pairs for leaf, all intermediate nodes, and the root
 	 */
 	async addLeafWithTrail(leafIndex: number, newData: Uint8Array): Promise<MMRLeafInsertTrail> {
 		if (this.leafCount !== leafIndex) throw new Error(`Expected leafIndex ${this.leafCount} but got ${leafIndex}`)

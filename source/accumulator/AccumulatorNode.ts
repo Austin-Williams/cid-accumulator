@@ -1,20 +1,20 @@
-import type { IpfsAdapter } from "./interfaces/IpfsAdapter.ts"
-import type { StorageAdapter } from "./interfaces/StorageAdapter.ts"
+import type { IpfsAdapter } from "../interfaces/IpfsAdapter.ts"
+import type { StorageAdapter } from "../interfaces/StorageAdapter.ts"
 import type { CID } from "multiformats/cid"
-import { getAccumulatorData } from "./shared/ethereum/commonCalls.ts"
+import { getAccumulatorData } from "../ethereum/commonCalls.ts"
 import type {
 	PeakWithHeight,
 	LeafRecord,
 	NormalizedLeafInsertEvent,
 	MMRLeafInsertTrail,
 	CIDDataPair,
-} from "./shared/types.ts"
-import { resolveMerkleTreeOrThrow } from "./shared/ipfs.ts"
-import { computePreviousRootCIDAndPeaksWithHeights } from "./shared/accumulator/mmrUtils.ts"
-import { getRootCIDFromPeaks } from "./shared/accumulator/mmrUtils.ts"
-import { getLeafInsertLogs } from "./shared/ethereum/commonCalls.ts"
-import { firstSuccessful } from "./shared/firstSuccessful.ts"
-import { MerkleMountainRange } from "./shared/accumulator/MerkleMountainRange.ts"
+} from "../types/types.ts"
+import { resolveMerkleTreeOrThrow } from "../ipfs/ipfs.ts"
+import { computePreviousRootCIDAndPeaksWithHeights } from "./mmrUtils.ts"
+import { getRootCIDFromPeaks } from "./mmrUtils.ts"
+import { getLeafInsertLogs } from "../ethereum/commonCalls.ts"
+import { firstSuccessful } from "../utils/firstSuccessful.ts"
+import { MerkleMountainRange } from "./MerkleMountainRange.ts"
 import {
 	CIDDataPairToString,
 	CIDTohexString,
@@ -26,7 +26,7 @@ import {
 	hexStringToCID,
 	StringToPeakWithHeightArray,
 	stringToCIDDataPair,
-} from "./shared/codec.ts"
+} from "../utils/codec.ts"
 
 /**
  * AccumulatorNode: Unified entry point for accumulator logic in any environment.

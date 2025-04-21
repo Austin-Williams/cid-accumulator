@@ -1,9 +1,9 @@
 import { getSelector, getEventTopic, parseLeafInsertLog } from "./abiUtils.ts"
 import { callContractView, ethRpcFetch } from "./ethRpcFetch.ts"
 import { parseGetLatestCIDResult, parseGetAccumulatorDataResult, parseAccumulatorMetaBits } from "./abiUtils.ts"
-import { AccumulatorMetadata, NormalizedLeafInsertEvent, PeakWithHeight, RawEthLog } from "../types.ts"
+import { AccumulatorMetadata, NormalizedLeafInsertEvent, PeakWithHeight, RawEthLog } from "../types/types.ts"
 import { CID } from "multiformats/cid"
-import { contractPeakHexToMmrCid } from "../codec.ts"
+import { contractPeakHexToMmrCid } from "../utils/codec.ts"
 
 /**
  * Fetches the latest CID from the contract using a raw JSON-RPC call and ABI decoding.

@@ -4,7 +4,7 @@ export interface RawEthLog {
 	address: string // Contract address
 	topics: string[] // Array of 32-byte hex strings
 	data: string // Hex string, ABI-encoded data
-	blockNumber: number // Block number (ethers.js auto-converts from hex)
+	blockNumber: number // Block number
 	transactionHash: string // Transaction hash
 	transactionIndex: number // Transaction index in block
 	blockHash: string // Block hash
