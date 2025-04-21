@@ -31,17 +31,4 @@ export class SqliteAdapter implements StorageAdapter {
 			yield { key: row.key, value: JSON.parse(row.value) }
 		}
 	}
-	async getMaxKey(prefix: string): Promise<number | undefined> {
-		const stmt = this.db.prepare("SELECT key FROM kv WHERE key LIKE ?")
-		let max: number | undefined = undefined
-		for (const row of stmt.iterate(`${prefix}%`) as Iterable<{ key: string }>) {
-			const key: string = row.key
-			const suffix = key.slice(prefix.length)
-			const num = parseInt(suffix)
-			if (!isNaN(num) && (max === undefined || num > max)) {
-				max = num
-			}
-		}
-		return max
-	}
 }

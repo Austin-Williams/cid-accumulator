@@ -2,7 +2,7 @@ import { ethers, Log } from "ethers"
 import { CID } from "multiformats/cid"
 import { KuboRPCClient } from "kubo-rpc-client"
 
-import { MerkleMountainRange } from "../shared/mmr.ts"
+import { MerkleMountainRange } from "../shared/accumulator/MerkleMountainRange.ts"
 import { MINIMAL_ACCUMULATOR_ABI } from "../shared/constants.ts"
 import { initializeSchema, openOrCreateDatabase, createMetaHandlers } from "./db.ts"
 

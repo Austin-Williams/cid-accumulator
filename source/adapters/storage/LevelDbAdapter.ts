@@ -2,45 +2,52 @@ import type { Level } from "level"
 import type { StorageAdapter } from "../../interfaces/StorageAdapter.js"
 
 /**
- * LevelDbAdapter implements StorageAdapter for Node.js using LevelDB.
+ * Basic LevelDbAdapter: stores and retrieves string values only.
  */
 export class LevelDbAdapter implements StorageAdapter {
-	private db: Level
-	constructor(db: Level) {
+	private db: Level<string, string>
+
+	constructor(db: Level<string, string>) {
 		this.db = db
 	}
-	async put(key: string, value: any): Promise<void> {
-		await this.db.put(key, value)
-	}
-	async get(key: string): Promise<any | undefined> {
-		try {
-			return await this.db.get(key)
-		} catch (e: any) {
-			if (e.notFound) return undefined
-			throw e
-		}
-	}
+
 	async delete(key: string): Promise<void> {
 		await this.db.del(key)
 	}
-	async *iterate(prefix: string): AsyncIterable<{ key: string; value: any }> {
-		for await (const [key, value] of this.db.iterator({ keys: true, values: true })) {
-			if (key.startsWith(prefix)) {
-				yield { key, value }
-			}
+
+	async *iterate(prefix: string): AsyncIterable<{ key: string; value: string }> {
+		const iterator = this.db.iterator({ keys: true, values: true, valueEncoding: "utf8" }) as any
+		const next: () => Promise<[string | undefined, string | undefined]> = () => {
+			return new Promise((resolve, reject) => {
+				iterator.next((err: any, k: string | undefined, v: string | undefined) => {
+					if (err) return reject(err)
+					resolve([k, v])
+				})
+			})
 		}
-	}
-	async getMaxKey(prefix: string): Promise<number | undefined> {
-		let max: number | undefined = undefined
-		for await (const [key] of this.db.iterator({ keys: true, values: false })) {
-			if (key.startsWith(prefix)) {
-				const suffix = key.slice(prefix.length)
-				const num = parseInt(suffix)
-				if (!isNaN(num) && (max === undefined || num > max)) {
-					max = num
+		try {
+			while (true) {
+				const [key, value] = await next()
+				if (key === undefined) break
+				if (key.startsWith(prefix) && typeof value === "string") {
+					yield { key, value }
 				}
 			}
+		} finally {
+			await iterator.end()
 		}
-		return max
+	}
+
+	async put(key: string, value: string): Promise<void> {
+		await this.db.put(key, value, { valueEncoding: "utf8" })
+	}
+
+	async get(key: string): Promise<string | undefined> {
+		try {
+			return await this.db.get(key, { valueEncoding: "utf8" })
+		} catch (err: any) {
+			if (err.notFound) return undefined
+			throw err
+		}
 	}
 }

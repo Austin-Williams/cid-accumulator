@@ -37,6 +37,9 @@ export interface AccumulatorMetadata {
  */
 export type PeakWithHeight = { cid: CID; height: number }
 
+// contains the CID and data for the leaf, all new intermediate nodes, and the new root node
+export type MMRLeafInsertTrail = { cid: CID; data: Uint8Array }[]
+
 /**
  * Represents all relevant data for a leaf/event in the accumulator.
  */
@@ -47,15 +50,7 @@ export type LeafRecord = {
 	rootCid?: CID
 	peaksWithHeights?: PeakWithHeight[] // This is the set of active peaks of the mmr AFTER this leaf/event is inserted.
 	// ...other fields as needed
+	[key: string]: unknown // Allow extra properties for type tagging
 }
 
-/**
- * Represents a DAG node (leaf or link) in the accumulator.
- */
-export type DagNodeRecord = {
-	cid: CID
-	data: Uint8Array
-	type: "leaf" | "link"
-	leafIndex?: number
-	// ...other fields as needed (e.g., children, parent, height)
-}
+export type CIDDataPair = {cid: CID; data: Uint8Array;}

@@ -24,17 +24,4 @@ export class MemoryAdapter implements StorageAdapter {
 			}
 		}
 	}
-	async getMaxKey(prefix: string): Promise<number | undefined> {
-		let max: number | undefined = undefined
-		for (const key of this.store.keys()) {
-			if (key.startsWith(prefix)) {
-				const suffix = key.slice(prefix.length)
-				const num = parseInt(suffix)
-				if (!isNaN(num) && (max === undefined || num > max)) {
-					max = num
-				}
-			}
-		}
-		return max
-	}
 }

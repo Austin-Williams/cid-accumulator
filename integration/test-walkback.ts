@@ -1,7 +1,7 @@
 import { CID } from "multiformats/cid"
-import { computePreviousRootCIDAndPeaks } from "../source/shared/computePreviousRootCID"
+import { computePreviousRootCIDAndPeaksWithHeights } from "../source/shared/accumulator/mmrUtils.ts"
 import { getAccumulatorData, getLeafInsertLogForTargetLeafIndex } from "../source/shared/ethereum/commonCalls"
-import { getRootCIDFromPeaks } from "../source/shared/mmr.ts"
+import { getRootCIDFromPeaks } from "../source/shared/accumulator/mmrUtils.ts"
 import dotenv from "dotenv"
 
 dotenv.config()
@@ -40,7 +40,9 @@ async function main() {
 			currentLeafIndex,
 		)
 		if (!event) {
-			throw new Error(`[STEP ${step}] No event found for currentLeafIndex=${currentLeafIndex}, currentBlockNumber=${currentBlockNumber}. Stopping walkback.`);
+			throw new Error(
+				`[STEP ${step}] No event found for currentLeafIndex=${currentLeafIndex}, currentBlockNumber=${currentBlockNumber}. Stopping walkback.`,
+			)
 		}
 
 		console.log(`[STEP ${step}] Event:`, event)
@@ -50,7 +52,7 @@ async function main() {
 		console.log(`  event.newData:`, event.newData)
 		console.log(`  event.leftInputs:`, event.leftInputs)
 
-		const { previousRootCID, previousPeaksWithHeights } = await computePreviousRootCIDAndPeaks(
+		const { previousRootCID, previousPeaksWithHeights } = await computePreviousRootCIDAndPeaksWithHeights(
 			currentPeaksWithHeights,
 			event.newData,
 			event.leftInputs,

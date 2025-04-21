@@ -1,24 +1,27 @@
 import type { IpfsAdapter } from "./interfaces/IpfsAdapter.ts"
 import type { StorageAdapter } from "./interfaces/StorageAdapter.ts"
+import type { CID } from "multiformats/cid"
 import { getAccumulatorData } from "./shared/ethereum/commonCalls.ts"
-import type { DagNodeRecord, PeakWithHeight, LeafRecord, NormalizedLeafInsertEvent } from "./shared/types.ts"
-import { CID } from "multiformats/cid"
+import type {PeakWithHeight, LeafRecord, NormalizedLeafInsertEvent, MMRLeafInsertTrail, CIDDataPair } from "./shared/types.ts"
 import { resolveMerkleTreeOrThrow } from "./shared/ipfs.ts"
-import { computePreviousRootCIDAndPeaksWithHeights } from "./shared/computePreviousRootCID.ts"
-import { getRootCIDFromPeaks } from "./shared/mmr.ts"
+import { computePreviousRootCIDAndPeaksWithHeights } from "./shared/accumulator/mmrUtils.ts"
+import { getRootCIDFromPeaks } from "./shared/accumulator/mmrUtils.ts"
 import { getLeafInsertLogs } from "./shared/ethereum/commonCalls.ts"
+import { firstSuccessful } from "./shared/firstSuccessful.ts"
+import { MerkleMountainRange } from "./shared/accumulator/MerkleMountainRange.ts"
+import {CIDDataPairToString, CIDTohexString, Uint8ArrayToHexString, NormalizedLeafInsertEventToString, PeakWithHeightArrayToString, HexStringToUint8Array, StringToNormalizedLeafInsertEvent, hexStringToCID, StringToPeakWithHeightArray, stringToCIDDataPair} from "./shared/codec.ts"
 
 /**
  * AccumulatorNode: Unified entry point for accumulator logic in any environment.
  * Pass in the appropriate IpfsAdapter and StorageAdapter for your environment.
  */
-
 export class AccumulatorNode {
 	ipfs: IpfsAdapter
 	storage: StorageAdapter
 	ethereumRpcUrl: string
 	contractAddress: string
-	// ...other fields (provider, contract, etc.)
+	mmr: MerkleMountainRange
+	highestCommittedLeafIndex: number
 
 	constructor({
 		ipfs,
@@ -36,67 +39,118 @@ export class AccumulatorNode {
 		this.storage = storage
 		this.ethereumRpcUrl = ethereumRpcUrl
 		this.contractAddress = contractAddress
+		this.mmr = new MerkleMountainRange()
+		this.highestCommittedLeafIndex = -1
 	}
 
-	// --- DB Access Methods ---
-
-	/** Store a leaf record by leafIndex. */
-	async putLeafRecord(leafIndex: number, record: LeafRecord): Promise<void> {
-		const existing = await this.getLeafRecord(leafIndex)
-		if (existing) {
-			// Merge: prefer new values if present, fallback to existing
-			const merged: LeafRecord = {
-				newData: record.newData ?? existing.newData,
-				event: record.event ?? existing.event,
-				blockNumber: record.blockNumber ?? existing.blockNumber,
-				rootCid: record.rootCid ?? existing.rootCid,
-				peaksWithHeights: record.peaksWithHeights ?? existing.peaksWithHeights,
-			}
-			await this.storage.put(`leaf:${leafIndex}`, merged)
-		} else {
-			await this.storage.put(`leaf:${leafIndex}`, record)
+	/**
+	 * Commits all uncommitted leaves to the MMR and pins the full trail to IPFS.
+	 * 
+	 * This function iterates through all uncommitted leaves and commits them one by one.
+	 * For each leaf, it adds the leaf to the MMR, stores the trail in the DB, and pins the full trail to IPFS.
+	 * 
+	 * @returns A Promise that resolves when all uncommitted leaves have been committed.
+	 */
+	async commitAllUncommittedLeaves(): Promise<void> {
+		console.log(`[Accumulator] \u{1F4DC} Committing all uncommitted leaves...`)
+		const fromIndex: number = this.highestCommittedLeafIndex + 1
+		const toIndex: number = await this.getHighestContiguousLeafIndexWithData()
+		if (fromIndex > toIndex) throw new Error(`[Accumulator] Expected to commit leaves from ${fromIndex} to ${toIndex}, but found no newData for leaf ${fromIndex}`)
+		if (fromIndex === toIndex) return // All leaves already committed
+		for (let i = fromIndex; i <= toIndex; i++) {
+			const record = await this.getLeafRecord(i)
+			if (!record || !record.newData) throw new Error(`[Accumulator] Expected newData for leaf ${i}`)
+			if (!(record.newData instanceof Uint8Array)) throw new Error(`[Accumulator] newData for leaf ${i} is not a Uint8Array`)
+			await this.commitLeaf(i, record.newData)
 		}
+		console.log(`[Accumulator] \u{2705} Committed all uncommitted leaves from ${fromIndex} to ${toIndex}`)
 	}
 
-	/** Retrieve a leaf record by leafIndex. */
+	/**
+	 * Adds a leaf to the MMR, stores the trail in the DB, and pins the full trail to IPFS.
+	 * 
+	 * @param leafIndex - The index of the leaf to add.
+	 * @param newData - The new data for the leaf.
+	 */
+	async commitLeaf(leafIndex: number, newData: Uint8Array): Promise<void> {
+		// Add leaf to MMR
+		const trail = await this.mmr.addLeafWithTrail(leafIndex, newData)
+		// Store trail in local DB (efficient append-only)
+		await this.appendTrailToDB(trail)
+		// Pin and provide full trail to IPFS
+		for (const { cid, data } of trail) {
+			await this.ipfs.put(cid, data)
+			await this.ipfs.pin(cid)
+			await this.ipfs.provide(cid)
+		}
+		this.highestCommittedLeafIndex++
+	}
+
+	/**
+	 * Re-pins all data to IPFS.
+	 * 
+	 * This function iterates through all trail pairs and re-pins each CID to IPFS.
+	 * It provides a progress update every 100 CIDs.
+	 */
+	async rePinAllDataToIPFS(): Promise<void> {
+		console.log(`[Accumulator] \u{1F4CC} Re-pinning all data to IPFS...`)
+		let count = 0;
+		for await (const { cid, data } of this.iterateTrailPairs()) {
+			await this.ipfs.put(cid, data)
+			await this.ipfs.pin(cid)
+			await this.ipfs.provide(cid)
+			count++;
+			if (count % 100 === 0) {
+				console.log(`[Accumulator] \u{1F4CC} Re-pinned ${count} CIDs to IPFS...`)
+			}
+		}
+		console.log(`[Accumulator] \u{2705} Re-pinned all ${count} CIDs to IPFS. Done!`)
+	}
+
+	//Store a leaf record in the DB by leafIndex, splitting fields into separate keys.
+	async #putLeafRecordInDB(leafIndex: number, value: LeafRecord): Promise<void> {
+		// Store newData
+		await this.storage.put(`leaf:${leafIndex}:newData`, Uint8ArrayToHexString(value.newData));
+		// Store optional fields as strings
+		if (value.event !== undefined) await this.storage.put(`leaf:${leafIndex}:event`, NormalizedLeafInsertEventToString(value.event))
+		if (value.blockNumber !== undefined) await this.storage.put(`leaf:${leafIndex}:blockNumber`, value.blockNumber.toString())
+		if (value.rootCid !== undefined) await this.storage.put(`leaf:${leafIndex}:rootCid`, CIDTohexString(value.rootCid));
+		if (value.peaksWithHeights !== undefined) await this.storage.put(`leaf:${leafIndex}:peaksWithHeights`, PeakWithHeightArrayToString(value.peaksWithHeights));
+	}
+
+	/** Retrieve a leaf record by leafIndex, reconstructing from individual fields. Throws if types are not correct. */
 	async getLeafRecord(leafIndex: number): Promise<LeafRecord | undefined> {
-		return await this.storage.get(`leaf:${leafIndex}`)
-	}
+		const newDataStr = await this.storage.get(`leaf:${leafIndex}:newData`);
+		if (!newDataStr) return undefined;
+		const newData = HexStringToUint8Array(newDataStr);
+		const eventStr = await this.storage.get(`leaf:${leafIndex}:event`);
+		const event = eventStr !== undefined ? StringToNormalizedLeafInsertEvent(eventStr) : undefined;
+		const blockNumberStr = await this.storage.get(`leaf:${leafIndex}:blockNumber`);
+		const blockNumber = blockNumberStr !== undefined ? parseInt(blockNumberStr, 10) : undefined;
+		const rootCidStr = await this.storage.get(`leaf:${leafIndex}:rootCid`);
+		const rootCid = rootCidStr !== undefined ? await hexStringToCID(rootCidStr) : undefined;
+		const peaksWithHeightsStr = await this.storage.get(`leaf:${leafIndex}:peaksWithHeights`);
+		const peaksWithHeights = peaksWithHeightsStr !== undefined ? await StringToPeakWithHeightArray(peaksWithHeightsStr) : undefined;
 
-	/** Store a DAG node record by CID. */
-	async putDagNode(cid: string, record: DagNodeRecord): Promise<void> {
-		await this.storage.put(`dag:${cid}`, record)
-	}
-
-	/** Retrieve a DAG node record by CID. */
-	async getDagNode(cid: string): Promise<DagNodeRecord | undefined> {
-		return await this.storage.get(`dag:${cid}`)
-	}
-
-	/** Retrieve all DAG node records efficiently using async iteration. */
-	async getAllDagNodes(): Promise<DagNodeRecord[]> {
-		const dagNodes: DagNodeRecord[] = []
-		for await (const { key: _key, value } of this.storage.iterate("dag:")) {
-			if (value && (value.type === "leaf" || value.type === "link")) {
-				dagNodes.push(value)
-			}
-		}
-		return dagNodes
-	}
-
-	/** Retrieve the latest leaf index (highest stored in DB) efficiently. */
-	async getLatestLeafIndex(): Promise<number | undefined> {
-		return await this.storage.getMaxKey("leaf:")
+		return {
+			newData,
+			event,
+			blockNumber,
+			rootCid,
+			peaksWithHeights,
+		};
 	}
 
 	/**
 	 * Searches from leafIndex 0 to maxLeafIndex for leaves that are missing newData.
 	 * Returns an array of leaf indexes that are missing newData.
+	 * Used for sanity checking.
 	 */
 	async getLeafIndexesWithMissingNewData(maxLeafIndex: number): Promise<number[]> {
 		const missing: number[] = []
 		for (let i = 0; i <= maxLeafIndex; i++) {
 			const rec = await this.getLeafRecord(i)
+			console.log(`[getLeafIndexesWithMissingNewData] leafIndex=${i}, rec.newData type=${typeof rec?.newData}, constructor=${rec?.newData?.constructor?.name}, value=`, rec?.newData);
 			if (!rec || !rec.newData) missing.push(i)
 		}
 		return missing
@@ -112,45 +166,45 @@ export class AccumulatorNode {
 		const currentBlock = meta.previousInsertBlockNumber
 		const minBlock = meta.deployBlockNumber
 
-		console.log(`\u{1F9EE} [AccumulatorNode] Syncing backwards from block #${meta.previousInsertBlockNumber} to block #${meta.deployBlockNumber} (${meta.previousInsertBlockNumber - meta.deployBlockNumber} blocks), grabbing ${maxBlockRange} blocks per RPC call.`)
+		console.log(
+			`[Accumulator] \u{1F501} Syncing backwards from block ${meta.previousInsertBlockNumber} to block ${meta.deployBlockNumber} (${meta.previousInsertBlockNumber - meta.deployBlockNumber} blocks), grabbing ${maxBlockRange} blocks per RPC call.`,
+		)
+		console.log(
+			`[Accumulator] \u{1F50E} Simultaneously checking IPFS for older root CIDs as we discover them.`,
+		)
 
 		// Compute the current root CID from the current peaks
 		const currentRootCID = await getRootCIDFromPeaks(peaks.map((p) => p.cid))
 
-		// Try to resolve the entire DAG from the root CID
-		console.log(`\u{1F9EE} [AccumulatorNode] Checking availability of root CID ${currentRootCID.toString()} on IPFS...`)
-		const success: boolean = await this.getAndResolveCID(currentRootCID)
-		if (success) {
-			const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
-			if (missing.length !== 0) throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
-			console.log("\u{1F9EE} [AccumulatorNode] Successfully resolved all data from the current root CID.")
-			return
-		}
-		console.log("\u{1F9EE} [AccumulatorNode] Root CID not fully available on IPFS. Beginning walkback loop...")
-
 		let oldestRootCid: CID = currentRootCID
+		let oldestProcessedLeafIndex = currentLeafIndex + 1
 		let currentPeaksWithHeights: PeakWithHeight[] = peaks
+		const ipfsChecks: { promise: Promise<boolean>; controller: AbortController; cid: CID }[] = []
 
 		// --- Batch event fetching ---
 		for (let endBlock = currentBlock; endBlock >= minBlock; endBlock -= maxBlockRange) {
 			const startBlock = Math.max(minBlock, endBlock - maxBlockRange + 1)
-			console.log(`\u{1F9EE} [AccumulatorNode] Querying blocks ${startBlock} to ${endBlock} for LeafInsert events...`)
+			console.log(`[Accumulator] \u{1F4E6} Querying blocks ${startBlock} to ${endBlock} for LeafInsert events...`)
+			// Get the LeafInsert event logs
 			const logs: NormalizedLeafInsertEvent[] = await getLeafInsertLogs(
 				this.ethereumRpcUrl,
 				this.contractAddress,
 				startBlock,
 				endBlock,
 			)
-			console.log(`\u{1F9EE} [AccumulatorNode] Found ${logs.length} LeafInsert events`)
+			console.log(`[Accumulator] \u{1F343} Found ${logs.length} LeafInsert events`)
 
+			// Process the LeafInsert event logs
 			for (const event of logs.sort((a, b) => b.leafIndex - a.leafIndex)) {
+				if (event.leafIndex !== --oldestProcessedLeafIndex) throw new Error(`[Accumulator] Expected leafIndex ${oldestProcessedLeafIndex} but got leafIndex ${event.leafIndex}`)
 				// Compute previous root CID and peaks
 				const { previousRootCID, previousPeaksWithHeights } = await computePreviousRootCIDAndPeaksWithHeights(
 					currentPeaksWithHeights,
 					event.newData,
 					event.leftInputs,
 				)
-				await this.putLeafRecord(event.leafIndex, {
+				// Store the relevat data in the DB
+				await this.#putLeafRecordInDB(event.leafIndex, {
 					newData: event.newData,
 					event,
 					blockNumber: event.blockNumber,
@@ -162,71 +216,77 @@ export class AccumulatorNode {
 				oldestRootCid = previousRootCID
 			}
 
-			// After the batch, check if the oldest root CID is available on IPFS
-			console.log(`\u{1F9EE} [AccumulatorNode] Checking availability of root CID ${oldestRootCid.toString()} on IPFS...`)
-			const success = await this.getAndResolveCID(oldestRootCid)
-			if (success) {
+			// After processing all events in this batch, fire off an IPFS check for the oldestRootCid
+			const controller = new AbortController()
+			const checkPromise = this.getAndResolveCID(oldestRootCid, { signal: controller.signal })
+				.catch((err) => {
+					if (err?.name === "AbortError") return false
+					throw err
+				})
+			ipfsChecks.push({ promise: checkPromise, controller, cid: oldestRootCid })
+
+			// After each batch, race all IPFS checks for first success
+			const successfulIndex = await firstSuccessful(ipfsChecks.map((c, idx) => c.promise.then(success => success ? idx : undefined)))
+			if (typeof successfulIndex === "number") {
+				// Abort all outstanding checks
+				ipfsChecks.forEach((c) => c.controller.abort())
+				const foundIpfsCid = ipfsChecks[successfulIndex].cid
+				// Sanity check to make sure we didn't unexpectedly miss any datda
 				const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
 				if (missing.length !== 0)
 					throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
-				console.log(`\u{1F9EE} [AccumulatorNode] Successfully resolved all data from old root CID ${oldestRootCid.toString()}.`)
+				console.log(`[Accumulator] \u{1F4E5} Downloaded all data for root CID ${foundIpfsCid?.toString() ?? "undefined"}.`)
+				console.log(`[Accumulator] \u{1F64C} Successfully resolved all remaining data from IPFS!`)
+				console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
 				return
 			}
-			console.log("\u{1F9EE} [AccumulatorNode] Root CID not fully available on IPFS. Continuing to walkback...")
 		}
 		// If we get here, we've fully synced backwards using only event data (no data found on IPFS)
-		console.log("\u{1F9EE} [AccumulatorNode] Fully synced backwards using only event data (no data found on IPFS)")
+		// Abort all outstanding IPFS checks
+		ipfsChecks.forEach((c) => c.controller.abort())
+		// Wait for all outstanding IPFS check promises to settle (resolve or reject)
+		await Promise.allSettled(ipfsChecks.map((c) => c.promise));
+		// Sanity check to make sure we didn't unexpectedly miss any datda
 		const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
-		if (missing.length !== 0) throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
-		console.log("\u{1F9EE} [AccumulatorNode] Successfully resolved all data from contract events.")
+		if (missing.length !== 0) {
+			console.warn("[Accumulator] ⚠️ Missing newData for leaf indices:", missing.join(", "))
+		}
+		console.log("[Accumulator] \u{1F9BE} Fully synced backwards using only event data (no data found on IPFS)")
+		console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
 	}
 
 	/**
 	 * Recursively attempts to resolve the entire DAG from a given root CID using the IPFS adapter.
-	 * If it succeeds, adds the leaf data to the database.
-	 *
+	 * If it succeeds, adds all the leaf data to the database.
+	 * Can optionally reject on abort signal to allow for cancellation.
+	 * 
 	 * @param cid - The root CID to resolve.
-	 * @returns true if all nodes are available, false otherwise.
+	 * @returns true if all leaf data are available, false otherwise.
 	 */
-	async getAndResolveCID(cid: CID): Promise<boolean> {
+	// Accept an optional AbortSignal and respect it
+	async getAndResolveCID(cid: CID, opts?: { signal?: AbortSignal }): Promise<boolean> {
+		const signal = opts?.signal
+		// Only throw if already aborted at entry
+		if (signal?.aborted) throw new DOMException("Aborted", "AbortError")
+		let abortListener: (() => void) | undefined
+		let abortPromise: Promise<never> | undefined
+		if (signal) {
+			abortPromise = new Promise((_, reject) => {
+				abortListener = () => reject(new DOMException("Aborted", "AbortError"))
+				signal.addEventListener("abort", abortListener)
+			})
+		}
 		try {
-			const leaves = await resolveMerkleTreeOrThrow(cid, this.ipfs)
-			console.log(`Found and fully resolved root CID ${cid.toString()} on IPFS. Aquired ${leaves.length} leaves.`)
-			// Store all the leaves' newData values in the DB as LeafRecords
-			for (let i = 0; i < leaves.length; i++) await this.putLeafRecord(i, { newData: leaves[i] })
-			// Optionally: console.log(`Number of leaves: ${leaves.length}`)
+			const leavesPromise = resolveMerkleTreeOrThrow(cid, this.ipfs)
+			const leaves = await (abortPromise ? Promise.race([leavesPromise, abortPromise]) : leavesPromise)
+			for (let i = 0; i < leaves.length; i++) await this.#putLeafRecordInDB(i, { newData: leaves[i], __type: "LeafRecord" })
 			return true
 		} catch {
+			// Always return false on any error (including AbortError)
 			return false
+		} finally {
+			if (signal && abortListener) signal.removeEventListener("abort", abortListener)
 		}
-	}
-
-	/**
-	 * Periodically checks IPFS for available root CIDs as we sync backwards.
-	 */
-	async checkIpfsForAvailableRootCids(): Promise<void> {
-		// TODO: For each root CID, check IPFS for availability
-	}
-
-	/**
-	 * If an old root CID is found on IPFS, performs binary search forward to find the latest available CID.
-	 */
-	async binarySearchForwardFromIpfsRoot(): Promise<void> {
-		// TODO: Use binary search to minimize IPFS calls, find latest available root CID
-	}
-
-	/**
-	 * Merges downloaded IPFS DAG data with locally stored event data to reconstruct the full state.
-	 */
-	async mergeIpfsAndEventData(): Promise<void> {
-		// TODO: Download DAG from IPFS, replay events forward
-	}
-
-	/**
-	 * Once fully synced, rebuilds and pins/provides the entire DAG.
-	 */
-	async rebuildAndPinDag(): Promise<void> {
-		// TODO: Rebuild DAG, pin and provide all CIDs
 	}
 
 	/**
@@ -235,4 +295,43 @@ export class AccumulatorNode {
 	async startLiveSync(): Promise<void> {
 		// TODO: Subscribe to events, update state and pin as new data arrives
 	}
+
+	// --- Helpers ---
+
+	/**
+	 * Appends all trail pairs to the DB in an efficient, sequential manner.
+	 * Each pair is stored as dag:trail:<index>. The max index is tracked by dag:trail:maxIndex.
+	 */
+	async appendTrailToDB(trail: MMRLeafInsertTrail): Promise<void> {
+		let maxIndex = Number((await this.storage.get('dag:trail:maxIndex') ?? - 1))
+		for (const pair of trail) {
+			maxIndex++;
+			await this.storage.put(`dag:trail:index:${maxIndex}`, CIDDataPairToString(pair));
+		}
+		await this.storage.put('dag:trail:maxIndex', maxIndex.toString());
+	}
+
+	/**
+	 * Async generator to efficiently iterate over all stored trail pairs.
+	 */
+	async *iterateTrailPairs(): AsyncGenerator<CIDDataPair> {
+		for await (const { value } of this.storage.iterate('dag:trail:index:')) {
+			if (value && typeof value === 'string') yield stringToCIDDataPair(value);
+		}
+	}
+
+	/**
+	 * Finds the highest contiguous leaf index N such that all leaf records 0...N have newData.
+	 */
+	async getHighestContiguousLeafIndexWithData(): Promise<number> {
+		let i = 0
+		while (true) {
+			const record = await this.getLeafRecord(i)
+			if (!record || !record.newData) {
+				return i - 1
+			}
+			i++
+		}
+	}
 }
+
