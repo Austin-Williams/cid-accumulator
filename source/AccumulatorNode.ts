@@ -150,7 +150,6 @@ export class AccumulatorNode {
 		const missing: number[] = []
 		for (let i = 0; i <= maxLeafIndex; i++) {
 			const rec = await this.getLeafRecord(i)
-			console.log(`[getLeafIndexesWithMissingNewData] leafIndex=${i}, rec.newData type=${typeof rec?.newData}, constructor=${rec?.newData?.constructor?.name}, value=`, rec?.newData);
 			if (!rec || !rec.newData) missing.push(i)
 		}
 		return missing
