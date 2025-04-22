@@ -112,7 +112,9 @@ export async function parseLeafInsertLog(log: RawEthLog): Promise<NormalizedLeaf
 		leftInputs.push(hexStringToUint8Array(hexStr))
 		leftInputsCursor += 64
 	}
-	const leftInputsAsCIDs: CID[] = await Promise.all(leftInputs.map(async (input) => contractPeakHexToMmrCid(input)))
+	const leftInputsAsCIDs: CID<unknown, 113, 18, 1>[] = await Promise.all(
+		leftInputs.map(async (input) => contractPeakHexToMmrCid(input)),
+	)
 
 	return {
 		leafIndex,

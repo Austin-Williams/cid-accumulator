@@ -1,12 +1,13 @@
 // shared/codec.ts
-import { CID } from "multiformats/cid"
 import * as dagCbor from "@ipld/dag-cbor"
-import { sha256 } from "multiformats/hashes/sha2"
-import { CIDDataPair, LeafRecord, NormalizedLeafInsertEvent } from "../types/types.ts"
-import { fromHex } from "multiformats/bytes"
+import { CID } from "multiformats/cid"
 import { create as createDigest } from "multiformats/hashes/digest"
+import { sha256 } from "multiformats/hashes/sha2"
+import { fromHex } from "multiformats/bytes"
 
-export async function encodeBlock(value: unknown): Promise<{ cid: CID; bytes: Uint8Array }> {
+import { CIDDataPair, LeafRecord, NormalizedLeafInsertEvent } from "../types/types.ts"
+
+export async function encodeBlock(value: unknown): Promise<{ cid: CID<unknown, 113, 18, 1>; bytes: Uint8Array }> {
 	const encoded = dagCbor.encode(value)
 	const hash = await sha256.digest(encoded)
 	const cid = CID.createV1(dagCbor.code, hash)
@@ -14,7 +15,10 @@ export async function encodeBlock(value: unknown): Promise<{ cid: CID; bytes: Ui
 }
 
 // Encodes a link node as per DagCborCIDEncoder.encodeLinkNode in Solidity
-export async function encodeLinkNode(left: CID, right: CID): Promise<CID> {
+export async function encodeLinkNode(
+	left: CID<unknown, 113, 18, 1>,
+	right: CID<unknown, 113, 18, 1>,
+): Promise<CID<unknown, 113, 18, 1>> {
 	// Map(2) { "L": left, "R": right }
 	const node = { L: left, R: right }
 	const encoded = dagCbor.encode(node)
@@ -24,12 +28,12 @@ export async function encodeLinkNode(left: CID, right: CID): Promise<CID> {
 
 // Robust CID construction from raw bytes32-hex-string hashes (assume dag-cbor + sha2-256, CIDv1)
 // If your accumulator uses a different codec/hash, update these codes!
-export async function hexStringToCID(bytes32hexString: string): Promise<CID> {
+export async function hexStringToCID(bytes32hexString: string): Promise<CID<unknown, 113, 18, 1>> {
 	const digest = await sha256.digest(fromHex(bytes32hexString).slice(0, 32))
 	return CID.create(1, 0x71, digest) // 0x71 = dag-cbor
 }
 
-export function CIDTohexString(cid: CID): string {
+export function CIDTohexString(cid: CID<unknown, 113, 18, 1>): string {
 	// Only support dag-cbor + sha2-256, CIDv1
 	if (cid.version !== 1) {
 		console.error("[CIDTohexString] CID version mismatch:", {
@@ -119,12 +123,14 @@ export function NormalizedLeafInsertEventToString(event: NormalizedLeafInsertEve
 }
 
 // Converts PeakWithHeight[] to a JSON string with cids as hex strings
-export function PeakWithHeightArrayToString(peaks: { cid: CID; height: number }[]): string {
+export function PeakWithHeightArrayToString(peaks: { cid: CID<unknown, 113, 18, 1>; height: number }[]): string {
 	return JSON.stringify(peaks.map((p) => ({ cid: CIDTohexString(p.cid), height: p.height })))
 }
 
 // Converts a JSON string back to PeakWithHeight[] (cids from hex strings)
-export async function StringToPeakWithHeightArray(str: string): Promise<{ cid: CID; height: number }[]> {
+export async function StringToPeakWithHeightArray(
+	str: string,
+): Promise<{ cid: CID<unknown, 113, 18, 1>; height: number }[]> {
 	const arr = JSON.parse(str)
 	return Promise.all(
 		arr.map(async (p: { cid: string; height: number }) => ({ cid: await hexStringToCID(p.cid), height: p.height })),

@@ -1,20 +1,14 @@
+import type { CID } from "multiformats/cid"
 import type { IpfsAdapter } from "../interfaces/IpfsAdapter.ts"
 import type { StorageAdapter } from "../interfaces/StorageAdapter.ts"
-import type { CID } from "multiformats/cid"
-import { getAccumulatorData } from "../ethereum/commonCalls.ts"
-import type {
-	PeakWithHeight,
-	LeafRecord,
-	NormalizedLeafInsertEvent,
-	MMRLeafInsertTrail,
-	CIDDataPair,
-} from "../types/types.ts"
-import { resolveMerkleTreeOrThrow } from "../ipfs/ipfs.ts"
-import { computePreviousRootCIDAndPeaksWithHeights } from "./mmrUtils.ts"
-import { getRootCIDFromPeaks } from "./mmrUtils.ts"
-import { getLeafInsertLogs, getLatestCID } from "../ethereum/commonCalls.ts"
-
+import { getAccumulatorData, getLeafInsertLogs, getLatestCID } from "../ethereum/commonCalls.ts"
+import { ethRpcFetch } from "../ethereum/ethRpcFetch.ts"
 import { MerkleMountainRange } from "./MerkleMountainRange.ts"
+import { computePreviousRootCIDAndPeaksWithHeights, getRootCIDFromPeaks } from "./mmrUtils.ts"
+import { walkBackLeafInsertLogsOrThrow } from "../utils/walkBackLogsOrThrow.ts"
+import { resolveMerkleTreeOrThrow } from "../ipfs/ipfs.ts"
+import { NULL_CID } from "../shared/constants.ts"
+
 import {
 	CIDDataPairToString,
 	CIDTohexString,
@@ -28,7 +22,14 @@ import {
 	stringToCIDDataPair,
 	getLeafRecordFromNormalizedLeafInsertEvent,
 } from "../utils/codec.ts"
-import { walkBackLeafInsertLogsOrThrow } from "../utils/walkBackLogsOrThrow.ts"
+
+import type {
+	PeakWithHeight,
+	LeafRecord,
+	NormalizedLeafInsertEvent,
+	MMRLeafInsertTrail,
+	CIDDataPair,
+} from "../types/types.ts"
 
 /**
  * AccumulatorNode: Unified entry point for accumulator logic in any environment.
@@ -60,7 +61,6 @@ export class AccumulatorNode {
 		ethereumHttpRpcUrl: string
 		ethereumWsRpcUrl?: string
 		contractAddress: string
-		[key: string]: any // TODO come back to this and see what's up with it
 	}) {
 		this.ipfs = ipfs
 		this.storage = storage
@@ -69,6 +69,33 @@ export class AccumulatorNode {
 		this.contractAddress = contractAddress
 		this.mmr = new MerkleMountainRange()
 		this.highestCommittedLeafIndex = -1
+	}
+
+	async init() {
+		// Ensure DB is open
+		await this.storage.open()
+
+		// Check if Ethereum connection is working
+		console.log("[Accumulator] \u{1F440} Checking Ethereum connection...")
+		try {
+			// Use eth_chainId as a lightweight check
+			const chainId = await ethRpcFetch(this.ethereumHttpRpcUrl, "eth_chainId", [])
+			console.log(`[Accumulator] \u{2705} Connected to Ethereum node, chainId: ${chainId}`)
+		} catch (e) {
+			console.error("[Accumulator] \u{274C} Failed to connect to Ethereum node:", e)
+			throw new Error("Failed to connect to Ethereum node. See above error.")
+		}
+
+		// Check if IPFS connection is working
+		console.log("[Accumulator] \u{1F440} Checking IPFS connection...")
+		try {
+			// Attempt to fetch a block
+			await this.ipfs.get(NULL_CID)
+			console.log("[Accumulator] \u{2705} Connected to IPFS node.")
+		} catch (e) {
+			console.error("[Accumulator] \u{274C} Failed to connect to IPFS node:", e)
+			throw new Error("Failed to connect to IPFS node. See above error.")
+		}
 	}
 
 	/**
@@ -81,20 +108,18 @@ export class AccumulatorNode {
 
 		let useSubscription = false
 		if (this.ethereumWsRpcUrl) {
-			console.log(`[Accumulator] Detected ETHEREUM_WS_RPC_URL: ${this.ethereumWsRpcUrl}`)
+			console.log(`[Accumulator] \u{2705} Detected ETHEREUM_WS_RPC_URL: ${this.ethereumWsRpcUrl}`)
 			useSubscription = await this.#detectSubscriptionSupport(this.ethereumWsRpcUrl)
 			if (!useSubscription) {
-				console.log("[Accumulator] WS endpoint does not support eth_subscribe, falling back to polling.")
+				console.log("[Accumulator] \u{274C} WS endpoint does not support eth_subscribe, falling back to polling.")
 			}
 		} else {
-			console.log("[Accumulator] No ETHEREUM_WS_RPC_URL provided, will use polling.")
+			console.log("[Accumulator] 👎 No ETHEREUM_WS_RPC_URL provided, will use polling.")
 		}
-
+		console.log(`[Accumulator] \u{1F440} Using ${useSubscription ? "subscriptions" : "polling"} for live sync.`)
 		if (useSubscription) {
-			console.log("[Accumulator] Using Ethereum WS subscriptions for live sync.")
 			this.#startSubscriptionSync()
 		} else {
-			console.log("[Accumulator] Using polling for live sync.")
 			this.#startPollingSync(pollIntervalMs)
 		}
 	}
@@ -105,10 +130,10 @@ export class AccumulatorNode {
 	 */
 	async #detectSubscriptionSupport(wsUrl: string): Promise<boolean> {
 		if (!wsUrl.startsWith("ws://") && !wsUrl.startsWith("wss://")) {
-			console.log(`[Accumulator] ETHEREUM_WS_RPC_URL is not a ws:// or wss:// URL: ${wsUrl}`)
+			console.log(`[Accumulator] 👎 ETHEREUM_WS_RPC_URL is not a ws:// or wss:// URL: ${wsUrl}`)
 			return false
 		}
-		console.log(`[Accumulator] Attempting to open WebSocket and send eth_subscribe to ${wsUrl}...`)
+		console.log(`[Accumulator] 🙏 Attempting to open WebSocket and send eth_subscribe to ${wsUrl}...`)
 		return await new Promise<boolean>((resolve) => {
 			let ws: WebSocket | null = null
 			let finished = false
@@ -311,33 +336,39 @@ export class AccumulatorNode {
 		// Commit the leaf to the MMR
 		await this.commitLeaf(event.leafIndex, event.newData)
 
-		// TEST/DEBUG: Check to see if our mmr root CID matches the on-chain root CID
-		try {
-			const localRootCid = await this.mmr.rootCIDAsBase32()
-			const onChainRootCid = await getLatestCID(this.ethereumHttpRpcUrl, this.contractAddress)
-			console.log(`[Accumulator DEBUG] Local MMR root CID (base32): ${localRootCid}`)
-			console.log(`[Accumulator DEBUG] On-chain latest root CID: ${onChainRootCid}`)
-			if (localRootCid !== onChainRootCid.toString()) {
-				console.warn("[Accumulator DEBUG] Local and on-chain root CIDs do NOT match!")
-			} else {
-				console.log("[Accumulator DEBUG] Local and on-chain root CIDs match!")
+		// === THE FOLLOWING CODE BLOCK CAN BE REMOVED. IT IS JUST A SANITY CHECK. ===
+		const { meta } = await getAccumulatorData(this.ethereumHttpRpcUrl, this.contractAddress)
+		// This sanity check only makes sense when the node is fully synced
+		if (this.highestCommittedLeafIndex === meta.leafCount - 1) {
+			try {
+				const localRootCid = await this.mmr.rootCIDAsBase32()
+				const onChainRootCid = await getLatestCID(this.ethereumHttpRpcUrl, this.contractAddress)
+				if (localRootCid !== onChainRootCid.toString()) {
+					console.warn(`[Accumulator: sanity check] \u{274C} Local (${localRootCid} )and on-chain (${onChainRootCid.toString()}) root CIDs do NOT match!`)
+				} else {
+					console.log("[Accumulator: sanity check] \u{2705} Local and on-chain root CIDs match!")
+				}
+			} catch (err) {
+				console.warn("[Accumulator: sanity check] \u{274C} Failed to compare root CIDs:", err)
 			}
-		} catch (err) {
-			console.warn("[Accumulator DEBUG] Failed to compare root CIDs:", err)
 		}
-		console.log(`[Accumulator] Processed new leaf with index ${event.leafIndex}`)
+		// =============================== END SANITY CHECK. ===============================
+
+		console.log(`[Accumulator] \u{1F343} Processed new leaf with index ${event.leafIndex}`)
 	}
 
 	/**
-	 * Commits all uncommitted leaves to the MMR and pins the full trail to IPFS.
+	 * Rebuilds the Merkle Mountain Range (MMR) by committing all uncommitted leaves and pinning the full trail to IPFS.
 	 *
 	 * This function iterates through all uncommitted leaves and commits them one by one.
 	 * For each leaf, it adds the leaf to the MMR, stores the trail in the DB, and pins the full trail to IPFS.
 	 *
-	 * @returns A Promise that resolves when all uncommitted leaves have been committed.
+	 * @returns A Promise that resolves when the MMR has been rebuilt from all uncommitted leaves.
 	 */
-	async commitAllUncommittedLeaves(): Promise<void> {
-		console.log(`[Accumulator] \u{1F4DC} Committing all uncommitted leaves...`)
+	async rebuildAndProvideMMR(): Promise<void> {
+		console.log(
+			`[Accumulator] \u{1F4DC} Rebuilding the Merkle Mountain Range from synced leaves and pinning to IPFS...`,
+		)
 		const fromIndex: number = this.highestCommittedLeafIndex + 1
 		const toIndex: number = await this.getHighestContiguousLeafIndexWithData()
 		if (fromIndex > toIndex)
@@ -352,7 +383,7 @@ export class AccumulatorNode {
 				throw new Error(`[Accumulator] newData for leaf ${i} is not a Uint8Array`)
 			await this.commitLeaf(i, record.newData)
 		}
-		console.log(`[Accumulator] \u{2705} Committed all uncommitted leaves from ${fromIndex} to ${toIndex}`)
+		console.log(`[Accumulator] \u{2705} Fully rebuilt the Merkle Mountain Range up to leaf index ${toIndex}`)
 	}
 
 	/**
@@ -368,9 +399,7 @@ export class AccumulatorNode {
 		await this.appendTrailToDB(trail)
 		// Pin and provide trail to IPFS
 		for (const { cid, data } of trail) {
-			await this.ipfs.put(cid, data)
-			await this.ipfs.pin(cid)
-			await this.ipfs.provide(cid)
+			await this.#putPinProvideToIPFS(cid, data)
 		}
 		this.highestCommittedLeafIndex++
 	}
@@ -384,22 +413,48 @@ export class AccumulatorNode {
 	async rePinAllDataToIPFS(): Promise<void> {
 		const toIndex = Number((await this.storage.get("dag:trail:maxIndex")) ?? -1)
 		if (toIndex === -1) return
-		console.log(`[Accumulator] \u{1F4CC} Re-pinning all ${toIndex + 1} CIDs to IPFS...`)
+		console.log(
+			`[Accumulator] \u{1F4CC} Attempting to pin all ${toIndex + 1} CIDs (leaves, root, and intermediate nodes) to IPFS...`,
+		)
 
 		let count = 0
+		let failed = 0
 		for (let i = 0; i <= toIndex; i++) {
 			const pair: CIDDataPair | null = await this.getCIDDataPairFromDB(i)
 			if (!pair) throw new Error(`[Accumulator] Expected CIDDataPair for leaf ${i}`)
 
-			await this.ipfs.put(pair.cid, pair.data)
-			await this.ipfs.pin(pair.cid)
-			await this.ipfs.provide(pair.cid)
+			const putOk = await this.#putPinProvideToIPFS(pair.cid, pair.data)
+			if (!putOk) {
+				failed++
+				continue
+			}
 			count++
 			if (count % 100 === 0) {
 				console.log(`[Accumulator] \u{1F4CC} Re-pinned ${count} CIDs to IPFS...`)
 			}
 		}
-		console.log(`[Accumulator] \u{2705} Re-pinned all ${count} CIDs to IPFS. Done!`)
+		console.log(`[Accumulator] \u{2705} Pinned ${count} CIDs to IPFS (${failed} failures). Done!`)
+	}
+
+	// Centralized helper for robust IPFS put/pin/provide with logging
+	async #putPinProvideToIPFS(cid: CID, data: Uint8Array): Promise<boolean> {
+		try {
+			await this.ipfs.put(cid, data)
+		} catch (err) {
+			console.error(`[Accumulator] \u{1F4A5} IPFS put failed for CID ${cid}:`, err)
+			return false
+		}
+		try {
+			await this.ipfs.pin(cid)
+		} catch (err) {
+			console.error(`[Accumulator] IPFS pin failed for CID ${cid}:`, err)
+		}
+		try {
+			await this.ipfs.provide(cid)
+		} catch (err) {
+			console.error(`[Accumulator] IPFS provide failed for CID ${cid}:`, err)
+		}
+		return true
 	}
 
 	//Store a leaf record in the DB by leafIndex, splitting fields into separate keys.
@@ -465,6 +520,8 @@ export class AccumulatorNode {
 		const minBlock = meta.deployBlockNumber
 		this._lastProcessedBlock = meta.previousInsertBlockNumber
 
+		const highestLeafIndexInDB = await this.getHighestContiguousLeafIndexWithData()
+
 		console.log(
 			`[Accumulator] \u{1F501} Syncing backwards from block ${meta.previousInsertBlockNumber} to block ${meta.deployBlockNumber} (${meta.previousInsertBlockNumber - meta.deployBlockNumber} blocks), grabbing ${maxBlockRange} blocks per RPC call.`,
 		)
@@ -473,12 +530,12 @@ export class AccumulatorNode {
 		// Compute the current root CID from the current peaks
 		const currentRootCID = await getRootCIDFromPeaks(peaks.map((p) => p.cid))
 
-		let oldestRootCid: CID = currentRootCID
+		let oldestRootCid: CID<unknown, 113, 18, 1> = currentRootCID
 		let oldestProcessedLeafIndex = currentLeafIndex + 1
 		let currentPeaksWithHeights: PeakWithHeight[] = peaks
 
 		const ipfsChecks: Array<
-			ReturnType<typeof makeTrackedPromise<boolean>> & { controller: AbortController; cid: CID }
+			ReturnType<typeof makeTrackedPromise<boolean>> & { controller: AbortController; cid: CID<unknown, 113, 18, 1> }
 		> = []
 
 		// --- Utility: tracked promise for polling ---
@@ -552,12 +609,14 @@ export class AccumulatorNode {
 				if (missing.length !== 0)
 					throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
 				console.log(
-					`[Accumulator] \u{1F4E5} Downloaded all data for root CID ${foundIpfsCid?.toString() ?? "undefined"}.`,
+					`[Accumulator] \u{1F4E5} Downloaded all data for root CID ${foundIpfsCid?.toString() ?? "undefined"} from IPFS.`,
 				)
 				console.log(`[Accumulator] \u{1F64C} Successfully resolved all remaining data from IPFS!`)
 				console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
 				return
 			}
+			// We can also stop syncing backwards if we get back to a leaf that we laready have
+			if (oldestProcessedLeafIndex <= highestLeafIndexInDB) break
 		}
 		// If we get here, we've fully synced backwards using only event data (no data found on IPFS)
 		// Abort all outstanding IPFS checks
@@ -569,7 +628,9 @@ export class AccumulatorNode {
 		if (missing.length !== 0) {
 			throw new Error("[Accumulator] Missing newData for leaf indices: " + missing.join(", "))
 		}
-		console.log("[Accumulator] \u{1F9BE} Fully synced backwards using only event data (no data found on IPFS)")
+		console.log(
+			"[Accumulator] \u{1F9BE} Fully synced backwards using only event data and local DB data (no data used from IPFS)",
+		)
 		console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
 	}
 
@@ -582,7 +643,7 @@ export class AccumulatorNode {
 	 * @returns true if all leaf data are available, false otherwise.
 	 */
 	// Accept an optional AbortSignal and respect it
-	async getAndResolveCID(cid: CID, opts?: { signal?: AbortSignal }): Promise<boolean> {
+	async getAndResolveCID(cid: CID<unknown, 113, 18, 1>, opts?: { signal?: AbortSignal }): Promise<boolean> {
 		const signal = opts?.signal
 		// Only throw if already aborted at entry
 		if (signal?.aborted) throw new DOMException("Aborted", "AbortError")
@@ -663,18 +724,20 @@ export class AccumulatorNode {
 	 * Safe to call multiple times.
 	 */
 	public async shutdown(): Promise<void> {
+		console.log("[Accumulator] 👋 Shutting down gracefully.]")
 		// Stop live sync (polling or WS)
 		this.stopLiveSync()
 		// Close DB if possible
-		if (this.storage && typeof this.storage === "object" && "db" in this.storage) {
-			const db = (this.storage as any).db
-			if (db && typeof db.close === "function") {
-				try {
-					await db.close()
-				} catch (e) {
-					console.error("[AccumulatorNode] Error closing DB:", e)
-				}
-			}
-		}
+		await this.storage.close()
+		console.log("[Accumulator] 🏁 Done.")
 	}
+}
+
+//Helper to extract error messages from various error types.
+//Returns a string representation of the error message.
+function extractErrorMessage(err: unknown): string {
+	if (typeof err === "object" && err !== null && "message" in err && typeof (err as any).message === "string") {
+		return (err as any).message
+	}
+	return String(err)
 }

@@ -23,8 +23,14 @@ export class IndexedDbAdapter implements StorageAdapter {
 		// TODO: Use Dexie.js or idb-keyval cursor to efficiently iterate by prefix
 		// Example: for await (const [key, value] of db.where('key').startsWith(prefix))
 	}
-	async getMaxKey(_prefix: string): Promise<number | undefined> {
-		// TODO: Use Dexie.js or idb-keyval to find max numeric suffix for prefix
-		return undefined
+
+	async open(): Promise<void> {
+		// TODO: Implement open logic for IndexedDB (Dexie.js or idb-keyval)
+		return
+	}
+
+	async close(): Promise<void> {
+		// TODO: Implement close logic for IndexedDB (Dexie.js or idb-keyval)
+		return
 	}
 }

@@ -1,16 +1,16 @@
 import { CID } from "multiformats/cid"
 import { encodeBlock } from "../utils/codec.ts"
 import type { PeakWithHeight } from "../types/types.ts"
-import { EMPTY_CID } from "../shared/constants.ts"
+import { NULL_CID } from "../shared/constants.ts"
 
 /**
  * Computes the root CID from an array of peak CIDs, left-to-right bagging (canonical MMR logic).
  * @param peaks Array of CIDs (left-to-right order)
  * @returns The root CID (or the zero CID if peaks is empty)
  */
-export async function getRootCIDFromPeaks(peaks: CID[]): Promise<CID> {
+export async function getRootCIDFromPeaks(peaks: CID<unknown, 113, 18, 1>[]): Promise<CID<unknown, 113, 18, 1>> {
 	if (peaks.length === 0) {
-		return CID.parse("bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku")
+		return NULL_CID
 	}
 	if (peaks.length === 1) {
 		return peaks[0]
@@ -26,17 +26,19 @@ export async function getRootCIDFromPeaks(peaks: CID[]): Promise<CID> {
 export async function computePreviousRootCIDAndPeaksWithHeights(
 	currentPeaksWithHeights: PeakWithHeight[],
 	newData: Uint8Array,
-	leftInputsDuringLatestMerge: CID[],
-): Promise<{ previousRootCID: CID; previousPeaksWithHeights: PeakWithHeight[] }> {
+	leftInputsDuringLatestMerge: CID<unknown, 113, 18, 1>[],
+): Promise<{ previousRootCID: CID<unknown, 113, 18, 1>; previousPeaksWithHeights: PeakWithHeight[] }> {
 	// Defensive copy
 	let peaks: PeakWithHeight[] = currentPeaksWithHeights.map((p) => ({ cid: p.cid, height: p.height }))
 
-	if (currentPeaksWithHeights.length == 0) return { previousRootCID: EMPTY_CID, previousPeaksWithHeights: [] } // if there are no peaks now, there never were
+	if (currentPeaksWithHeights.length == 0) return { previousRootCID: NULL_CID, previousPeaksWithHeights: [] } // if there are no peaks now, there never were
 
 	if (leftInputsDuringLatestMerge.length === 0) {
 		// No merges, just remove the peak with height 0
 		const previousPeaksWithHeights = currentPeaksWithHeights.filter((p) => p.height !== 0)
-		const previousRootCID: CID = await getRootCIDFromPeaks(previousPeaksWithHeights.map((p) => p.cid))
+		const previousRootCID: CID<unknown, 113, 18, 1> = await getRootCIDFromPeaks(
+			previousPeaksWithHeights.map((p) => p.cid),
+		)
 		return { previousRootCID, previousPeaksWithHeights }
 	}
 
@@ -55,7 +57,7 @@ export async function computePreviousRootCIDAndPeaksWithHeights(
 	const { cid: newLeafCID } = await encodeBlock(newData)
 	reconstructedPeaks = reconstructedPeaks.filter((p) => !(p.height === 0 && p.cid.toString() === newLeafCID.toString()))
 
-	const previousRootCID: CID = await getRootCIDFromPeaks(reconstructedPeaks.map((p) => p.cid))
+	const previousRootCID: CID<unknown, 113, 18, 1> = await getRootCIDFromPeaks(reconstructedPeaks.map((p) => p.cid))
 
 	return { previousRootCID, previousPeaksWithHeights: reconstructedPeaks }
 }

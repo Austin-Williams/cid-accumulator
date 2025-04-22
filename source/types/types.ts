@@ -18,7 +18,7 @@ export interface NormalizedLeafInsertEvent {
 	previousInsertBlockNumber: number
 	newData: Uint8Array
 	// leftInputs: Uint8Array[] // "left hashes" as raw 32-byte hashes (not dag-cbor encoded CIDs).
-	leftInputs: CID[]
+	leftInputs: CID<unknown, 113, 18, 1>[]
 	blockNumber: number
 	transactionHash: string
 	removed: boolean
@@ -35,10 +35,10 @@ export interface AccumulatorMetadata {
 /**
  * Represents a single MMR peak with its CID and height.
  */
-export type PeakWithHeight = { cid: CID; height: number }
+export type PeakWithHeight = { cid: CID<unknown, 113, 18, 1>; height: number }
 
 // contains the CID and data for the leaf, all new intermediate nodes, and the new root node
-export type MMRLeafInsertTrail = { cid: CID; data: Uint8Array }[]
+export type MMRLeafInsertTrail = { cid: CID<unknown, 113, 18, 1>; data: Uint8Array }[]
 
 /**
  * Represents all relevant data for a leaf/event in the accumulator.
@@ -47,10 +47,10 @@ export type LeafRecord = {
 	newData: Uint8Array
 	event?: NormalizedLeafInsertEvent
 	blockNumber?: number
-	rootCid?: CID
+	rootCid?: CID<unknown, 113, 18, 1>
 	peaksWithHeights?: PeakWithHeight[] // This is the set of active peaks of the mmr AFTER this leaf/event is inserted.
 	// ...other fields as needed
 	[key: string]: unknown // Allow extra properties for type tagging
 }
 
-export type CIDDataPair = { cid: CID; data: Uint8Array }
+export type CIDDataPair = { cid: CID<unknown, 113, 18, 1>; data: Uint8Array }

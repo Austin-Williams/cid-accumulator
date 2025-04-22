@@ -69,7 +69,7 @@ For example, if you insert `2^20` entries (just over 1 million), here’s how of
 | 8           | 0.1953125%  |
 | 9           | 0.09765625% |
 
-> ✅ Even after a million inserts, over **87%** of them will require **2 or fewer merges**, keeping gas costs low and consistent.
+> \u{2705} Even after a million inserts, over **87%** of them will require **2 or fewer merges**, keeping gas costs low and consistent.
 
 So the gas cost is determined only by that insert’s merge activity — **not** by the total size of the data set.
 

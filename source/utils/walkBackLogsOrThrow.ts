@@ -1,5 +1,5 @@
 import { getLeafInsertLogForTargetLeafIndex } from "../ethereum/commonCalls.ts"
-import { NormalizedLeafInsertEvent, RawEthLog } from "../types/types.ts"
+import { NormalizedLeafInsertEvent } from "../types/types.ts"
 
 /**
  * Walks back along the previousInsertBlockNumber chain, starting from fromLeafIndex,

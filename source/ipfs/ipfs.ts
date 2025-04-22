@@ -2,13 +2,16 @@ import * as dagCbor from "@ipld/dag-cbor"
 import { CID } from "multiformats/cid"
 import { createKuboRPCClient } from "kubo-rpc-client"
 
-export type IpldNode = Uint8Array | CID | { L: CID; R: CID }
+export type IpldNode =
+	| Uint8Array
+	| CID<unknown, 113, 18, 1>
+	| { L: CID<unknown, 113, 18, 1>; R: CID<unknown, 113, 18, 1> }
 
-function isIpldLink(obj: unknown): obj is CID {
+function isIpldLink(obj: unknown): obj is CID<unknown, 113, 18, 1> {
 	return obj instanceof CID
 }
 
-function isInternalNode(obj: unknown): obj is { L: CID; R: CID } {
+function isInternalNode(obj: unknown): obj is { L: CID<unknown, 113, 18, 1>; R: CID<unknown, 113, 18, 1> } {
 	return (
 		typeof obj === "object" &&
 		obj !== null &&
@@ -43,13 +46,13 @@ function isInternalNode(obj: unknown): obj is { L: CID; R: CID } {
  * }
  */
 export async function resolveMerkleTreeOrThrow(
-	cid: CID,
-	blockstore: { get(cid: CID): Promise<Uint8Array> },
+	cid: CID<unknown, 113, 18, 1>,
+	blockstore: { get(cid: CID<unknown, 113, 18, 1>): Promise<Uint8Array> },
 ): Promise<Uint8Array[]> {
 	let raw: Uint8Array
 	try {
 		raw = await blockstore.get(cid)
-	} catch (e) {
+	} catch {
 		throw new Error(`Block with CID ${cid.toString()} not found in blockstore`)
 	}
 	const node: IpldNode = dagCbor.decode(raw)
@@ -73,7 +76,7 @@ export class IPFSBlockstore {
 	constructor(ipfs: ReturnType<typeof createKuboRPCClient>) {
 		this.ipfs = ipfs
 	}
-	async get(cid: CID): Promise<Uint8Array> {
+	async get(cid: CID<unknown, 113, 18, 1>): Promise<Uint8Array> {
 		return await this.ipfs.block.get(cid)
 	}
 }

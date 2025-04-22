@@ -50,4 +50,18 @@ export class LevelDbAdapter implements StorageAdapter {
 			throw err
 		}
 	}
+
+	async open(): Promise<void> {
+		// LevelDB's open() returns a promise
+		if (typeof this.db.open === "function") {
+			await this.db.open()
+		}
+	}
+
+	async close(): Promise<void> {
+		// LevelDB's close() returns a promise
+		if (typeof this.db.close === "function") {
+			await this.db.close()
+		}
+	}
 }

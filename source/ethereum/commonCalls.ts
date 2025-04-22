@@ -29,7 +29,7 @@ export async function getAccumulatorData(
 	const [mmrMetaBits, peaks] = parseGetAccumulatorDataResult(accumulatorDataHex)
 	const meta = parseAccumulatorMetaBits(mmrMetaBits)
 	const activePeaks: Uint8Array[] = peaks.slice(0, meta.peakCount) // only active peaks
-	const activePeaksAsCids: CID[] = activePeaks.map(contractPeakHexToMmrCid)
+	const activePeaksAsCids: CID<unknown, 113, 18, 1>[] = activePeaks.map(contractPeakHexToMmrCid)
 	const activePeaksWithHeight: PeakWithHeight[] = activePeaksAsCids.map((cid, i) => ({
 		cid,
 		height: meta.peakHeights[i],

@@ -1,9 +1,10 @@
 import { CID } from "multiformats/cid"
 import { encodeBlock } from "../utils/codec.ts"
 import { MMRLeafInsertTrail } from "../types/types.ts"
+import { NULL_CID } from "../shared/constants.ts"
 
 export class MerkleMountainRange {
-	public peaks: CID[] = []
+	public peaks: CID<unknown, 113, 18, 1>[] = []
 	public leafCount = 0
 
 	constructor() {}
@@ -46,18 +47,17 @@ export class MerkleMountainRange {
 	}
 
 	async rootCIDWithTrail(): Promise<{
-		root: CID
+		root: CID<unknown, 113, 18, 1>
 		cids: string[] // TODO: redundant, remove
 		data: Uint8Array[] // TODO: redundant, remove
-		trail: { cid: CID; data: Uint8Array }[]
+		trail: { cid: CID<unknown, 113, 18, 1>; data: Uint8Array }[]
 	}> {
 		const cids: string[] = []
 		const data: Uint8Array[] = []
-		const trail: { cid: CID; data: Uint8Array }[] = []
+		const trail: { cid: CID<unknown, 113, 18, 1>; data: Uint8Array }[] = []
 
 		if (this.peaks.length === 0) {
-			const empty = CID.parse("bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku")
-			return { root: empty, cids: [], data: [], trail: [] }
+			return { root: NULL_CID, cids: [], data: [], trail: [] }
 		}
 
 		if (this.peaks.length === 1) {
@@ -76,7 +76,7 @@ export class MerkleMountainRange {
 		return { root: current, cids, data, trail }
 	}
 
-	async rootCID(): Promise<CID> {
+	async rootCID(): Promise<CID<unknown, 113, 18, 1>> {
 		const result = await this.rootCIDWithTrail()
 		return result.root
 	}
