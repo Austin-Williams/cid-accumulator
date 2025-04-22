@@ -3,9 +3,18 @@ pragma solidity 0.8.25;
 
 import { DagCborCIDEncoder } from "./libraries/DagCborCIDEncoder.sol";
 
-// A content-addressable Merkle (mountain range) accumulator 
-// using IPLD dag-cbor and CID-based hashing
-contract DagCborAccumulator {
+/**
+ * An on-chain Merkle Mountain Range (MMR) accumulator that allows arbitrary
+ * data (bytes) to be appended as leaves (via the _addData function). The
+ * contract maintains a root hash encoded as an IPFS CID (Content Identifier),
+ * which is updated trustlessly -- by this contract itself -- with each insertion.
+ * The CID can be used to fetch and verify the complete data set from IPFS, so
+ * users don't need their own Ethereum nodes or paid-tier RPC providers to
+ * acquire and verify arbitrarily large sets of data from the contract. It is
+ * suitable for applications requiring efficient, verifiable access to
+ * historical data.
+ */
+contract CIDAccumulator {
 	// LIBRARIES
 	using DagCborCIDEncoder for bytes;
 

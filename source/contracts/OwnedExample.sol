@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { DagCborAccumulator } from "./DagCborAccumulator.sol";
+import { CIDAccumulator } from "./CIDAccumulator.sol";
 
-contract OwnedExample is DagCborAccumulator {
+contract OwnedExample is CIDAccumulator {
 	address private immutable owner;
 
 	constructor() {

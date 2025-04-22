@@ -8,16 +8,16 @@
 - Computes the CID incrementally as new data is added
 - Allows users to fetch the full dataset from IPFS using a single `getLatestCID()` call
 
-Apps often emit on-chain events that users need later — like Merkle tree commitments, offers, or market data. But querying and reconstructing large event logs is inefficient, especially for users on free-tier RPCs.
+Apps often emit on-chain events that users need later — like deposit events, offers, or market data. But querying and reconstructing large event logs is inefficient, especially for users on free-tier RPCs.
 
-This contract solves that by having _the smart contract itself_ compute and store an IPFS CID (using the `dag-cbor` codec) that points to a file containing all data ever emitted. The contract maintains this CID as an accumulator root. A lightweight (and untrusted) off-chain service can watch events and publish the data to IPFS. Users can fetch everything they need directly from IPFS, with full trust in the data’s integrity — because _the smart contract itself_ computed the CID.
+This contract solves that by having _the smart contract itself_ compute and store an IPFS CID that points to a file containing all data ever emitted by the contract. The contract maintains this CID as an accumulator root. A lightweight (and untrusted) off-chain service can watch events and publish the data to IPFS. Users can fetch everything they need directly from IPFS, with full trust in the data’s integrity — because _the smart contract itself_ computed the CID.
 
 ### Usage
 
-Have your contract inherit from the `DagCborAccumulator` contract.
+Have your contract inherit from the `CIDAccumulator` contract.
 
 ```solidity
-contract Example is DagCborAccumulator {
+contract Example is CIDAccumulator {
     function addData(bytes calldata newData) external {
         _addData(newData);
     }
