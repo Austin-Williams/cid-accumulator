@@ -52,23 +52,24 @@ See `source/example.ts` for an example.
 ```typescript
 ...
 
-	// Instantiate the client
-	const accumulatorClient = new AccumulatorClient(...)
-	
-	// Initialize the client
-	await accumulatorClient.init()
+// Instantiate the client
+const accumulatorClient = new AccumulatorClient(...)
 
-	// Sync backwards from the latest leaf insert
-	// This checks IPFS for older root CIDs as you go
-	await accumulatorClient.syncBackwardsFromLatest()
+// Initialize the client
+await accumulatorClient.init()
 
-	// Once you're synced, rebuild the Merkle Mountain Range and pin all related data to IPFS
-	await accumulatorClient.rebuildAndProvideMMR()
+// Sync backwards from the latest leaf insert
+// This checks IPFS for older root CIDs as you go
+await accumulatorClient.syncBackwardsFromLatest()
 
-	// Start watching the chain for new LeafInsert events
-	await accumulatorClient.startLiveSync()
+// Once you're synced, rebuild the Merkle Mountain Range \
+// and pin all related data to IPFS
+await accumulatorClient.rebuildAndProvideMMR()
 
-	...
+// Start watching the chain for new LeafInsert events
+await accumulatorClient.startLiveSync()
+
+...
 
 ```
 
