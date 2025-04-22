@@ -2,18 +2,25 @@
 
 > ⚠️ **Warning:** This project is unaudited and has not been thoroughly tested.
 
-### What it does
+## What it does
 
 - Trustlessly computes and stores an IPFS CID on-chain that represents **all emitted event data**
 - Computes the CID incrementally as new data is added
 - Allows users to fetch the full dataset from IPFS using a single `getLatestCID()` call
 
+## Why we need it
+
 Apps often emit on-chain events that users need later — like deposit events, offers, or market data. But querying and reconstructing large event logs is inefficient, especially for users on free-tier RPCs.
 
-This contract solves that by having _the smart contract itself_ compute and store an IPFS CID that points to a file containing all data ever emitted by the contract. The contract maintains this CID as an accumulator root. A lightweight (and untrusted) off-chain service can watch events and publish the data to IPFS. Users can fetch everything they need directly from IPFS, with full trust in the data’s integrity — because _the smart contract itself_ computed the CID.
+Too often, app developers rely on centralized services to provide the data directly to their users. This has two serious problems. First, if the centralized service goes offline, the users can't use the app because they can't get the data. Second, while the users could _in principle_ verify the data they get against the blockchain, _in practice_ they can't because that requires running their own node or using a paid-tier RPC provider. So data verifiability is inaccessible to most users of centralized data providers.
 
-### Usage
+Storing the data on IPFS solves the first problem -- it lets users get the data they need even when the centralized service goes offline. All they need it the IPFS CID (Content Identifier) for the data. But it does not solve the second problem -- how do users get and verify the CID they need without having to trust anyone?
 
+This contract, the `CIDAccumulator`, solves that by having _the smart contract itself_ compute and store an IPFS CID that points to a file containing all data ever emitted by the contract. The contract maintains this CID as an accumulator. Users can fetch everything they need directly from IPFS, with full trust in the data’s integrity — because _the smart contract itself_ computed the CID.
+
+## How to use it
+
+### On-chain component
 Have your contract inherit from the `CIDAccumulator` contract.
 
 ```solidity
@@ -24,11 +31,45 @@ contract Example is CIDAccumulator {
 }
 ```
 
-You can call `_addData` with any `bytes` payload you'd like to include in the accumulator. This appends the data to the internal Merkle Mountain Range (MMR) and updates the CID.
+Your contract can then call `_addData` with any `bytes` payload you'd like to include in the accumulator. The data will be inserted and the CID will be updated.
 
-> ℹ️ Most inserts fall in the 12.8k - 23.5k gas range. See below for more about gas costs.
+> ℹ️ Most inserts fall in the 12.8k - 23.5k gas range for execution. See below for more about gas costs.
 
-Use `getLatestCID()` to retrieve the IPFS CID of the file that includes all data added so far.
+### Off-chain component
+
+The client-side UI can then call `getLatestCID()` to retrieve the IPFS CID of the file that includes all data added so far. But what if that CID is not available on IPFS?
+
+The `CIDAccumulator` is designed so that you can efficiently compute the _previous_ CID from the current CID + the small amount of data that was emitted by the contract during the last data insert. This allows you to efficiently "walk backwards" from the current CID through previous CIDs until you find one that is available on IPFS.
+
+A nice feature of this CID-walkback is that, once you find an older CID that is available on IPFS, you'll have already collected all the data between it and the current CID (because you gathered it as you "walked back"). So you'll be fully synced!
+
+(In the worst case, if you never find any of the CIDs on IPFS, you'll eventually walk all the way back to the contract deployent block. If that happens you'll have fully synced using event data alone -- with no help from IPFS.)
+
+This can all be handled by a light-weight `AccumulatorClient`
+
+See `source/example.ts` for an example.
+
+```typescript
+// Instantiate the node
+	const AccumulatorClient = new AccumulatorClient(...)
+	// Initialize the node
+	await AccumulatorClient.init()
+
+	// Sync backwards from the latest leaf insert
+	// This simultaneously checks IPFS for older root CIDs as they are discovered
+	await AccumulatorClient.syncBackwardsFromLatest()
+
+	// Rebuild the Merkle Mountain Range and pin all related data to IPFS
+	await AccumulatorClient.rebuildAndProvideMMR()
+
+	// Start watching the chain for new LeafInsert events to process
+	await AccumulatorClient.startLiveSync()
+
+```
+
+> 🚧 In-browser version is in progess
+
+
 
 ### ⛽ Gas Costs
 

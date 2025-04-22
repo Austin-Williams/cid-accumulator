@@ -2,7 +2,7 @@ import "dotenv/config"
 import { create as createKuboClient } from "kubo-rpc-client"
 import { Level } from "level"
 
-import { AccumulatorNode } from "./accumulator/AccumulatorNode.ts"
+import { AccumulatorClient } from "./accumulator/AccumulatorClient.ts"
 import { KuboRpcAdapter } from "./adapters/ipfs/KuboRpcAdapter.ts"
 import { LevelDbAdapter } from "./adapters/storage/LevelDbAdapter.ts"
 import { registerGracefulShutdown } from "./utils/gracefulShutdown.ts"
@@ -23,7 +23,7 @@ async function main() {
 	const storage = new LevelDbAdapter(db)
 
 	// Instantiate the node
-	const accumulatorNode = new AccumulatorNode({
+	const AccumulatorClient = new AccumulatorClient({
 		ipfs,
 		storage,
 		ethereumHttpRpcUrl: ETHEREUM_HTTP_RPC_URL,
@@ -31,20 +31,20 @@ async function main() {
 	})
 
 	// Initialize the node (opens the DB and checks Ethereum and IPFS connections)
-	await accumulatorNode.init()
+	await AccumulatorClient.init()
 
 	// Sync backwards from the latest leaf insert
 	// This simultaneously checks IPFS for older root CIDs as they are discovered
-	await accumulatorNode.syncBackwardsFromLatest()
+	await AccumulatorClient.syncBackwardsFromLatest()
 
 	// Rebuild the Merkle Mountain Range and pin all related data to IPFS
-	await accumulatorNode.rebuildAndProvideMMR()
+	await AccumulatorClient.rebuildAndProvideMMR()
 
 	// Start watching the chain for new LeafInsert events to process
-	await accumulatorNode.startLiveSync()
+	await AccumulatorClient.startLiveSync()
 	
 	// (OPTIONAL) Register SIGINT handler for graceful shutdown
-	registerGracefulShutdown(accumulatorNode)
+	registerGracefulShutdown(AccumulatorClient)
 }
 
 await main().catch((e) => {

@@ -1,6 +1,6 @@
-import { AccumulatorNode } from "../accumulator/AccumulatorNode.ts"
+import { AccumulatorClient } from "../accumulator/AccumulatorClient.ts"
 
-export function registerGracefulShutdown(node: AccumulatorNode) {
+export function registerGracefulShutdown(node: AccumulatorClient) {
   let shuttingDown = false
   process.on("SIGINT", async () => {
     if (shuttingDown) return

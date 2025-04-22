@@ -31,10 +31,10 @@ import {
 } from "../utils/codec.ts"
 
 /**
- * AccumulatorNode: Unified entry point for accumulator logic in any environment.
+ * AccumulatorClient: Unified entry point for accumulator logic in any environment.
  * Pass in the appropriate IpfsAdapter and StorageAdapter for your environment.
  */
-export class AccumulatorNode {
+export class AccumulatorClient {
 	ipfs: IpfsAdapter
 	storage: StorageAdapter
 	ethereumHttpRpcUrl: string
@@ -260,7 +260,7 @@ export class AccumulatorNode {
 	}
 
 	/**
-	 * Gracefully shuts down the AccumulatorNode: stops live sync and closes the DB if possible.
+	 * Gracefully shuts down the AccumulatorClient: stops live sync and closes the DB if possible.
 	 * Safe to call multiple times.
 	 */
 	public async shutdown(): Promise<void> {
