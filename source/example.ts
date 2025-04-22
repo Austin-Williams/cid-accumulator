@@ -15,7 +15,7 @@ const LEVEL_PATH = process.env.LEVEL_PATH || "./test.leveldb" // default LevelDB
 async function main() {
 	// Set up fetch-based IPFS adapter (see source/adapters/ipfs for other options, or create your own)
 	const ipfs = new FetchIpfsAdapter(IPFS_API_URL)
-	
+
 	// Set up storage adapter (see source/adapters/storage for other options, or create your own)
 	const db = new Level(LEVEL_PATH)
 	const storage = new LevelDbAdapter(db)
@@ -43,7 +43,6 @@ async function main() {
 
 	// Start watching the chain for new LeafInsert events to process
 	await accumulatorClient.startLiveSync()
-
 }
 
 await main().catch((e) => {

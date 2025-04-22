@@ -1,4 +1,5 @@
-import { CID } from "multiformats/cid"
+// import { CID } from "multiformats/cid"
+import { CID } from "../utils/CID.js"
 
 export interface RawEthLog {
 	address: string // Contract address

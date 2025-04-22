@@ -1,4 +1,5 @@
-import { CID } from "multiformats/cid"
+// import { CID } from "multiformats/cid"
+import { CID } from "../utils/CID.js"
 import { encodeBlock } from "../utils/codec.ts"
 import type { PeakWithHeight } from "../types/types.ts"
 import { NULL_CID } from "../utils/constants.ts"

@@ -16,7 +16,6 @@
 		"@noble/hashes": "^1.7.2",
 		"dotenv": "^16.5.0",
 		"level": "^9.0.0",
-		"multiformats": "^13.3.2",
 		"tsx": "^4.19.3"
 	},
 	"devDependencies": {

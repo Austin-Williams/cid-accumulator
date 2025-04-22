@@ -304,7 +304,7 @@ export class AccumulatorClient {
 		}
 	}
 
-// Stops live synchronization and cleans up resources.
+	// Stops live synchronization and cleans up resources.
 	stopLiveSync() {
 		this._liveSyncRunning = false
 		if (this._liveSyncInterval) {
