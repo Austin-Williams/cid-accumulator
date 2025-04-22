@@ -65,4 +65,5 @@ export const MINIMAL_ACCUMULATOR_ABI = [
 	},
 ] as const
 
-export const EMPTY_CID: CID = CID.parse("bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku")
+// Canonical dag-cbor/sha2-256/CIDv1 empty node CID
+export const EMPTY_CID: CID = CID.parse("bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku")

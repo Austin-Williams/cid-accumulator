@@ -2,7 +2,7 @@
 
 import "dotenv/config"
 import { ethers } from "ethers"
-import { promptUserChoice } from "../source/shared/userPrompt.js"
+import { promptUserChoice } from "../source/utils/userPrompt.ts"
 import fs from "fs/promises"
 import path from "path"
 import { fileURLToPath } from "url"
@@ -20,7 +20,7 @@ function sleep(ms: number) {
 
 async function main() {
 	let contractAddress = process.env.TARGET_CONTRACT_ADDRESS
-	let providerUrl = process.env.ETHEREUM_RPC_PROVIDER_URL
+	let providerUrl = process.env.ETHEREUM_HTTP_RPC_URL
 	let mnemonic = process.env.MNEMONIC_FOR_SUBMITTER
 
 	if (!contractAddress) {
@@ -51,7 +51,7 @@ async function main() {
 	console.log("Submitter Wallet Address:", submitterAddress)
 
 	// Use the shared yes/no prompt for confirmation
-	const { promptYesNo } = await import("../source/shared/userPrompt.js")
+	const { promptYesNo } = await import("../source/utils/userPrompt.ts")
 	const confirmed = await promptYesNo("Is this all correct?")
 	if (!confirmed) {
 		console.log("Okay, aborting.")

@@ -12,8 +12,8 @@ import type {
 import { resolveMerkleTreeOrThrow } from "../ipfs/ipfs.ts"
 import { computePreviousRootCIDAndPeaksWithHeights } from "./mmrUtils.ts"
 import { getRootCIDFromPeaks } from "./mmrUtils.ts"
-import { getLeafInsertLogs } from "../ethereum/commonCalls.ts"
-import { firstSuccessful } from "../utils/firstSuccessful.ts"
+import { getLeafInsertLogs, getLatestCID } from "../ethereum/commonCalls.ts"
+
 import { MerkleMountainRange } from "./MerkleMountainRange.ts"
 import {
 	CIDDataPairToString,
@@ -26,7 +26,7 @@ import {
 	hexStringToCID,
 	StringToPeakWithHeightArray,
 	stringToCIDDataPair,
-	getLeafRecordFromNormalizedLeafInsertEvent
+	getLeafRecordFromNormalizedLeafInsertEvent,
 } from "../utils/codec.ts"
 import { walkBackLeafInsertLogsOrThrow } from "../utils/walkBackLogsOrThrow.ts"
 
@@ -37,48 +37,270 @@ import { walkBackLeafInsertLogsOrThrow } from "../utils/walkBackLogsOrThrow.ts"
 export class AccumulatorNode {
 	ipfs: IpfsAdapter
 	storage: StorageAdapter
-	ethereumRpcUrl: string
+	ethereumHttpRpcUrl: string
+	ethereumWsRpcUrl?: string
 	contractAddress: string
 	mmr: MerkleMountainRange
 	highestCommittedLeafIndex: number
 
+	private _liveSyncRunning: boolean = false
+	private _liveSyncInterval?: ReturnType<typeof setTimeout>
+	private _lastProcessedBlock: number = 0
+	private _ws?: WebSocket
+
 	constructor({
 		ipfs,
 		storage,
-		ethereumRpcUrl,
+		ethereumHttpRpcUrl,
+		ethereumWsRpcUrl,
 		contractAddress,
 	}: {
 		ipfs: IpfsAdapter
 		storage: StorageAdapter
-		ethereumRpcUrl: string
+		ethereumHttpRpcUrl: string
+		ethereumWsRpcUrl?: string
 		contractAddress: string
-		[key: string]: any
+		[key: string]: any // TODO come back to this and see what's up with it
 	}) {
 		this.ipfs = ipfs
 		this.storage = storage
-		this.ethereumRpcUrl = ethereumRpcUrl
+		this.ethereumHttpRpcUrl = ethereumHttpRpcUrl
+		this.ethereumWsRpcUrl = ethereumWsRpcUrl
 		this.contractAddress = contractAddress
 		this.mmr = new MerkleMountainRange()
 		this.highestCommittedLeafIndex = -1
 	}
 
-	async processNewLeafEvent(event: NormalizedLeafInsertEvent): Promise<void> {
+	/**
+	 * Listens for new events and keeps the node up-to-date in real time.
+	 * Automatically uses polling if subscriptions are not supported or no WS URL is provided.
+	 */
+	async startLiveSync(pollIntervalMs = 10_000): Promise<void> {
+		if (this._liveSyncRunning) return
+		this._liveSyncRunning = true
+
+		let useSubscription = false
+		if (this.ethereumWsRpcUrl) {
+			console.log(`[Accumulator] Detected ETHEREUM_WS_RPC_URL: ${this.ethereumWsRpcUrl}`)
+			useSubscription = await this.#detectSubscriptionSupport(this.ethereumWsRpcUrl)
+			if (!useSubscription) {
+				console.log("[Accumulator] WS endpoint does not support eth_subscribe, falling back to polling.")
+			}
+		} else {
+			console.log("[Accumulator] No ETHEREUM_WS_RPC_URL provided, will use polling.")
+		}
+
+		if (useSubscription) {
+			console.log("[Accumulator] Using Ethereum WS subscriptions for live sync.")
+			this.#startSubscriptionSync()
+		} else {
+			console.log("[Accumulator] Using polling for live sync.")
+			this.#startPollingSync(pollIntervalMs)
+		}
+	}
+
+	/**
+	 * Attempts to detect if the given wsUrl supports Ethereum subscriptions (eth_subscribe).
+	 * Returns true if successful, false otherwise.
+	 */
+	async #detectSubscriptionSupport(wsUrl: string): Promise<boolean> {
+		if (!wsUrl.startsWith("ws://") && !wsUrl.startsWith("wss://")) {
+			console.log(`[Accumulator] ETHEREUM_WS_RPC_URL is not a ws:// or wss:// URL: ${wsUrl}`)
+			return false
+		}
+		console.log(`[Accumulator] Attempting to open WebSocket and send eth_subscribe to ${wsUrl}...`)
+		return await new Promise<boolean>((resolve) => {
+			let ws: WebSocket | null = null
+			let finished = false
+			const timeout = setTimeout(() => {
+				if (!finished) {
+					finished = true
+					if (ws) ws.close()
+					resolve(false)
+				}
+			}, 3000)
+
+			try {
+				ws = new WebSocket(wsUrl)
+				ws.onopen = () => {
+					// Send a test eth_subscribe request
+					const msg = JSON.stringify({
+						jsonrpc: "2.0",
+						id: 1,
+						method: "eth_subscribe",
+						params: ["newHeads"],
+					})
+					ws!.send(msg)
+				}
+				ws.onmessage = (event) => {
+					try {
+						const data = JSON.parse(event.data)
+						if (data.id === 1 && (data.result || data.error)) {
+							if (!finished) {
+								finished = true
+								clearTimeout(timeout)
+								ws!.close()
+								resolve(!data.error)
+							}
+						}
+					} catch {
+						/* ignore parse errors */
+					}
+				}
+				ws.onerror = () => {
+					if (!finished) {
+						finished = true
+						clearTimeout(timeout)
+						ws!.close()
+						resolve(false)
+					}
+				}
+				ws.onclose = () => {
+					if (!finished) {
+						finished = true
+						clearTimeout(timeout)
+						resolve(false)
+					}
+				}
+			} catch {
+				if (!finished) {
+					finished = true
+					clearTimeout(timeout)
+					if (ws) ws.close()
+					resolve(false)
+				}
+			}
+		})
+	}
+
+	#startPollingSync(pollIntervalMs: number) {
+		const poll = async () => {
+			try {
+				const { meta } = await getAccumulatorData(this.ethereumHttpRpcUrl, this.contractAddress)
+				const latestBlock = meta.previousInsertBlockNumber
+				if (latestBlock > this._lastProcessedBlock) {
+					const newEvents = await getLeafInsertLogs(
+						this.ethereumHttpRpcUrl,
+						this.contractAddress,
+						this._lastProcessedBlock + 1,
+						latestBlock,
+					)
+					for (const event of newEvents) {
+						await this.#processNewLeafEvent(event)
+					}
+					this._lastProcessedBlock = latestBlock
+				}
+			} catch (err) {
+				console.error("[LiveSync] Error during polling:", err)
+			}
+			if (this._liveSyncRunning) {
+				this._liveSyncInterval = setTimeout(poll, pollIntervalMs)
+			}
+		}
+		poll()
+	}
+
+	#startSubscriptionSync() {
+		if (!this.ethereumWsRpcUrl) {
+			console.error("[Accumulator] No ETHEREUM_WS_RPC_URL set. Cannot start subscription sync.")
+			return
+		}
+		if (this._ws) {
+			console.warn("[Accumulator] Subscription WebSocket already running.")
+			return
+		}
+		console.log(`[Accumulator] Connecting to WS: ${this.ethereumWsRpcUrl}`)
+		this._ws = new WebSocket(this.ethereumWsRpcUrl)
+		this._ws.onopen = () => {
+			console.log("[Accumulator] WebSocket open. Subscribing to newHeads...")
+			const msg = JSON.stringify({
+				jsonrpc: "2.0",
+				id: 1,
+				method: "eth_subscribe",
+				params: ["newHeads"],
+			})
+			this._ws!.send(msg)
+		}
+		let subscriptionId: string | null = null
+		this._ws.onmessage = async (event) => {
+			try {
+				const data = JSON.parse(event.data)
+				if (data.id === 1 && data.result) {
+					subscriptionId = data.result
+					console.log(`[Accumulator] Subscribed to newHeads. Subscription id: ${subscriptionId}`)
+					return
+				}
+				// Handle new block notifications
+				if (data.method === "eth_subscription" && data.params && data.params.subscription === subscriptionId) {
+					const blockHash = data.params.result.hash
+					console.log(`[Accumulator] New block: ${blockHash}. Fetching events...`)
+					// Get latest block number and process new events
+					try {
+						const { meta } = await getAccumulatorData(this.ethereumHttpRpcUrl, this.contractAddress)
+						const latestBlock = meta.previousInsertBlockNumber
+						if (latestBlock > this._lastProcessedBlock) {
+							const newEvents = await getLeafInsertLogs(
+								this.ethereumHttpRpcUrl,
+								this.contractAddress,
+								this._lastProcessedBlock + 1,
+								latestBlock,
+							)
+							for (const event of newEvents) {
+								await this.#processNewLeafEvent(event)
+							}
+							this._lastProcessedBlock = latestBlock
+						}
+					} catch (err) {
+						console.error("[LiveSync] Error during WS event processing:", err)
+					}
+				}
+			} catch (err) {
+				console.error("[Accumulator] Error parsing WS message:", err)
+			}
+		}
+		this._ws.onerror = (err) => {
+			console.error("[Accumulator] WebSocket error:", err)
+		}
+		this._ws.onclose = () => {
+			console.log("[Accumulator] WebSocket closed.")
+			this._ws = undefined
+		}
+	}
+
+	stopLiveSync() {
+		this._liveSyncRunning = false
+		if (this._liveSyncInterval) {
+			clearTimeout(this._liveSyncInterval)
+			this._liveSyncInterval = undefined
+		}
+		if (this._ws) {
+			this._ws.close()
+			this._ws = undefined
+		}
+	}
+
+	/**
+	 * Processes a new leaf event and commits it to the MMR.
+	 */
+	async #processNewLeafEvent(event: NormalizedLeafInsertEvent): Promise<void> {
 		// return if we have already processed this leaf
 		if (event.leafIndex <= this.highestCommittedLeafIndex) return
 
 		// if event.leafIndex > highestCommittedLeafIndex + 1:
 		if (event.leafIndex > this.highestCommittedLeafIndex + 1) {
-			console.log(`[Accumulator] \u{1F4CC} Missing event for leaf indexes ${this.highestCommittedLeafIndex + 1} to ${event.leafIndex - 1}. Getting them now...`)
+			console.log(
+				`[Accumulator] \u{1F4CC} Missing event for leaf indexes ${this.highestCommittedLeafIndex + 1} to ${event.leafIndex - 1}. Getting them now...`,
+			)
 			// Walk back through the previousInsertBlockNumber's to get the missing leaves
 			const pastEvents: NormalizedLeafInsertEvent[] = await walkBackLeafInsertLogsOrThrow(
-				this.ethereumRpcUrl,
+				this.ethereumHttpRpcUrl,
 				this.contractAddress,
 				event.leafIndex - 1,
 				event.previousInsertBlockNumber,
-				this.highestCommittedLeafIndex + 1
+				this.highestCommittedLeafIndex + 1,
 			)
-			for (let i=0; i<pastEvents.length; i++) {
-				await this.processNewLeafEvent(pastEvents[i])
+			for (let i = 0; i < pastEvents.length; i++) {
+				await this.#processNewLeafEvent(pastEvents[i])
 			}
 			console.log(`[Accumulator] \u{1F44D} Got the missing events.`)
 		}
@@ -88,6 +310,22 @@ export class AccumulatorNode {
 
 		// Commit the leaf to the MMR
 		await this.commitLeaf(event.leafIndex, event.newData)
+
+		// TEST/DEBUG: Check to see if our mmr root CID matches the on-chain root CID
+		try {
+			const localRootCid = await this.mmr.rootCIDAsBase32()
+			const onChainRootCid = await getLatestCID(this.ethereumHttpRpcUrl, this.contractAddress)
+			console.log(`[Accumulator DEBUG] Local MMR root CID (base32): ${localRootCid}`)
+			console.log(`[Accumulator DEBUG] On-chain latest root CID: ${onChainRootCid}`)
+			if (localRootCid !== onChainRootCid.toString()) {
+				console.warn("[Accumulator DEBUG] Local and on-chain root CIDs do NOT match!")
+			} else {
+				console.log("[Accumulator DEBUG] Local and on-chain root CIDs match!")
+			}
+		} catch (err) {
+			console.warn("[Accumulator DEBUG] Failed to compare root CIDs:", err)
+		}
+		console.log(`[Accumulator] Processed new leaf with index ${event.leafIndex}`)
 	}
 
 	/**
@@ -221,10 +459,11 @@ export class AccumulatorNode {
 	 * Uses on-chain metadata to determine where to start.
 	 */
 	async syncBackwardsFromLatest(maxBlockRange = 1000): Promise<void> {
-		const { meta, peaks } = await getAccumulatorData(this.ethereumRpcUrl, this.contractAddress)
+		const { meta, peaks } = await getAccumulatorData(this.ethereumHttpRpcUrl, this.contractAddress)
 		const currentLeafIndex = meta.leafCount - 1
 		const currentBlock = meta.previousInsertBlockNumber
 		const minBlock = meta.deployBlockNumber
+		this._lastProcessedBlock = meta.previousInsertBlockNumber
 
 		console.log(
 			`[Accumulator] \u{1F501} Syncing backwards from block ${meta.previousInsertBlockNumber} to block ${meta.deployBlockNumber} (${meta.previousInsertBlockNumber - meta.deployBlockNumber} blocks), grabbing ${maxBlockRange} blocks per RPC call.`,
@@ -237,20 +476,36 @@ export class AccumulatorNode {
 		let oldestRootCid: CID = currentRootCID
 		let oldestProcessedLeafIndex = currentLeafIndex + 1
 		let currentPeaksWithHeights: PeakWithHeight[] = peaks
-		const ipfsChecks: { promise: Promise<boolean>; controller: AbortController; cid: CID }[] = []
+
+		const ipfsChecks: Array<
+			ReturnType<typeof makeTrackedPromise<boolean>> & { controller: AbortController; cid: CID }
+		> = []
+
+		// --- Utility: tracked promise for polling ---
+		function makeTrackedPromise<T>(promise: Promise<T>) {
+			let isFulfilled = false
+			let value: T | undefined
+			const tracked = promise.then((v) => {
+				isFulfilled = true
+				value = v
+				return v
+			})
+			return { promise: tracked, isFulfilled: () => isFulfilled, getValue: () => value }
+		}
 
 		// --- Batch event fetching ---
 		for (let endBlock = currentBlock; endBlock >= minBlock; endBlock -= maxBlockRange) {
 			const startBlock = Math.max(minBlock, endBlock - maxBlockRange + 1)
-			console.log(`[Accumulator] \u{1F4E6} Querying blocks ${startBlock} to ${endBlock} for LeafInsert events...`)
+			console.log(`[Accumulator] \u{1F4E6} Checking blocks ${startBlock} to ${endBlock} for LeafInsert events...`)
 			// Get the LeafInsert event logs
 			const logs: NormalizedLeafInsertEvent[] = await getLeafInsertLogs(
-				this.ethereumRpcUrl,
+				this.ethereumHttpRpcUrl,
 				this.contractAddress,
 				startBlock,
 				endBlock,
 			)
-			console.log(`[Accumulator] \u{1F343} Found ${logs.length} LeafInsert events`)
+
+			if (logs.length > 0) console.log(`[Accumulator] \u{1F343} Found ${logs.length} LeafInsert events`)
 
 			// Process the LeafInsert event logs
 			for (const event of logs.sort((a, b) => b.leafIndex - a.leafIndex)) {
@@ -279,17 +534,16 @@ export class AccumulatorNode {
 
 			// After processing all events in this batch, fire off an IPFS check for the oldestRootCid
 			const controller = new AbortController()
-			const checkPromise = this.getAndResolveCID(oldestRootCid, { signal: controller.signal }).catch((err) => {
-				if (err?.name === "AbortError") return false
-				throw err
-			})
-			ipfsChecks.push({ promise: checkPromise, controller, cid: oldestRootCid })
-
-			// After each batch, race all IPFS checks for first success
-			const successfulIndex = await firstSuccessful(
-				ipfsChecks.map((c, idx) => c.promise.then((success) => (success ? idx : undefined))),
+			const tracked = makeTrackedPromise(
+				this.getAndResolveCID(oldestRootCid, { signal: controller.signal }).catch((err) => {
+					if (err?.name === "AbortError") return false
+					throw err
+				}),
 			)
-			if (typeof successfulIndex === "number") {
+			ipfsChecks.push({ ...tracked, controller, cid: oldestRootCid })
+			// After each batch, poll for any truthy-resolved IPFS check
+			const successfulIndex = ipfsChecks.findIndex((c) => c.isFulfilled() && c.getValue())
+			if (successfulIndex !== -1) {
 				// Abort all outstanding checks
 				ipfsChecks.forEach((c) => c.controller.abort())
 				const foundIpfsCid = ipfsChecks[successfulIndex].cid
@@ -313,7 +567,7 @@ export class AccumulatorNode {
 		// Sanity check to make sure we didn't unexpectedly miss any datda
 		const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
 		if (missing.length !== 0) {
-			console.warn("[Accumulator] ⚠️ Missing newData for leaf indices:", missing.join(", "))
+			throw new Error("[Accumulator] Missing newData for leaf indices: " + missing.join(", "))
 		}
 		console.log("[Accumulator] \u{1F9BE} Fully synced backwards using only event data (no data found on IPFS)")
 		console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
@@ -352,13 +606,6 @@ export class AccumulatorNode {
 		} finally {
 			if (signal && abortListener) signal.removeEventListener("abort", abortListener)
 		}
-	}
-
-	/**
-	 * Listens for new events and keeps the node up-to-date in real time.
-	 */
-	async startLiveSync(): Promise<void> {
-		// TODO: Subscribe to events, update state and pin as new data arrives
 	}
 
 	// --- Helpers ---
@@ -409,6 +656,25 @@ export class AccumulatorNode {
 				return i - 1
 			}
 			i++
+		}
+	}
+	/**
+	 * Gracefully shuts down the AccumulatorNode: stops live sync and closes the DB if possible.
+	 * Safe to call multiple times.
+	 */
+	public async shutdown(): Promise<void> {
+		// Stop live sync (polling or WS)
+		this.stopLiveSync()
+		// Close DB if possible
+		if (this.storage && typeof this.storage === "object" && "db" in this.storage) {
+			const db = (this.storage as any).db
+			if (db && typeof db.close === "function") {
+				try {
+					await db.close()
+				} catch (e) {
+					console.error("[AccumulatorNode] Error closing DB:", e)
+				}
+			}
 		}
 	}
 }

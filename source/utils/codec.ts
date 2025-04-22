@@ -31,11 +31,44 @@ export async function hexStringToCID(bytes32hexString: string): Promise<CID> {
 
 export function CIDTohexString(cid: CID): string {
 	// Only support dag-cbor + sha2-256, CIDv1
-	if (cid.version !== 1) throw new Error("Only CIDv1 supported")
-	if (cid.code !== 0x71) throw new Error("Only dag-cbor supported")
-	if (cid.multihash.code !== 0x12) throw new Error("Only sha2-256 supported")
+	if (cid.version !== 1) {
+		console.error("[CIDTohexString] CID version mismatch:", {
+			cid: cid.toString(),
+			version: cid.version,
+			code: cid.code,
+			multihashCode: cid.multihash.code,
+		})
+		throw new Error("Only CIDv1 supported")
+	}
+	if (cid.code !== 0x71) {
+		console.error("[CIDTohexString] CID codec mismatch:", {
+			cid: cid.toString(),
+			version: cid.version,
+			code: cid.code,
+			multihashCode: cid.multihash.code,
+		})
+		throw new Error("Only dag-cbor supported")
+	}
+	if (cid.multihash.code !== 0x12) {
+		console.error("[CIDTohexString] Multihash code mismatch:", {
+			cid: cid.toString(),
+			version: cid.version,
+			code: cid.code,
+			multihashCode: cid.multihash.code,
+		})
+		throw new Error("Only sha2-256 supported")
+	}
 	const digestBytes = cid.multihash.digest
-	if (digestBytes.length !== 32) throw new Error("Digest must be 32 bytes")
+	if (digestBytes.length !== 32) {
+		console.error("[CIDTohexString] Digest length mismatch:", {
+			cid: cid.toString(),
+			version: cid.version,
+			code: cid.code,
+			multihashCode: cid.multihash.code,
+			digestLength: digestBytes.length,
+		})
+		throw new Error("Digest must be 32 bytes")
+	}
 	return Uint8ArrayToHexString(digestBytes)
 }
 
