@@ -1,6 +1,5 @@
-import * as dagCbor from "@ipld/dag-cbor"
+import * as dagCbor from "../utils/dagCbor.ts"
 import { CID } from "multiformats/cid"
-import { createKuboRPCClient } from "kubo-rpc-client"
 
 export type IpldNode =
 	| Uint8Array
@@ -67,16 +66,5 @@ export async function resolveMerkleTreeOrThrow(
 		return [...L, ...R]
 	} else {
 		throw new Error("Unexpected node structure")
-	}
-}
-
-// Minimal Blockstore adapter for kubo-rpc-client
-export class IPFSBlockstore {
-	ipfs: ReturnType<typeof createKuboRPCClient>
-	constructor(ipfs: ReturnType<typeof createKuboRPCClient>) {
-		this.ipfs = ipfs
-	}
-	async get(cid: CID<unknown, 113, 18, 1>): Promise<Uint8Array> {
-		return await this.ipfs.block.get(cid)
 	}
 }

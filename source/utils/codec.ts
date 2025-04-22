@@ -1,16 +1,29 @@
 // shared/codec.ts
-import * as dagCbor from "@ipld/dag-cbor"
+import { createHash } from "crypto"
+import * as dagCbor from "./dagCbor.ts"
+
 import { CID } from "multiformats/cid"
-import { create as createDigest } from "multiformats/hashes/digest"
-import { sha256 } from "multiformats/hashes/sha2"
-import { fromHex } from "multiformats/bytes"
 
 import { CIDDataPair, LeafRecord, NormalizedLeafInsertEvent } from "../types/types.ts"
 
+interface Digest<Code, Size extends number = number> {
+  code: Code;            // hash function code (e.g., 0x12 for sha2-256)
+  digest: Uint8Array;    // the actual hash digest bytes
+  size: Size;            // length of the digest in bytes
+  bytes: Uint8Array;     // the full multihash bytes (code + length + digest)
+}
+
+function hashToMultiformatsDigest(code: 0x12, hash: Uint8Array): Digest<0x12, 32> {
+  // Multihash format: [code, length, ...digest]
+  const bytes = new Uint8Array([code, hash.length, ...hash]);
+  return { code, digest: hash, size: 32, bytes };
+}
+
 export async function encodeBlock(value: unknown): Promise<{ cid: CID<unknown, 113, 18, 1>; bytes: Uint8Array }> {
 	const encoded = dagCbor.encode(value)
-	const hash = await sha256.digest(encoded)
-	const cid = CID.createV1(dagCbor.code, hash)
+	const hash = new Uint8Array(createHash("sha256").update(encoded).digest());
+	const multihash = hashToMultiformatsDigest(0x12, hash) // 0x12 is the code for sha2-256
+	const cid = CID.createV1(dagCbor.code, multihash)
 	return { cid, bytes: encoded }
 }
 
@@ -22,15 +35,17 @@ export async function encodeLinkNode(
 	// Map(2) { "L": left, "R": right }
 	const node = { L: left, R: right }
 	const encoded = dagCbor.encode(node)
-	const hash = await sha256.digest(encoded)
-	return CID.createV1(dagCbor.code, hash)
+	const hash = new Uint8Array(createHash("sha256").update(encoded).digest());
+	const multihash = hashToMultiformatsDigest(0x12, hash) // 0x12 is the code for sha2-256
+	return CID.createV1(dagCbor.code, multihash)
 }
 
 // Robust CID construction from raw bytes32-hex-string hashes (assume dag-cbor + sha2-256, CIDv1)
 // If your accumulator uses a different codec/hash, update these codes!
 export async function hexStringToCID(bytes32hexString: string): Promise<CID<unknown, 113, 18, 1>> {
-	const digest = await sha256.digest(fromHex(bytes32hexString).slice(0, 32))
-	return CID.create(1, 0x71, digest) // 0x71 = dag-cbor
+	const hash = new Uint8Array(createHash("sha256").update(HexStringToUint8Array(bytes32hexString).slice(0, 32)).digest());
+	const multihash = hashToMultiformatsDigest(0x12, hash) // 0x12 is the code for sha2-256
+	return CID.createV1(0x71, multihash) // 0x71 = dag-cbor
 }
 
 export function CIDTohexString(cid: CID<unknown, 113, 18, 1>): string {
@@ -87,7 +102,7 @@ export async function stringToCIDDataPair(s: string): Promise<CIDDataPair> {
 
 // Convert contract peak hex (digest) to the exact CID form used by mmr.peaks (wrap digest, do not hash)
 export function contractPeakHexToMmrCid(bytes: Uint8Array) {
-	const digest = createDigest(0x12, bytes) // 0x12 = sha2-256
+	const digest = hashToMultiformatsDigest(0x12, bytes) // 0x12 = sha2-256
 	return CID.create(1, 0x71, digest) // 0x71 = dag-cbor
 }
 

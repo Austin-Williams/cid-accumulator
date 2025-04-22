@@ -524,13 +524,13 @@ export class AccumulatorClient {
 				const onChainRootCid = await getLatestCID(this.ethereumHttpRpcUrl, this.contractAddress)
 				if (localRootCid !== onChainRootCid.toString()) {
 					console.warn(
-						`[Accumulator: sanity check] \u{274C} Local (${localRootCid} )and on-chain (${onChainRootCid.toString()}) root CIDs do NOT match!`,
+						`[Accumulator:SanityCheck] \u{274C} Local (${localRootCid} )and on-chain (${onChainRootCid.toString()}) root CIDs do NOT match!`,
 					)
 				} else {
-					console.log("[Accumulator: sanity check] \u{2705} Local and on-chain root CIDs match!")
+					console.log("[Accumulator:SanityCheck] \u{2705} Local and on-chain root CIDs match!")
 				}
 			} catch (err) {
-				console.warn("[Accumulator: sanity check] \u{274C} Failed to compare root CIDs:", err)
+				console.warn("[Accumulator:SanityCheck] \u{274C} Failed to compare root CIDs:", err)
 			}
 		}
 		// =============================== END SANITY CHECK. ===============================

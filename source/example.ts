@@ -1,9 +1,8 @@
 import "dotenv/config"
-import { create as createKuboClient } from "kubo-rpc-client"
 import { Level } from "level"
 
 import { AccumulatorClient } from "./accumulator/AccumulatorClient.ts"
-import { KuboRpcAdapter } from "./adapters/ipfs/KuboRpcAdapter.ts"
+import { FetchIpfsAdapter } from "./adapters/ipfs/FetchIpfsAdapter.ts"
 import { LevelDbAdapter } from "./adapters/storage/LevelDbAdapter.ts"
 import { registerGracefulShutdown } from "./utils/gracefulShutdown.ts"
 
@@ -14,11 +13,10 @@ const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001" // defa
 const LEVEL_PATH = process.env.LEVEL_PATH || "./test.leveldb" // default LevelDB path
 
 async function main() {
-	// Set up Kubo IPFS adapter (see source/adapters/ipfs for other options, or create your own)
-	const kuboClient = createKuboClient(IPFS_API_URL)
-	const ipfs = new KuboRpcAdapter(kuboClient)
+	// Set up fetch-based IPFS adapter (see source/adapters/ipfs for other options, or create your own)
+	const ipfs = new FetchIpfsAdapter(IPFS_API_URL)
 	
-	// Set uo storage adapter (see source/adapters/storage for other options, or create your own)
+	// Set up storage adapter (see source/adapters/storage for other options, or create your own)
 	const db = new Level(LEVEL_PATH)
 	const storage = new LevelDbAdapter(db)
 
