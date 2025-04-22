@@ -141,21 +141,7 @@ dist
 bin/
 soljson-*
 
-# Foundry build artifacts
-out/
-cache/
-lib/
-broadcast/
-
-# Foundry test coverage
-coverage/
-
-# Foundry scripts
-script/
-
-# Pinner state
-.pinner/
-
 
 test.leveldb/
 integration/
+soljson-*
