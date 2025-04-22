@@ -1,5 +1,5 @@
 // shared/codec.ts
-import { createHash } from "crypto"
+import { sha256 } from "./hash.js"
 import * as dagCbor from "./dagCbor.ts"
 import { CID } from "./CID.js"
 
@@ -20,7 +20,7 @@ function hashToMultiformatsDigest(code: 0x12, hash: Uint8Array): Digest<0x12, 32
 
 export async function encodeBlock(value: unknown): Promise<{ cid: CID<unknown, 113, 18, 1>; bytes: Uint8Array }> {
 	const encoded = dagCbor.encode(value)
-	const hash = new Uint8Array(createHash("sha256").update(encoded).digest())
+	const hash = await sha256(encoded)
 	const multihash = hashToMultiformatsDigest(0x12, hash) // 0x12 is the code for sha2-256
 	const cid = CID.createV1(dagCbor.code, multihash)
 	return { cid, bytes: encoded }
@@ -34,7 +34,7 @@ export async function encodeLinkNode(
 	// Map(2) { "L": left, "R": right }
 	const node = { L: left, R: right }
 	const encoded = dagCbor.encode(node)
-	const hash = new Uint8Array(createHash("sha256").update(encoded).digest())
+	const hash = await sha256(encoded)
 	const multihash = hashToMultiformatsDigest(0x12, hash) // 0x12 is the code for sha2-256
 	return CID.createV1(dagCbor.code, multihash)
 }
@@ -42,9 +42,7 @@ export async function encodeLinkNode(
 // Robust CID construction from raw bytes32-hex-string hashes (assume dag-cbor + sha2-256, CIDv1)
 // If your accumulator uses a different codec/hash, update these codes!
 export async function hexStringToCID(bytes32hexString: string): Promise<CID<unknown, 113, 18, 1>> {
-	const hash = new Uint8Array(
-		createHash("sha256").update(HexStringToUint8Array(bytes32hexString).slice(0, 32)).digest(),
-	)
+	const hash = await sha256(HexStringToUint8Array(bytes32hexString).slice(0, 32))
 	const multihash = hashToMultiformatsDigest(0x12, hash) // 0x12 is the code for sha2-256
 	return CID.createV1(0x71, multihash) // 0x71 = dag-cbor
 }

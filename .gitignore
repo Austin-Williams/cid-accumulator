@@ -141,7 +141,14 @@ dist
 bin/
 soljson-*
 
+# Vite and test output
+dist/
+.vite/
 
 test.leveldb/
 integration/
 soljson-*
+
+config.ts
+test.*
+package-lock.json

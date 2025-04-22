@@ -5,6 +5,8 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
 		"test": "vitest",
 		"coverage": "vitest run --coverage",
 		"lint": "eslint --fix source/ integration/ test/",
@@ -14,8 +16,7 @@
 	"license": "MIT",
 	"dependencies": {
 		"@noble/hashes": "^1.7.2",
-		"dotenv": "^16.5.0",
-		"tsx": "^4.19.3"
+		"dotenv": "^16.5.0"
 	},
 	"devDependencies": {
 		"@types/better-sqlite3": "^7.6.13",
@@ -30,6 +31,8 @@
 		"ethers": "^6.13.5",
 		"globals": "^16.0.0",
 		"prettier": "^3.5.3",
+		"tsx": "^4.19.3",
+		"vite": "^6.3.2",
 		"vitest": "^3.1.1"
 	}
 }
