@@ -1,5 +1,6 @@
 import type { CID } from "../utils/CID.ts"
 import type { IpfsAdapter } from "../interfaces/IpfsAdapter.ts"
+import type { AccumulatorClientConfig } from "../types/types.ts"
 import type { StorageAdapter } from "../interfaces/StorageAdapter.ts"
 import type {
 	PeakWithHeight,
@@ -8,6 +9,7 @@ import type {
 	MMRLeafInsertTrail,
 	CIDDataPair,
 } from "../types/types.ts"
+
 
 import { getAccumulatorData, getLeafInsertLogs, getLatestCID } from "../ethereum/commonCalls.ts"
 import { ethRpcFetch } from "../ethereum/ethRpcFetch.ts"
@@ -48,24 +50,15 @@ export class AccumulatorClient {
 	private _lastProcessedBlock: number = 0
 	private _ws?: WebSocket
 
-	constructor({
-		ipfs,
-		storage,
-		ethereumHttpRpcUrl,
-		ethereumWsRpcUrl,
-		contractAddress,
-	}: {
+	constructor(config: AccumulatorClientConfig & {
 		ipfs: IpfsAdapter
 		storage: StorageAdapter
-		ethereumHttpRpcUrl: string
-		ethereumWsRpcUrl?: string
-		contractAddress: string
 	}) {
-		this.ipfs = ipfs
-		this.storage = storage
-		this.ethereumHttpRpcUrl = ethereumHttpRpcUrl
-		this.ethereumWsRpcUrl = ethereumWsRpcUrl
-		this.contractAddress = contractAddress
+		this.ipfs = config.ipfs
+		this.storage = config.storage
+		this.ethereumHttpRpcUrl = config.ETHEREUM_HTTP_RPC_URL
+		this.ethereumWsRpcUrl = config.ETHEREUM_WS_RPC_URL
+		this.contractAddress = config.CONTRACT_ADDRESS
 		this.mmr = new MerkleMountainRange()
 		this.highestCommittedLeafIndex = -1
 	}

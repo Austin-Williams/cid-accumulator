@@ -3,6 +3,10 @@ pragma solidity 0.8.25;
 
 import { DagCborCIDEncoder } from "./libraries/DagCborCIDEncoder.sol";
 
+
+// CUSTOM ERRORS
+error DataBlockTooLargeForIPFS(uint256 actualSize);
+
 /**
  * An on-chain Merkle Mountain Range (MMR) accumulator that allows arbitrary
  * data (bytes) to be appended as leaves (via the _addData function). The
@@ -14,6 +18,7 @@ import { DagCborCIDEncoder } from "./libraries/DagCborCIDEncoder.sol";
  * suitable for applications requiring efficient, verifiable access to
  * historical data.
  */
+
 contract CIDAccumulator {
 	// LIBRARIES
 	using DagCborCIDEncoder for bytes;
@@ -36,6 +41,7 @@ contract CIDAccumulator {
 	uint256 private constant PREVIOUS_INSERT_BLOCKNUM_MASK = 0xFFFFFFFF;	// 32 bits
 	uint256 private constant DEPLOY_BLOCKNUM_OFFSET = 229;
 	uint256 private constant DEPLOY_BLOCKNUM_MASK = (1 << 27) - 1;	// 0x7FFFFFF
+	uint256 private constant MAX_SIZE_IPFS_BLOCK = 1_048_576; // 1 MB
 
 	// STATE VARIABLES
 	bytes32[32] private peaks;  // Fixed-size array for node hashes
@@ -79,6 +85,8 @@ contract CIDAccumulator {
 
 	// INTERNAL FUNCTIONS
 	function _addData(bytes calldata newData) internal {
+		if (newData.length > MAX_SIZE_IPFS_BLOCK) revert DataBlockTooLargeForIPFS(newData.length);
+
 		uint256 bits = mmrMetaBits; // SLOAD
 
 		bytes32 carryHash = DagCborCIDEncoder.encodeRawBytes(newData);
