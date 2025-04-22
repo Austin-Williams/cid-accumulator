@@ -23,7 +23,6 @@ export function getEventTopic(signature: string): string {
 
 /**
  * Parses the ABI-encoded result of a contract call to getLatestCID() -> bytes.
- * This does NOT use ethers/abi, just raw buffer parsing.
  * @param abiResult string (0x-prefixed hex string)
  * @returns Buffer (decoded bytes)
  */

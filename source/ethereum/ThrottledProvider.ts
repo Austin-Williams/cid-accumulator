@@ -1,5 +1,3 @@
-// Note: This class is now generic and does not require ethers.js
-
 export interface ThrottledProviderOptions {
 	minDelayMs?: number // Minimum delay between calls
 	maxRetries?: number // Max number of retries
