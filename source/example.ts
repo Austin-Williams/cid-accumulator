@@ -5,83 +5,49 @@ import { Level } from "level"
 import { AccumulatorNode } from "./accumulator/AccumulatorNode.ts"
 import { KuboRpcAdapter } from "./adapters/ipfs/KuboRpcAdapter.ts"
 import { LevelDbAdapter } from "./adapters/storage/LevelDbAdapter.ts"
-import { getLatestCID } from "./ethereum/commonCalls.ts"
-// import {MemoryAdapter} from "./adapters/storage/MemoryAdapter.ts"
+import { registerGracefulShutdown } from "./utils/gracefulShutdown.ts"
 
-// --- CONFIGURE THESE FOR YOUR ENVIRONMENT ---
-const RPC_URL = process.env.ETHEREUM_HTTP_RPC_URL || "<YOUR_RPC_URL>"
-const CONTRACT_ADDRESS = process.env.TARGET_CONTRACT_ADDRESS || "<YOUR_CONTRACT_ADDRESS>"
+// --- CONFIGURE THESE FOR YOUR ENVIRONMENT (See .env.example) ---
+const ETHEREUM_HTTP_RPC_URL = process.env.ETHEREUM_HTTP_RPC_URL || "http://127.0.0.1:8545"
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS || "<YOUR_CONTRACT_ADDRESS>"
 const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001" // default Kubo daemon
 const LEVEL_PATH = process.env.LEVEL_PATH || "./test.leveldb" // default LevelDB path
 
 async function main() {
-	// Set up Kubo IPFS adapter
+	// Set up Kubo IPFS adapter (see source/adapters/ipfs for other options, or create your own)
 	const kuboClient = createKuboClient(IPFS_API_URL)
 	const ipfs = new KuboRpcAdapter(kuboClient)
+	
+	// Set uo storage adapter (see source/adapters/storage for other options, or create your own)
 	const db = new Level(LEVEL_PATH)
 	const storage = new LevelDbAdapter(db)
-	// const storage = new MemoryAdapter()
 
-	// Instantiate the node with fetch-based contract config
-	const node = new AccumulatorNode({
+	// Instantiate the node
+	const accumulatorNode = new AccumulatorNode({
 		ipfs,
 		storage,
-		ethereumHttpRpcUrl: RPC_URL,
+		ethereumHttpRpcUrl: ETHEREUM_HTTP_RPC_URL,
 		contractAddress: CONTRACT_ADDRESS,
 	})
 
-	await node.init()
+	// Initialize the node (opens the DB and checks Ethereum and IPFS connections)
+	await accumulatorNode.init()
 
-	// Register SIGINT handler for graceful shutdown
-	let shuttingDown = false
-	process.on("SIGINT", async () => {
-		if (shuttingDown) return
-		shuttingDown = true
-		console.log("\n[Accumulator TEST] Caught SIGINT (Ctrl+C). Shutting down gracefully...")
-		try {
-			await node.shutdown()
-			console.log("[Accumulator TEST] Graceful shutdown complete. Exiting.")
-		} catch (err) {
-			console.error("[Accumulator TEST] Error during shutdown:", err)
-		} finally {
-			process.exit(0)
-		}
-	})
+	// Sync backwards from the latest leaf insert
+	// This simultaneously checks IPFS for older root CIDs as they are discovered
+	await accumulatorNode.syncBackwardsFromLatest()
 
-	try {
-		// 1. Sync backwards
-		await node.syncBackwardsFromLatest(1000)
-		console.log("[Accumulator TEST] \u{2705} backwards sync complete!")
+	// Rebuild the Merkle Mountain Range and pin all related data to IPFS
+	await accumulatorNode.rebuildAndProvideMMR()
 
-		// 2. Commit all uncommitted leaves
-		await node.rebuildAndProvideMMR()
-		console.log("[Accumulator TEST] \u{2705} committed all uncommitted leaves!")
-
-		const localRootCid = await node.mmr.rootCIDAsBase32()
-		const onChainRootCid = await getLatestCID(RPC_URL, CONTRACT_ADDRESS)
-		console.log(`[Accumulator TEST] Local MMR root CID (base32): ${localRootCid}`)
-		console.log(`[Accumulator TEST] On-chain latest root CID: ${onChainRootCid}`)
-		if (localRootCid !== onChainRootCid.toString()) throw new Error("Local and on-chain root CIDs do not match!")
-		console.log("[Accumulator TEST] \u{2705} Local and on-chain root CIDs match!")
-		await node.rePinAllDataToIPFS()
-		// Start live sync and keep test running for user-submitted txs
-		console.log("[Accumulator TEST] About to start live sync...")
-		await node.startLiveSync()
-		console.log("[Accumulator TEST] Live sync started. Waiting for transactions...")
-		console.log(
-			"[Accumulator TEST] Live sync running indefinitely. Submit transactions now. Press Ctrl+C to stop the test when finished.",
-		)
-		await new Promise(() => {}) // Keeps process alive until manually killed
-	} catch (e) {
-		console.error("\u{274C} AccumulatorNode test failed:", e)
-		if (e instanceof Error && e.stack) {
-			console.error(e.stack)
-		}
-		process.exit(1)
-	}
+	// Start watching the chain for new LeafInsert events to process
+	await accumulatorNode.startLiveSync()
+	
+	// (OPTIONAL) Register SIGINT handler for graceful shutdown
+	registerGracefulShutdown(accumulatorNode)
 }
 
 await main().catch((e) => {
-	console.error("\u{274C} Test runner error:", e)
+	console.error("\u{274C} Example runner error:", e)
 	process.exit(1)
 })

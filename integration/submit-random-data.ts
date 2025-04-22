@@ -19,7 +19,7 @@ function sleep(ms: number) {
 }
 
 async function main() {
-	let contractAddress = process.env.TARGET_CONTRACT_ADDRESS
+	let contractAddress = process.env.CONTRACT_ADDRESS
 	let providerUrl = process.env.ETHEREUM_HTTP_RPC_URL
 	let mnemonic = process.env.MNEMONIC_FOR_SUBMITTER
 

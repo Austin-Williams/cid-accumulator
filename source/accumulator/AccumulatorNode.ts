@@ -1,6 +1,14 @@
 import type { CID } from "multiformats/cid"
 import type { IpfsAdapter } from "../interfaces/IpfsAdapter.ts"
 import type { StorageAdapter } from "../interfaces/StorageAdapter.ts"
+import type {
+	PeakWithHeight,
+	LeafRecord,
+	NormalizedLeafInsertEvent,
+	MMRLeafInsertTrail,
+	CIDDataPair,
+} from "../types/types.ts"
+
 import { getAccumulatorData, getLeafInsertLogs, getLatestCID } from "../ethereum/commonCalls.ts"
 import { ethRpcFetch } from "../ethereum/ethRpcFetch.ts"
 import { MerkleMountainRange } from "./MerkleMountainRange.ts"
@@ -8,7 +16,6 @@ import { computePreviousRootCIDAndPeaksWithHeights, getRootCIDFromPeaks } from "
 import { walkBackLeafInsertLogsOrThrow } from "../utils/walkBackLogsOrThrow.ts"
 import { resolveMerkleTreeOrThrow } from "../ipfs/ipfs.ts"
 import { NULL_CID } from "../utils/constants.ts"
-
 import {
 	CIDDataPairToString,
 	CIDTohexString,
@@ -22,14 +29,6 @@ import {
 	stringToCIDDataPair,
 	getLeafRecordFromNormalizedLeafInsertEvent,
 } from "../utils/codec.ts"
-
-import type {
-	PeakWithHeight,
-	LeafRecord,
-	NormalizedLeafInsertEvent,
-	MMRLeafInsertTrail,
-	CIDDataPair,
-} from "../types/types.ts"
 
 /**
  * AccumulatorNode: Unified entry point for accumulator logic in any environment.
@@ -71,6 +70,12 @@ export class AccumulatorNode {
 		this.highestCommittedLeafIndex = -1
 	}
 
+	// ================================================
+	// 			SETUP, SYNCHRONIZATION & SHUTDOWN
+	// Handles node setup, connection checks, and
+	// backfilling state from on-chain and IPFS data.
+	// ================================================
+
 	async init() {
 		// Ensure DB is open
 		await this.storage.open()
@@ -96,7 +101,182 @@ export class AccumulatorNode {
 			console.error("[Accumulator] \u{274C} Failed to connect to IPFS node:", e)
 			throw new Error("Failed to connect to IPFS node. See above error.")
 		}
+
+		console.log("[Accumulator] \u{2705} Successfully initialized.")
 	}
+
+	/**
+	 * Syncs backwards from the latest leaf/block, fetching events and storing by leafIndex.
+	 * Uses on-chain metadata to determine where to start.
+	 */
+	async syncBackwardsFromLatest(maxBlockRange = 1000): Promise<void> {
+		const { meta, peaks } = await getAccumulatorData(this.ethereumHttpRpcUrl, this.contractAddress)
+		const currentLeafIndex = meta.leafCount - 1
+		const currentBlock = meta.previousInsertBlockNumber
+		const minBlock = meta.deployBlockNumber
+		this._lastProcessedBlock = meta.previousInsertBlockNumber
+
+		const highestLeafIndexInDB = await this.getHighestContiguousLeafIndexWithData()
+
+		console.log(
+			`[Accumulator] \u{1F501} Syncing backwards from block ${meta.previousInsertBlockNumber} to block ${meta.deployBlockNumber} (${meta.previousInsertBlockNumber - meta.deployBlockNumber} blocks), grabbing ${maxBlockRange} blocks per RPC call.`,
+		)
+		console.log(`[Accumulator] \u{1F50E} Simultaneously checking IPFS for older root CIDs as we discover them.`)
+
+		// Compute the current root CID from the current peaks
+		const currentRootCID = await getRootCIDFromPeaks(peaks.map((p) => p.cid))
+
+		let oldestRootCid: CID<unknown, 113, 18, 1> = currentRootCID
+		let oldestProcessedLeafIndex = currentLeafIndex + 1
+		let currentPeaksWithHeights: PeakWithHeight[] = peaks
+
+		const ipfsChecks: Array<
+			ReturnType<typeof makeTrackedPromise<boolean>> & { controller: AbortController; cid: CID<unknown, 113, 18, 1> }
+		> = []
+
+		// --- Utility: tracked promise for polling ---
+		function makeTrackedPromise<T>(promise: Promise<T>) {
+			let isFulfilled = false
+			let value: T | undefined
+			const tracked = promise.then((v) => {
+				isFulfilled = true
+				value = v
+				return v
+			})
+			return { promise: tracked, isFulfilled: () => isFulfilled, getValue: () => value }
+		}
+
+		// --- Batch event fetching ---
+		for (let endBlock = currentBlock; endBlock >= minBlock; endBlock -= maxBlockRange) {
+			const startBlock = Math.max(minBlock, endBlock - maxBlockRange + 1)
+			console.log(`[Accumulator] \u{1F4E6} Checking blocks ${startBlock} to ${endBlock} for LeafInsert events...`)
+			// Get the LeafInsert event logs
+			const logs: NormalizedLeafInsertEvent[] = await getLeafInsertLogs(
+				this.ethereumHttpRpcUrl,
+				this.contractAddress,
+				startBlock,
+				endBlock,
+			)
+
+			if (logs.length > 0) console.log(`[Accumulator] \u{1F343} Found ${logs.length} LeafInsert events`)
+
+			// Process the LeafInsert event logs
+			for (const event of logs.sort((a, b) => b.leafIndex - a.leafIndex)) {
+				if (event.leafIndex !== --oldestProcessedLeafIndex)
+					throw new Error(
+						`[Accumulator] Expected leafIndex ${oldestProcessedLeafIndex} but got leafIndex ${event.leafIndex}`,
+					)
+				// Compute previous root CID and peaks
+				const { previousRootCID, previousPeaksWithHeights } = await computePreviousRootCIDAndPeaksWithHeights(
+					currentPeaksWithHeights,
+					event.newData,
+					event.leftInputs,
+				)
+				// Store the relevat data in the DB
+				await this.#putLeafRecordInDB(event.leafIndex, {
+					newData: event.newData,
+					event,
+					blockNumber: event.blockNumber,
+					rootCid: previousRootCID,
+					peaksWithHeights: previousPeaksWithHeights,
+				})
+				// Update for next iteration
+				currentPeaksWithHeights = previousPeaksWithHeights
+				oldestRootCid = previousRootCID
+			}
+
+			// After processing all events in this batch, fire off an IPFS check for the oldestRootCid
+			const controller = new AbortController()
+			const tracked = makeTrackedPromise(
+				this.getAndResolveCID(oldestRootCid, { signal: controller.signal }).catch((err) => {
+					if (err?.name === "AbortError") return false
+					throw err
+				}),
+			)
+			ipfsChecks.push({ ...tracked, controller, cid: oldestRootCid })
+			// After each batch, poll for any truthy-resolved IPFS check
+			const successfulIndex = ipfsChecks.findIndex((c) => c.isFulfilled() && c.getValue())
+			if (successfulIndex !== -1) {
+				// Abort all outstanding checks
+				ipfsChecks.forEach((c) => c.controller.abort())
+				const foundIpfsCid = ipfsChecks[successfulIndex].cid
+				// Sanity check to make sure we didn't unexpectedly miss any datda
+				const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
+				if (missing.length !== 0)
+					throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
+				console.log(
+					`[Accumulator] \u{1F4E5} Downloaded all data for root CID ${foundIpfsCid?.toString() ?? "undefined"} from IPFS.`,
+				)
+				console.log(`[Accumulator] \u{1F64C} Successfully resolved all remaining data from IPFS!`)
+				console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
+				return
+			}
+			// We can also stop syncing backwards if we get back to a leaf that we laready have
+			if (oldestProcessedLeafIndex <= highestLeafIndexInDB) break
+		}
+		// If we get here, we've fully synced backwards using only event data (no data found on IPFS)
+		// Abort all outstanding IPFS checks
+		ipfsChecks.forEach((c) => c.controller.abort())
+		// Wait for all outstanding IPFS check promises to settle (resolve or reject)
+		await Promise.allSettled(ipfsChecks.map((c) => c.promise))
+		// Sanity check to make sure we didn't unexpectedly miss any datda
+		const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
+		if (missing.length !== 0) {
+			throw new Error("[Accumulator] Missing newData for leaf indices: " + missing.join(", "))
+		}
+		console.log(
+			"[Accumulator] \u{1F9BE} Fully synced backwards using only event data and local DB data (no data used from IPFS)",
+		)
+		console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
+	}
+
+	/**
+	 * Rebuilds the Merkle Mountain Range (MMR) by committing all uncommitted leaves and pinning the full trail to IPFS.
+	 *
+	 * This function iterates through all uncommitted leaves and commits them one by one.
+	 * For each leaf, it adds the leaf to the MMR, stores the trail in the DB, and pins the full trail to IPFS.
+	 *
+	 * @returns A Promise that resolves when the MMR has been rebuilt from all uncommitted leaves.
+	 */
+	async rebuildAndProvideMMR(): Promise<void> {
+		console.log(
+			`[Accumulator] \u{1F4DC} Rebuilding the Merkle Mountain Range from synced leaves and pinning to IPFS...`,
+		)
+		const fromIndex: number = this.highestCommittedLeafIndex + 1
+		const toIndex: number = await this.getHighestContiguousLeafIndexWithData()
+		if (fromIndex > toIndex)
+			throw new Error(
+				`[Accumulator] Expected to commit leaves from ${fromIndex} to ${toIndex}, but found no newData for leaf ${fromIndex}`,
+			)
+		if (fromIndex === toIndex) return // All leaves already committed
+		for (let i = fromIndex; i <= toIndex; i++) {
+			const record = await this.getLeafRecord(i)
+			if (!record || !record.newData) throw new Error(`[Accumulator] Expected newData for leaf ${i}`)
+			if (!(record.newData instanceof Uint8Array))
+				throw new Error(`[Accumulator] newData for leaf ${i} is not a Uint8Array`)
+			await this.#commitLeaf(i, record.newData)
+		}
+		console.log(`[Accumulator] \u{2705} Fully rebuilt the Merkle Mountain Range up to leaf index ${toIndex}`)
+	}
+
+	/**
+	 * Gracefully shuts down the AccumulatorNode: stops live sync and closes the DB if possible.
+	 * Safe to call multiple times.
+	 */
+	public async shutdown(): Promise<void> {
+		console.log("[Accumulator] 👋 Shutting down gracefully.")
+		// Stop live sync (polling or WS)
+		this.stopLiveSync()
+		// Close DB if possible
+		await this.storage.close()
+		console.log("[Accumulator] 🏁 Done.")
+	}
+
+	// ================================================
+	// 				REAL-TIME EVENT MONITORING
+	// Logic for watching the blockchain for new events
+	// and keeping the accumulator node up-to-date.
+	// ================================================
 
 	/**
 	 * Listens for new events and keeps the node up-to-date in real time.
@@ -121,6 +301,19 @@ export class AccumulatorNode {
 			this.#startSubscriptionSync()
 		} else {
 			this.#startPollingSync(pollIntervalMs)
+		}
+	}
+
+// Stops live synchronization and cleans up resources.
+	stopLiveSync() {
+		this._liveSyncRunning = false
+		if (this._liveSyncInterval) {
+			clearTimeout(this._liveSyncInterval)
+			this._liveSyncInterval = undefined
+		}
+		if (this._ws) {
+			this._ws.close()
+			this._ws = undefined
 		}
 	}
 
@@ -292,21 +485,7 @@ export class AccumulatorNode {
 		}
 	}
 
-	stopLiveSync() {
-		this._liveSyncRunning = false
-		if (this._liveSyncInterval) {
-			clearTimeout(this._liveSyncInterval)
-			this._liveSyncInterval = undefined
-		}
-		if (this._ws) {
-			this._ws.close()
-			this._ws = undefined
-		}
-	}
-
-	/**
-	 * Processes a new leaf event and commits it to the MMR.
-	 */
+	// Processes a new leaf event and commits it to the MMR.
 	async #processNewLeafEvent(event: NormalizedLeafInsertEvent): Promise<void> {
 		// return if we have already processed this leaf
 		if (event.leafIndex <= this.highestCommittedLeafIndex) return
@@ -334,7 +513,7 @@ export class AccumulatorNode {
 		await this.#putLeafRecordInDB(event.leafIndex, getLeafRecordFromNormalizedLeafInsertEvent(event))
 
 		// Commit the leaf to the MMR
-		await this.commitLeaf(event.leafIndex, event.newData)
+		await this.#commitLeaf(event.leafIndex, event.newData)
 
 		// === THE FOLLOWING CODE BLOCK CAN BE REMOVED. IT IS JUST A SANITY CHECK. ===
 		const { meta } = await getAccumulatorData(this.ethereumHttpRpcUrl, this.contractAddress)
@@ -344,7 +523,9 @@ export class AccumulatorNode {
 				const localRootCid = await this.mmr.rootCIDAsBase32()
 				const onChainRootCid = await getLatestCID(this.ethereumHttpRpcUrl, this.contractAddress)
 				if (localRootCid !== onChainRootCid.toString()) {
-					console.warn(`[Accumulator: sanity check] \u{274C} Local (${localRootCid} )and on-chain (${onChainRootCid.toString()}) root CIDs do NOT match!`)
+					console.warn(
+						`[Accumulator: sanity check] \u{274C} Local (${localRootCid} )and on-chain (${onChainRootCid.toString()}) root CIDs do NOT match!`,
+					)
 				} else {
 					console.log("[Accumulator: sanity check] \u{2705} Local and on-chain root CIDs match!")
 				}
@@ -357,46 +538,12 @@ export class AccumulatorNode {
 		console.log(`[Accumulator] \u{1F343} Processed new leaf with index ${event.leafIndex}`)
 	}
 
-	/**
-	 * Rebuilds the Merkle Mountain Range (MMR) by committing all uncommitted leaves and pinning the full trail to IPFS.
-	 *
-	 * This function iterates through all uncommitted leaves and commits them one by one.
-	 * For each leaf, it adds the leaf to the MMR, stores the trail in the DB, and pins the full trail to IPFS.
-	 *
-	 * @returns A Promise that resolves when the MMR has been rebuilt from all uncommitted leaves.
-	 */
-	async rebuildAndProvideMMR(): Promise<void> {
-		console.log(
-			`[Accumulator] \u{1F4DC} Rebuilding the Merkle Mountain Range from synced leaves and pinning to IPFS...`,
-		)
-		const fromIndex: number = this.highestCommittedLeafIndex + 1
-		const toIndex: number = await this.getHighestContiguousLeafIndexWithData()
-		if (fromIndex > toIndex)
-			throw new Error(
-				`[Accumulator] Expected to commit leaves from ${fromIndex} to ${toIndex}, but found no newData for leaf ${fromIndex}`,
-			)
-		if (fromIndex === toIndex) return // All leaves already committed
-		for (let i = fromIndex; i <= toIndex; i++) {
-			const record = await this.getLeafRecord(i)
-			if (!record || !record.newData) throw new Error(`[Accumulator] Expected newData for leaf ${i}`)
-			if (!(record.newData instanceof Uint8Array))
-				throw new Error(`[Accumulator] newData for leaf ${i} is not a Uint8Array`)
-			await this.commitLeaf(i, record.newData)
-		}
-		console.log(`[Accumulator] \u{2705} Fully rebuilt the Merkle Mountain Range up to leaf index ${toIndex}`)
-	}
-
-	/**
-	 * Adds a leaf to the MMR, stores the trail in the DB, and pins the full trail to IPFS.
-	 *
-	 * @param leafIndex - The index of the leaf to add.
-	 * @param newData - The new data for the leaf.
-	 */
-	async commitLeaf(leafIndex: number, newData: Uint8Array): Promise<void> {
+	// Adds a leaf to the MMR, stores the trail in the DB, and pins the full trail to IPFS.
+	async #commitLeaf(leafIndex: number, newData: Uint8Array): Promise<void> {
 		// Add leaf to MMR
 		const trail = await this.mmr.addLeafWithTrail(leafIndex, newData)
 		// Store trail in local DB (efficient append-only)
-		await this.appendTrailToDB(trail)
+		await this.#appendTrailToDB(trail)
 		// Pin and provide trail to IPFS
 		for (const { cid, data } of trail) {
 			await this.#putPinProvideToIPFS(cid, data)
@@ -404,11 +551,53 @@ export class AccumulatorNode {
 		this.highestCommittedLeafIndex++
 	}
 
+	// ====================================================
+	//        				IPFS OPERATIONS
+	// Utilities for interacting with IPFS: putting,
+	// pinning, providing and retreiving CIDs and blocks.
+	// ====================================================
+
 	/**
-	 * Re-pins all data to IPFS.
+	 * Recursively attempts to resolve the entire DAG from a given root CID using the IPFS adapter.
+	 * If it succeeds, adds all the leaf data to the database.
+	 * Can optionally reject on abort signal to allow for cancellation.
 	 *
-	 * This function iterates through all trail pairs and re-pins each CID to IPFS.
-	 * It provides a progress update every 100 CIDs.
+	 * @param cid - The root CID to resolve.
+	 * @returns true if all leaf data are available, false otherwise.
+	 */
+	async getAndResolveCID(cid: CID<unknown, 113, 18, 1>, opts?: { signal?: AbortSignal }): Promise<boolean> {
+		const signal = opts?.signal
+		// Only throw if already aborted at entry
+		if (signal?.aborted) throw new DOMException("Aborted", "AbortError")
+		let abortListener: (() => void) | undefined
+		let abortPromise: Promise<never> | undefined
+		if (signal) {
+			abortPromise = new Promise((_, reject) => {
+				abortListener = () => reject(new DOMException("Aborted", "AbortError"))
+				signal.addEventListener("abort", abortListener)
+			})
+		}
+		try {
+			const leavesPromise = resolveMerkleTreeOrThrow(cid, this.ipfs)
+			const leaves = await (abortPromise ? Promise.race([leavesPromise, abortPromise]) : leavesPromise)
+			for (let i = 0; i < leaves.length; i++)
+				await this.#putLeafRecordInDB(i, { newData: leaves[i], __type: "LeafRecord" })
+			return true
+		} catch {
+			// Always return false on any error (including AbortError)
+			return false
+		} finally {
+			if (signal && abortListener) signal.removeEventListener("abort", abortListener)
+		}
+	}
+
+	/**
+	 * Re-pins all CIDs and related data to IPFS.
+	 * Data is automatically pinned during rebuildAndProvideMMR and processNewLeafEvent,
+	 * so this function does not need to be called during normal use.
+	 * This is just a helper in case your IPFS node has lost data and you want to make sure it is
+	 * pinning all the data you have synced.
+	 * @returns A Promise that resolves when all data has been pinned to IPFS.
 	 */
 	async rePinAllDataToIPFS(): Promise<void> {
 		const toIndex = Number((await this.storage.get("dag:trail:maxIndex")) ?? -1)
@@ -436,7 +625,7 @@ export class AccumulatorNode {
 		console.log(`[Accumulator] \u{2705} Pinned ${count} CIDs to IPFS (${failed} failures). Done!`)
 	}
 
-	// Centralized helper for robust IPFS put/pin/provide with logging
+	// Helper for robust IPFS put/pin/provide with logging
 	async #putPinProvideToIPFS(cid: CID, data: Uint8Array): Promise<boolean> {
 		try {
 			await this.ipfs.put(cid, data)
@@ -457,7 +646,13 @@ export class AccumulatorNode {
 		return true
 	}
 
-	//Store a leaf record in the DB by leafIndex, splitting fields into separate keys.
+	// ====================================================
+	//        DATABASE OPERATIONS & DATA MANAGEMENT
+	// Functions for storing, retrieving, and managing
+	// accumulator data in the configured storage backend.
+	// ====================================================
+
+	// Store a leaf record in the DB by leafIndex, splitting fields into separate keys.
 	async #putLeafRecordInDB(leafIndex: number, value: LeafRecord): Promise<void> {
 		// Store newData
 		await this.storage.put(`leaf:${leafIndex}:newData`, Uint8ArrayToHexString(value.newData))
@@ -471,7 +666,7 @@ export class AccumulatorNode {
 			await this.storage.put(`leaf:${leafIndex}:peaksWithHeights`, PeakWithHeightArrayToString(value.peaksWithHeights))
 	}
 
-	/** Retrieve a leaf record by leafIndex, reconstructing from individual fields. Throws if types are not correct. */
+	// Retrieve a leaf record by leafIndex, reconstructing from individual fields. Throws if types are not correct. */
 	async getLeafRecord(leafIndex: number): Promise<LeafRecord | undefined> {
 		const newDataStr = await this.storage.get(`leaf:${leafIndex}:newData`)
 		if (!newDataStr) return undefined
@@ -510,173 +705,11 @@ export class AccumulatorNode {
 	}
 
 	/**
-	 * Syncs backwards from the latest leaf/block, fetching events and storing by leafIndex.
-	 * Uses on-chain metadata to determine where to start.
-	 */
-	async syncBackwardsFromLatest(maxBlockRange = 1000): Promise<void> {
-		const { meta, peaks } = await getAccumulatorData(this.ethereumHttpRpcUrl, this.contractAddress)
-		const currentLeafIndex = meta.leafCount - 1
-		const currentBlock = meta.previousInsertBlockNumber
-		const minBlock = meta.deployBlockNumber
-		this._lastProcessedBlock = meta.previousInsertBlockNumber
-
-		const highestLeafIndexInDB = await this.getHighestContiguousLeafIndexWithData()
-
-		console.log(
-			`[Accumulator] \u{1F501} Syncing backwards from block ${meta.previousInsertBlockNumber} to block ${meta.deployBlockNumber} (${meta.previousInsertBlockNumber - meta.deployBlockNumber} blocks), grabbing ${maxBlockRange} blocks per RPC call.`,
-		)
-		console.log(`[Accumulator] \u{1F50E} Simultaneously checking IPFS for older root CIDs as we discover them.`)
-
-		// Compute the current root CID from the current peaks
-		const currentRootCID = await getRootCIDFromPeaks(peaks.map((p) => p.cid))
-
-		let oldestRootCid: CID<unknown, 113, 18, 1> = currentRootCID
-		let oldestProcessedLeafIndex = currentLeafIndex + 1
-		let currentPeaksWithHeights: PeakWithHeight[] = peaks
-
-		const ipfsChecks: Array<
-			ReturnType<typeof makeTrackedPromise<boolean>> & { controller: AbortController; cid: CID<unknown, 113, 18, 1> }
-		> = []
-
-		// --- Utility: tracked promise for polling ---
-		function makeTrackedPromise<T>(promise: Promise<T>) {
-			let isFulfilled = false
-			let value: T | undefined
-			const tracked = promise.then((v) => {
-				isFulfilled = true
-				value = v
-				return v
-			})
-			return { promise: tracked, isFulfilled: () => isFulfilled, getValue: () => value }
-		}
-
-		// --- Batch event fetching ---
-		for (let endBlock = currentBlock; endBlock >= minBlock; endBlock -= maxBlockRange) {
-			const startBlock = Math.max(minBlock, endBlock - maxBlockRange + 1)
-			console.log(`[Accumulator] \u{1F4E6} Checking blocks ${startBlock} to ${endBlock} for LeafInsert events...`)
-			// Get the LeafInsert event logs
-			const logs: NormalizedLeafInsertEvent[] = await getLeafInsertLogs(
-				this.ethereumHttpRpcUrl,
-				this.contractAddress,
-				startBlock,
-				endBlock,
-			)
-
-			if (logs.length > 0) console.log(`[Accumulator] \u{1F343} Found ${logs.length} LeafInsert events`)
-
-			// Process the LeafInsert event logs
-			for (const event of logs.sort((a, b) => b.leafIndex - a.leafIndex)) {
-				if (event.leafIndex !== --oldestProcessedLeafIndex)
-					throw new Error(
-						`[Accumulator] Expected leafIndex ${oldestProcessedLeafIndex} but got leafIndex ${event.leafIndex}`,
-					)
-				// Compute previous root CID and peaks
-				const { previousRootCID, previousPeaksWithHeights } = await computePreviousRootCIDAndPeaksWithHeights(
-					currentPeaksWithHeights,
-					event.newData,
-					event.leftInputs,
-				)
-				// Store the relevat data in the DB
-				await this.#putLeafRecordInDB(event.leafIndex, {
-					newData: event.newData,
-					event,
-					blockNumber: event.blockNumber,
-					rootCid: previousRootCID,
-					peaksWithHeights: previousPeaksWithHeights,
-				})
-				// Update for next iteration
-				currentPeaksWithHeights = previousPeaksWithHeights
-				oldestRootCid = previousRootCID
-			}
-
-			// After processing all events in this batch, fire off an IPFS check for the oldestRootCid
-			const controller = new AbortController()
-			const tracked = makeTrackedPromise(
-				this.getAndResolveCID(oldestRootCid, { signal: controller.signal }).catch((err) => {
-					if (err?.name === "AbortError") return false
-					throw err
-				}),
-			)
-			ipfsChecks.push({ ...tracked, controller, cid: oldestRootCid })
-			// After each batch, poll for any truthy-resolved IPFS check
-			const successfulIndex = ipfsChecks.findIndex((c) => c.isFulfilled() && c.getValue())
-			if (successfulIndex !== -1) {
-				// Abort all outstanding checks
-				ipfsChecks.forEach((c) => c.controller.abort())
-				const foundIpfsCid = ipfsChecks[successfulIndex].cid
-				// Sanity check to make sure we didn't unexpectedly miss any datda
-				const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
-				if (missing.length !== 0)
-					throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
-				console.log(
-					`[Accumulator] \u{1F4E5} Downloaded all data for root CID ${foundIpfsCid?.toString() ?? "undefined"} from IPFS.`,
-				)
-				console.log(`[Accumulator] \u{1F64C} Successfully resolved all remaining data from IPFS!`)
-				console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
-				return
-			}
-			// We can also stop syncing backwards if we get back to a leaf that we laready have
-			if (oldestProcessedLeafIndex <= highestLeafIndexInDB) break
-		}
-		// If we get here, we've fully synced backwards using only event data (no data found on IPFS)
-		// Abort all outstanding IPFS checks
-		ipfsChecks.forEach((c) => c.controller.abort())
-		// Wait for all outstanding IPFS check promises to settle (resolve or reject)
-		await Promise.allSettled(ipfsChecks.map((c) => c.promise))
-		// Sanity check to make sure we didn't unexpectedly miss any datda
-		const missing = await this.getLeafIndexesWithMissingNewData(currentLeafIndex)
-		if (missing.length !== 0) {
-			throw new Error("[Accumulator] Missing newData for leaf indices: " + missing.join(", "))
-		}
-		console.log(
-			"[Accumulator] \u{1F9BE} Fully synced backwards using only event data and local DB data (no data used from IPFS)",
-		)
-		console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
-	}
-
-	/**
-	 * Recursively attempts to resolve the entire DAG from a given root CID using the IPFS adapter.
-	 * If it succeeds, adds all the leaf data to the database.
-	 * Can optionally reject on abort signal to allow for cancellation.
-	 *
-	 * @param cid - The root CID to resolve.
-	 * @returns true if all leaf data are available, false otherwise.
-	 */
-	// Accept an optional AbortSignal and respect it
-	async getAndResolveCID(cid: CID<unknown, 113, 18, 1>, opts?: { signal?: AbortSignal }): Promise<boolean> {
-		const signal = opts?.signal
-		// Only throw if already aborted at entry
-		if (signal?.aborted) throw new DOMException("Aborted", "AbortError")
-		let abortListener: (() => void) | undefined
-		let abortPromise: Promise<never> | undefined
-		if (signal) {
-			abortPromise = new Promise((_, reject) => {
-				abortListener = () => reject(new DOMException("Aborted", "AbortError"))
-				signal.addEventListener("abort", abortListener)
-			})
-		}
-		try {
-			const leavesPromise = resolveMerkleTreeOrThrow(cid, this.ipfs)
-			const leaves = await (abortPromise ? Promise.race([leavesPromise, abortPromise]) : leavesPromise)
-			for (let i = 0; i < leaves.length; i++)
-				await this.#putLeafRecordInDB(i, { newData: leaves[i], __type: "LeafRecord" })
-			return true
-		} catch {
-			// Always return false on any error (including AbortError)
-			return false
-		} finally {
-			if (signal && abortListener) signal.removeEventListener("abort", abortListener)
-		}
-	}
-
-	// --- Helpers ---
-
-	/**
 	 * Appends all trail pairs to the DB in an efficient, sequential manner.
 	 * Each pair is stored as dag:trail:<index>. The max index is tracked by dag:trail:maxIndex.
 	 * Does not store a CID/Data pair if it is already in the DB
 	 */
-	async appendTrailToDB(trail: MMRLeafInsertTrail): Promise<void> {
+	async #appendTrailToDB(trail: MMRLeafInsertTrail): Promise<void> {
 		let maxIndex = Number((await this.storage.get("dag:trail:maxIndex")) ?? -1)
 		for (const pair of trail) {
 			const cidStr = pair.cid.toString()
@@ -697,18 +730,14 @@ export class AccumulatorNode {
 		return null
 	}
 
-	/**
-	 * Async generator to efficiently iterate over all stored trail pairs.
-	 */
+	// Async generator to efficiently iterate over all stored trail pairs.
 	async *iterateTrailPairs(): AsyncGenerator<CIDDataPair> {
 		for await (const { value } of this.storage.iterate("dag:trail:index:")) {
 			if (value && typeof value === "string") yield stringToCIDDataPair(value)
 		}
 	}
 
-	/**
-	 * Finds the highest contiguous leaf index N such that all leaf records 0...N have newData.
-	 */
+	// Finds the highest contiguous leaf index N such that all leaf records 0...N have newData.
 	async getHighestContiguousLeafIndexWithData(): Promise<number> {
 		let i = 0
 		while (true) {
@@ -719,25 +748,4 @@ export class AccumulatorNode {
 			i++
 		}
 	}
-	/**
-	 * Gracefully shuts down the AccumulatorNode: stops live sync and closes the DB if possible.
-	 * Safe to call multiple times.
-	 */
-	public async shutdown(): Promise<void> {
-		console.log("[Accumulator] 👋 Shutting down gracefully.]")
-		// Stop live sync (polling or WS)
-		this.stopLiveSync()
-		// Close DB if possible
-		await this.storage.close()
-		console.log("[Accumulator] 🏁 Done.")
-	}
-}
-
-//Helper to extract error messages from various error types.
-//Returns a string representation of the error message.
-function extractErrorMessage(err: unknown): string {
-	if (typeof err === "object" && err !== null && "message" in err && typeof (err as any).message === "string") {
-		return (err as any).message
-	}
-	return String(err)
 }
