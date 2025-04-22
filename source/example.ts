@@ -23,7 +23,7 @@ async function main() {
 	const storage = new LevelDbAdapter(db)
 
 	// Instantiate the node
-	const AccumulatorClient = new AccumulatorClient({
+	const accumulatorClient = new AccumulatorClient({
 		ipfs,
 		storage,
 		ethereumHttpRpcUrl: ETHEREUM_HTTP_RPC_URL,
@@ -31,20 +31,21 @@ async function main() {
 	})
 
 	// Initialize the node (opens the DB and checks Ethereum and IPFS connections)
-	await AccumulatorClient.init()
+	await accumulatorClient.init()
+
+	// (OPTIONAL) Register SIGINT handler for graceful shutdown
+	registerGracefulShutdown(accumulatorClient)
 
 	// Sync backwards from the latest leaf insert
 	// This simultaneously checks IPFS for older root CIDs as they are discovered
-	await AccumulatorClient.syncBackwardsFromLatest()
+	await accumulatorClient.syncBackwardsFromLatest()
 
 	// Rebuild the Merkle Mountain Range and pin all related data to IPFS
-	await AccumulatorClient.rebuildAndProvideMMR()
+	await accumulatorClient.rebuildAndProvideMMR()
 
 	// Start watching the chain for new LeafInsert events to process
-	await AccumulatorClient.startLiveSync()
-	
-	// (OPTIONAL) Register SIGINT handler for graceful shutdown
-	registerGracefulShutdown(AccumulatorClient)
+	await accumulatorClient.startLiveSync()
+
 }
 
 await main().catch((e) => {

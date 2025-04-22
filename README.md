@@ -45,31 +45,36 @@ A nice feature of this CID-walkback is that, once you find an older CID that is 
 
 (In the worst case, if you never find any of the CIDs on IPFS, you'll eventually walk all the way back to the contract deployent block. If that happens you'll have fully synced using event data alone -- with no help from IPFS.)
 
-This can all be handled by a light-weight `AccumulatorClient`
+This is all handled by a light-weight `AccumulatorClient` class.
 
 See `source/example.ts` for an example.
 
 ```typescript
-// Instantiate the node
-	const AccumulatorClient = new AccumulatorClient(...)
-	// Initialize the node
-	await AccumulatorClient.init()
+...
+
+	// Instantiate the client
+	const accumulatorClient = new AccumulatorClient(...)
+	
+	// Initialize the client
+	await accumulatorClient.init()
 
 	// Sync backwards from the latest leaf insert
-	// This simultaneously checks IPFS for older root CIDs as they are discovered
-	await AccumulatorClient.syncBackwardsFromLatest()
+	// This checks IPFS for older root CIDs as you go
+	await accumulatorClient.syncBackwardsFromLatest()
 
-	// Rebuild the Merkle Mountain Range and pin all related data to IPFS
-	await AccumulatorClient.rebuildAndProvideMMR()
+	// Once you're synced, rebuild the Merkle Mountain Range and pin all related data to IPFS
+	await accumulatorClient.rebuildAndProvideMMR()
 
-	// Start watching the chain for new LeafInsert events to process
-	await AccumulatorClient.startLiveSync()
+	// Start watching the chain for new LeafInsert events
+	await accumulatorClient.startLiveSync()
+
+	...
 
 ```
 
-> 🚧 In-browser version is in progess
+> 🚧 Brower-compatible version is in progess
 
-
+> 🚧 Mainnet example anyone can submit data to for testing coming soon (maybe).
 
 ### ⛽ Gas Costs
 
@@ -113,7 +118,3 @@ For example, if you insert `2^20` entries (just over 1 million), here’s how of
 > \u{2705} Even after a million inserts, over **87%** of them will require **2 or fewer merges**, keeping gas costs low and consistent.
 
 So the gas cost is determined only by that insert’s merge activity — **not** by the total size of the data set.
-
-## Off-chain services
-
-> 🚧 In Progess
