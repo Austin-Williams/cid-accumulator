@@ -1,4 +1,3 @@
-// import { CID } from "multiformats/cid"
 import { CID } from "../utils/CID.js"
 import { encodeBlock } from "../utils/codec.ts"
 import { MMRLeafInsertTrail } from "../types/types.ts"

@@ -1,4 +1,3 @@
-// import { CID } from "multiformats/cid"
 import { CID } from "../../utils/CID.js"
 import type { IpfsAdapter } from "../../interfaces/IpfsAdapter.ts"
 
@@ -41,12 +40,13 @@ export class FetchIpfsAdapter implements IpfsAdapter {
 	}
 
 	/**
-	 * Pin a CID (optional, since block/put can pin).
+	 * No-op. Explicit pinning is not supported here because:
+	 * - When data is available, block/put with pin=true is used.
+	 * - pin/add is unreliable if the block is not already present locally.
+	 * If you need to guarantee pinning, ensure you use put() with pin=true and provide the data.
 	 */
-	async pin(cid: CID<unknown, 113, 18, 1>): Promise<void> {
-		const url = `${this.apiUrl}/api/v0/pin/add?arg=${cid.toString()}`
-		const res = await fetch(url, { method: "POST" })
-		if (!res.ok) throw new Error(`IPFS pin/add failed: ${res.status} ${res.statusText}`)
+	async pin(_cid: CID<unknown, 113, 18, 1>): Promise<void> {
+		// No-op: see comment above.
 	}
 
 	/**

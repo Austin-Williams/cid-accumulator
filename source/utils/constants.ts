@@ -1,4 +1,3 @@
-// import { CID } from "multiformats/cid"
 import { CID } from "../utils/CID.js"
 
 export const MINIMAL_ACCUMULATOR_ABI = [

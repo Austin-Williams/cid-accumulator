@@ -1,4 +1,4 @@
-import type { CID } from "multiformats/cid"
+import type { CID } from "../utils/CID.ts"
 import type { IpfsAdapter } from "../interfaces/IpfsAdapter.ts"
 import type { StorageAdapter } from "../interfaces/StorageAdapter.ts"
 import type {
@@ -79,6 +79,10 @@ export class AccumulatorClient {
 	async init() {
 		// Ensure DB is open
 		await this.storage.open()
+
+		// Log how many leafs we have in the DB
+		const highestLeafIndexInDB = await this.getHighestContiguousLeafIndexWithData()
+		console.log(`[Accumulator] \u{1F4E4} Found ${highestLeafIndexInDB + 1} leafs in DB`)
 
 		// Check if Ethereum connection is working
 		console.log("[Accumulator] \u{1F440} Checking Ethereum connection...")
@@ -209,6 +213,7 @@ export class AccumulatorClient {
 				)
 				console.log(`[Accumulator] \u{1F64C} Successfully resolved all remaining data from IPFS!`)
 				console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
+				await this.storage.persist()
 				return
 			}
 			// We can also stop syncing backwards if we get back to a leaf that we laready have
@@ -228,6 +233,7 @@ export class AccumulatorClient {
 			"[Accumulator] \u{1F9BE} Fully synced backwards using only event data and local DB data (no data used from IPFS)",
 		)
 		console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
+		await this.storage.persist()
 	}
 
 	/**
@@ -257,6 +263,7 @@ export class AccumulatorClient {
 			await this.#commitLeaf(i, record.newData)
 		}
 		console.log(`[Accumulator] \u{2705} Fully rebuilt the Merkle Mountain Range up to leaf index ${toIndex}`)
+		await this.storage.persist()
 	}
 
 	/**
@@ -599,31 +606,38 @@ export class AccumulatorClient {
 	 * pinning all the data you have synced.
 	 * @returns A Promise that resolves when all data has been pinned to IPFS.
 	 */
-	async rePinAllDataToIPFS(): Promise<void> {
-		const toIndex = Number((await this.storage.get("dag:trail:maxIndex")) ?? -1)
-		if (toIndex === -1) return
-		console.log(
-			`[Accumulator] \u{1F4CC} Attempting to pin all ${toIndex + 1} CIDs (leaves, root, and intermediate nodes) to IPFS...`,
-		)
+	rePinAllDataToIPFS(): void {
+		this.storage.get("dag:trail:maxIndex").then(result => {
+			const toIndex = Number(result ?? -1)
+			if (toIndex === -1) return
+			// Launch the pinning process in the background
+			(async () => {
+				console.log(`[Accumulator] \u{1F4CC} Attempting to pin all ${toIndex + 1} CIDs (leaves, root, and intermediate nodes) to IPFS. Running in background. Will update you...`)
+				let count = 0
+				let failed = 0
+				for (let i = 0; i <= toIndex; i++) {
+					try {
+						const pair: CIDDataPair | null = await this.getCIDDataPairFromDB(i)
+						if (!pair) throw new Error(`[Accumulator] Expected CIDDataPair for leaf ${i}`)
 
-		let count = 0
-		let failed = 0
-		for (let i = 0; i <= toIndex; i++) {
-			const pair: CIDDataPair | null = await this.getCIDDataPairFromDB(i)
-			if (!pair) throw new Error(`[Accumulator] Expected CIDDataPair for leaf ${i}`)
-
-			const putOk = await this.#putPinProvideToIPFS(pair.cid, pair.data)
-			if (!putOk) {
-				failed++
-				continue
-			}
-			count++
-			if (count % 100 === 0) {
-				console.log(`[Accumulator] \u{1F4CC} Re-pinned ${count} CIDs to IPFS...`)
-			}
-		}
-		console.log(`[Accumulator] \u{2705} Pinned ${count} CIDs to IPFS (${failed} failures). Done!`)
+						const putOk = await this.#putPinProvideToIPFS(pair.cid, pair.data)
+						if (!putOk) {
+							failed++
+							continue
+						}
+						count++
+						if (count % 100 === 0) {
+							console.log(`[Accumulator] \u{1F4CC} UPDATE: Re-pinned ${count} CIDs to IPFS so far. Still working...`)
+						}
+					} catch (err) {
+						console.error(`[Accumulator] Error during optimistic IPFS pinning:`, err)
+					}
+				}
+				console.log(`[Accumulator] \u{2705} Pinned ${count} CIDs to IPFS (${failed} failures). Done!`)
+			})()
+		})
 	}
+
 
 	// Helper for robust IPFS put/pin/provide with logging
 	async #putPinProvideToIPFS(cid: CID, data: Uint8Array): Promise<boolean> {

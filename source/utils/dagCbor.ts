@@ -1,5 +1,4 @@
 // Minimal IPLD dag-cbor encode/decode (drop-in for @ipld/dag-cbor)
-// import { CID } from "multiformats/cid"
 import { CID } from "./CID.js"
 
 // CBOR major types

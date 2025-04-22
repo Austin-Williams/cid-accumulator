@@ -1,4 +1,4 @@
-// import { CID } from "multiformats/cid"
+// import { CID } from "../../utils/CID.ts"
 // import type { IpfsAdapter } from "../../interfaces/IpfsAdapter.ts"
 // import type { KuboRPCClient } from "kubo-rpc-client"
 

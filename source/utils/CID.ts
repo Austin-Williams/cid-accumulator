@@ -26,7 +26,7 @@ function base32encode(bytes: Uint8Array): string {
 function base32decode(str: string): Uint8Array {
 	let bits = 0,
 		value = 0,
-		index = 0,
+		//_index = 0,
 		output = []
 	str = str.toLowerCase().replace(/=+$/, "")
 	for (let i = 0; i < str.length; i++) {
@@ -125,7 +125,7 @@ export class CID<
 		return new CID(version, code, multihash)
 	}
 
-	static createV0<T = unknown>(multihash: MultihashDigest<18>): CID<T, 112, 18, 0> {
+	static createV0<T = unknown>(_multihash: MultihashDigest<18>): CID<T, 112, 18, 0> {
 		throw new Error("CIDv0 not supported in this minimal CID")
 	}
 
@@ -181,7 +181,7 @@ export class CID<
 		// Only supports single-byte varints (for 1 and 0x71)
 		return { value: bytes[offset], length: 1 }
 	}
-	static varintLength(bytes: Uint8Array, offset: number): number {
+	static varintLength(_bytes: Uint8Array, _offset: number): number {
 		return 1
 	}
 	static decodeMultihash(bytes: Uint8Array): MultihashDigest<number> {

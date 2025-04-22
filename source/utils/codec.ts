@@ -1,8 +1,6 @@
 // shared/codec.ts
 import { createHash } from "crypto"
 import * as dagCbor from "./dagCbor.ts"
-
-// import { CID } from "multiformats/cid"
 import { CID } from "./CID.js"
 
 import { CIDDataPair, LeafRecord, NormalizedLeafInsertEvent } from "../types/types.ts"

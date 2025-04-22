@@ -1,5 +1,4 @@
 import * as dagCbor from "../utils/dagCbor.ts"
-// import { CID } from "multiformats/cid"
 import { CID } from "../utils/CID.js"
 
 export type IpldNode =

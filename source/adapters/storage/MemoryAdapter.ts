@@ -35,19 +35,13 @@ export class MemoryAdapter implements StorageAdapter {
 		return
 	}
 
-	async close(): Promise<void> {
+	async persist(): Promise<void> {
 		// No-op for in-memory adapter
 		return
 	}
 
-	// --- Dummy IpfsAdapter methods for compatibility ---
-	async pin(_cid: any): Promise<void> {
-		// No-op for memory adapter
-		return
-	}
-
-	async provide(_cid: any): Promise<void> {
-		// No-op for memory adapter
+	async close(): Promise<void> {
+		// No-op for in-memory adapter
 		return
 	}
 }
