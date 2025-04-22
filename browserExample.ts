@@ -1,13 +1,10 @@
 // browserExample.ts: Browser-friendly version of example.ts
 // Run this with Vite or similar browser bundler
 
-import { AccumulatorClient } from "./source/accumulator/AccumulatorClient";
-import type { AccumulatorClientConfig } from "./source/types/types";
-// Use ReadOnlyIpfsAdapter for public gateway (e.g., dweb.link, ipfs.io)
-import { ReadOnlyIpfsAdapter } from "./source/adapters/ipfs/ReadOnlyIpfsAdapter";
-import { IndexedDBAdapter } from "./source/adapters/storage/IndexedDBAdapter";
-
-import { config } from "./config";
+import { AccumulatorClient } from "./source/accumulator/AccumulatorClient.ts";
+import { ReadOnlyIpfsAdapter } from "./source/adapters/ipfs/ReadOnlyIpfsAdapter.ts";
+import { IndexedDBAdapter } from "./source/adapters/storage/IndexedDBAdapter.ts";
+import { config } from "./config.ts"
 
 async function main() {
   // Set up read-only IPFS adapter for public gateway
