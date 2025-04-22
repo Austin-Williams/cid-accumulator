@@ -1,7 +1,7 @@
 import { CID } from "multiformats/cid"
 import { encodeBlock } from "../utils/codec.ts"
 import type { PeakWithHeight } from "../types/types.ts"
-import { NULL_CID } from "../shared/constants.ts"
+import { NULL_CID } from "../utils/constants.ts"
 
 /**
  * Computes the root CID from an array of peak CIDs, left-to-right bagging (canonical MMR logic).

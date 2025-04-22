@@ -7,7 +7,7 @@ import { MerkleMountainRange } from "./MerkleMountainRange.ts"
 import { computePreviousRootCIDAndPeaksWithHeights, getRootCIDFromPeaks } from "./mmrUtils.ts"
 import { walkBackLeafInsertLogsOrThrow } from "../utils/walkBackLogsOrThrow.ts"
 import { resolveMerkleTreeOrThrow } from "../ipfs/ipfs.ts"
-import { NULL_CID } from "../shared/constants.ts"
+import { NULL_CID } from "../utils/constants.ts"
 
 import {
 	CIDDataPairToString,
