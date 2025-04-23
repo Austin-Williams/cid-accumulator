@@ -258,7 +258,7 @@ export class AccumulatorClient {
 					`[Accumulator] \u{1F4E5} Downloaded all data for root CID ${foundIpfsCid?.toString() ?? "undefined"} from IPFS.`,
 				)
 				console.log(`[Accumulator] \u{1F64C} Successfully resolved all remaining data from IPFS!`)
-				console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
+				console.log(`[Accumulator] \u{2705} Your accumulator client is synced!`)
 				await this.storage.persist()
 				return
 			}
@@ -278,7 +278,7 @@ export class AccumulatorClient {
 		console.log(
 			"[Accumulator] \u{1F9BE} Fully synced backwards using only event data and local DB data (no data used from IPFS)",
 		)
-		console.log(`[Accumulator] \u{2705} Your accumulator node is synced!`)
+		console.log(`[Accumulator] \u{2705} Your accumulator client is synced!`)
 		await this.storage.persist()
 	}
 
@@ -349,7 +349,7 @@ export class AccumulatorClient {
 		} else {
 			console.log("[Accumulator] 👎 No ETHEREUM_WS_RPC_URL provided, will use polling.")
 		}
-		console.log(`[Accumulator] \u{1F440} Using ${useSubscription ? "subscriptions" : "polling"} for live sync.`)
+		console.log(`[Accumulator] \u{1F440} Using ${useSubscription ? "websocket subscription" : "HTTP polling"} to monitor the chain for new data insertions.`)
 		if (useSubscription) {
 			this.#startSubscriptionSync()
 		} else {
