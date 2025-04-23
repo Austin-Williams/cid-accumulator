@@ -2,11 +2,14 @@ import { CID } from "../utils/CID.js"
 
 export interface AccumulatorClientConfig {
 	ETHEREUM_HTTP_RPC_URL: string
-	ETHEREUM_WS_RPC_URL?: string
+	ETHEREUM_WS_RPC_URL: string | undefined
 	CONTRACT_ADDRESS: string
-	IPFS_API_URL: string
-	IPFS_READ_ONLY: boolean
-	DB_PATH?: string
+	IPFS_GATEWAY_URL: string
+	IPFS_API_URL: string | undefined
+	IPFS_PUT_IF_POSSIBLE: boolean
+	IPFS_PIN_IF_POSSIBLE: boolean
+	IPFS_PROVIDE_IF_POSSIBLE: boolean
+	DB_PATH: string | undefined
 }
 
 export interface RawEthLog {
@@ -47,7 +50,7 @@ export interface AccumulatorMetadata {
 export type PeakWithHeight = { cid: CID<unknown, 113, 18, 1>; height: number }
 
 // contains the CID and data for the leaf, all new intermediate nodes, and the new root node
-export type MMRLeafInsertTrail = { cid: CID<unknown, 113, 18, 1>; data: Uint8Array }[]
+export type MMRLeafInsertTrail = { cid: CID<unknown, 113, 18, 1>; dagCborEncodedData: DagCborEncodedData }[]
 
 /**
  * Represents all relevant data for a leaf/event in the accumulator.
@@ -62,4 +65,6 @@ export type LeafRecord = {
 	[key: string]: unknown // Allow extra properties for type tagging
 }
 
-export type CIDDataPair = { cid: CID<unknown, 113, 18, 1>; data: Uint8Array }
+export type DagCborEncodedData = Uint8Array & { __dagCborEncoded: true }
+
+export type CIDDataPair = { cid: CID<unknown, 113, 18, 1>; dagCborEncodedData: DagCborEncodedData }

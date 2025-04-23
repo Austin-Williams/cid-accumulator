@@ -20,8 +20,8 @@ export class MerkleMountainRange {
 
 		const trail: MMRLeafInsertTrail = []
 
-		const { cid: leafCID, bytes: leafData } = await encodeBlock(newData)
-		trail.push({ cid: leafCID, data: leafData })
+		const { cid: leafCID, dagCborEncodedData: dagCborEncodedLeafData } = await encodeBlock(newData)
+		trail.push({ cid: leafCID, dagCborEncodedData: dagCborEncodedLeafData })
 
 		let newPeak = leafCID
 		let height = 0
@@ -30,8 +30,8 @@ export class MerkleMountainRange {
 			const left = this.peaks.pop()
 			if (!left) throw new Error("MMR structure error: no peak to merge")
 
-			const { cid: merged, bytes } = await encodeBlock({ L: left, R: newPeak })
-			trail.push({ cid: merged, data: bytes })
+			const { cid: merged, dagCborEncodedData } = await encodeBlock({ L: left, R: newPeak })
+			trail.push({ cid: merged, dagCborEncodedData })
 
 			newPeak = merged
 			height++
@@ -47,33 +47,27 @@ export class MerkleMountainRange {
 	}
 
 	async rootCIDWithTrail(): Promise<{
-		root: CID<unknown, 113, 18, 1>
-		cids: string[] // TODO: redundant, remove
-		data: Uint8Array[] // TODO: redundant, remove
-		trail: { cid: CID<unknown, 113, 18, 1>; data: Uint8Array }[]
+		root: CID<unknown, 113, 18, 1> // Redundant (because the last item in the trail is the root) but convenient
+		trail: MMRLeafInsertTrail
 	}> {
-		const cids: string[] = []
-		const data: Uint8Array[] = []
-		const trail: { cid: CID<unknown, 113, 18, 1>; data: Uint8Array }[] = []
+		const trail: MMRLeafInsertTrail = []
 
 		if (this.peaks.length === 0) {
-			return { root: NULL_CID, cids: [], data: [], trail: [] }
+			return { root: NULL_CID, trail: [] }
 		}
 
 		if (this.peaks.length === 1) {
-			return { root: this.peaks[0], cids: [], data: [], trail: [] }
+			return { root: this.peaks[0], trail: [] }
 		}
 
 		let current = this.peaks[0]
 		for (let i = 1; i < this.peaks.length; i++) {
-			const { cid, bytes } = await encodeBlock({ L: current, R: this.peaks[i] })
-			trail.push({ cid: cid, data: bytes })
-			cids.push(cid.toString())
-			data.push(bytes)
+			const { cid, dagCborEncodedData } = await encodeBlock({ L: current, R: this.peaks[i] })
+			trail.push({ cid, dagCborEncodedData })
 			current = cid
 		}
 
-		return { root: current, cids, data, trail }
+		return { root: current, trail }
 	}
 
 	async rootCID(): Promise<CID<unknown, 113, 18, 1>> {

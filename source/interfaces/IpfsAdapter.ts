@@ -1,8 +1,8 @@
 import { CID } from "../utils/CID.js"
+import type { DagCborEncodedData } from "../types/types.js"
 
 export interface IpfsAdapter {
-	get(cid: CID): Promise<Uint8Array>
-	put(cid: CID, data: Uint8Array): Promise<void>
-	pin(cid: CID): Promise<void>
+	getBlock(cid: CID): Promise<DagCborEncodedData>
+	putBlock(cid: CID, dagCborEncodedData: DagCborEncodedData): Promise<void>
 	provide(cid: CID): Promise<void>
 }

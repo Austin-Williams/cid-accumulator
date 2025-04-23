@@ -1,4 +1,5 @@
-import type { CID } from "../utils/CID.ts"
+import * as dagCbor from "../utils/dagCbor.ts"
+import { CID } from "../utils/CID.ts"
 import type { IpfsAdapter } from "../interfaces/IpfsAdapter.ts"
 import type { AccumulatorClientConfig } from "../types/types.ts"
 import type { StorageAdapter } from "../interfaces/StorageAdapter.ts"
@@ -7,6 +8,7 @@ import type {
 	LeafRecord,
 	NormalizedLeafInsertEvent,
 	MMRLeafInsertTrail,
+	DagCborEncodedData,
 	CIDDataPair,
 } from "../types/types.ts"
 
@@ -16,20 +18,20 @@ import { MerkleMountainRange } from "./MerkleMountainRange.ts"
 import { computePreviousRootCIDAndPeaksWithHeights, getRootCIDFromPeaks } from "./mmrUtils.ts"
 import { walkBackLeafInsertLogsOrThrow } from "../utils/walkBackLogsOrThrow.ts"
 import { resolveMerkleTreeOrThrow } from "../ipfs/ipfs.ts"
+import { isNodeJs } from "../utils/envDetection.ts"
 import { NULL_CID } from "../utils/constants.ts"
 import {
-	cidDataPairToString,
-	cidTohexString,
+	cidDataPairToStringForDB,
 	uint8ArrayToHexString,
 	normalizedLeafInsertEventToString,
-	peakWithHeightArrayToString,
+	peakWithHeightArrayToStringForDB,
 	hexStringToUint8Array,
 	stringToNormalizedLeafInsertEvent,
-	hexStringToCID,
 	stringToPeakWithHeightArray,
-	stringToCIDDataPair,
+	stringFromDBToCIDDataPair,
 	getLeafRecordFromNormalizedLeafInsertEvent,
 } from "../utils/codec.ts"
+import { verifyCIDAgainstDagCborEncodedDataOrThrow } from "../utils/verifyCID.ts"
 
 /**
  * AccumulatorClient: Unified entry point for accumulator logic in any environment.
@@ -43,6 +45,10 @@ export class AccumulatorClient {
 	contractAddress: string
 	mmr: MerkleMountainRange
 	highestCommittedLeafIndex: number
+	
+	shouldPut: boolean
+	shouldPin: boolean
+	shouldProvide: boolean
 
 	private _liveSyncRunning: boolean = false
 	private _liveSyncInterval?: ReturnType<typeof setTimeout>
@@ -62,10 +68,24 @@ export class AccumulatorClient {
 		this.contractAddress = config.CONTRACT_ADDRESS
 		this.mmr = new MerkleMountainRange()
 		this.highestCommittedLeafIndex = -1
+		this.shouldPut = (config.IPFS_PUT_IF_POSSIBLE) && (config.IPFS_API_URL !== undefined)
+		this.shouldPin = (config.IPFS_PIN_IF_POSSIBLE) && (config.IPFS_API_URL !== undefined)
+		this.shouldProvide = (config.IPFS_PROVIDE_IF_POSSIBLE) && (config.IPFS_API_URL !== undefined) && (isNodeJs())
+		
+		if (!this.shouldPut) this.shouldPin = false // Doesn't make sense to pin if they don't put
+		if (!this.shouldPin) this.shouldProvide = false // Doesn't make sense to provide if they don't pin
+	}
+
+	async start() {
+		await this.init()
+		await this.syncBackwardsFromLatest()
+		await this.rebuildAndProvideMMR()
+		this.rePinAllDataToIPFS() // Runs in background, no-ops if this.shouldPin is false
+		await this.startLiveSync()
 	}
 
 	// ================================================
-	// 			SETUP, SYNCHRONIZATION & SHUTDOWN
+	// 		SETUP, SYNCHRONIZATION, & SHUTDOWN
 	// Handles node setup, connection checks, and
 	// backfilling state from on-chain and IPFS data.
 	// ================================================
@@ -89,18 +109,50 @@ export class AccumulatorClient {
 			throw new Error("Failed to connect to Ethereum node. See above error.")
 		}
 
-		// Check if IPFS connection is working
-		console.log("[Accumulator] \u{1F440} Checking IPFS connection...")
+		// Check if IPFS Gateway connection is working
+		console.log("[Accumulator] \u{1F440} Checking IPFS Gateway connection...")
 		try {
 			// Attempt to fetch a block
-			await this.ipfs.get(NULL_CID)
-			console.log("[Accumulator] \u{2705} Connected to IPFS node.")
+			await this.ipfs.getBlock(NULL_CID)
+			console.log("[Accumulator] \u{2705} Connected to IPFS Gateway.")
 		} catch (e) {
-			console.error("[Accumulator] \u{274C} Failed to connect to IPFS node:", e)
-			throw new Error("Failed to connect to IPFS node. See above error.")
+			console.error("[Accumulator] \u{274C} Failed to connect to IPFS Gateway:", e)
+			throw new Error("Failed to connect to IPFS Gateway. Must abort. See above error.")
 		}
 
-		console.log("[Accumulator] \u{2705} Successfully initialized.")
+		// If relevant, check that IPFS API connection can PUT/PIN
+		if (this.shouldPut) {
+			console.log("[Accumulator] \u{1F440} Checking IPFS API connection (attempting to PUT a block)...")
+			try {
+				// Attempt to put a block
+				await this.ipfs.putBlock(NULL_CID, dagCbor.encode(null))
+				console.log("[Accumulator] \u{2705} Connected to IPFS API and verified it can PUT blocks.")
+			} catch (e) {
+				this.shouldPut = false
+				this.shouldPin = false
+				console.error("[Accumulator] \u{274C} Failed to connect to IPFS API:", e)
+				console.log("[Accumulator] 🤷‍♂️ Will continue without IPFS API connection (Using IPFS Gateway only).")
+			}
+		}
+
+		// If relevant, check that IPFS API connection can PUT/PIN
+		if (this.shouldProvide && this.shouldPut) {
+			console.log("[Accumulator] \u{1F440} Checking if IPFS API can provide (advertise) blocks...")
+			try {
+				// Attempt to provide a block
+				await this.ipfs.provide(NULL_CID)
+				console.log("[Accumulator] \u{2705} Connected to IPFS API and verified it can PROVIDE blocks.")
+			} catch (e) {
+				this.shouldProvide = false
+				console.error("[Accumulator] \u{274C} Failed to verify that the IPFS API can provide (advertise) blocks.", e)
+				console.log("[Accumulator] 🤷‍♂️ Will continue without telling IPFS API to provide (advertise) blocks.")
+			}
+		}
+		console.log("[Accumulator] \u{2705} Successfully initialized. Summary:")
+		console.log(`[Accumulator] 📜 Summary: IPFS Gateway connected: YES`)
+		console.log(`[Accumulator] 📜 Summary: IPFS API PUT is set up: ${this.shouldPut ? "YES" : "NO"}`)
+		console.log(`[Accumulator] 📜 Summary: IPFS API PIN is set up: ${this.shouldPin ? "YES" : "NO"}`)
+		console.log(`[Accumulator] 📜 Summary: IPFS API PROVIDE is set up: ${this.shouldProvide ? "YES" : "NO"}`)
 	}
 
 	/**
@@ -240,7 +292,7 @@ export class AccumulatorClient {
 	 */
 	async rebuildAndProvideMMR(): Promise<void> {
 		console.log(
-			`[Accumulator] \u{1F4DC} Rebuilding the Merkle Mountain Range from synced leaves and pinning to IPFS...`,
+			`[Accumulator]  Rebuilding the Merkle Mountain Range from synced leaves...`,
 		)
 		const fromIndex: number = this.highestCommittedLeafIndex + 1
 		const toIndex: number = await this.getHighestContiguousLeafIndexWithData()
@@ -539,16 +591,19 @@ export class AccumulatorClient {
 		console.log(`[Accumulator] \u{1F343} Processed new leaf with index ${event.leafIndex}`)
 	}
 
-	// Adds a leaf to the MMR, stores the trail in the DB, and pins the full trail to IPFS.
+	// Adds a leaf to the MMR, stores the trail in the DB, and pins the full trail to IPFS (if applicable).
 	async #commitLeaf(leafIndex: number, newData: Uint8Array): Promise<void> {
 		// Add leaf to MMR
 		const trail = await this.mmr.addLeafWithTrail(leafIndex, newData)
 		// Store trail in local DB (efficient append-only)
 		await this.#appendTrailToDB(trail)
 		// Pin and provide trail to IPFS
-		for (const { cid, data } of trail) {
-			await this.#putPinProvideToIPFS(cid, data)
+		if (this.shouldPut) {
+			for (const { cid, dagCborEncodedData } of trail) {
+				await this.#putPinProvideToIPFS(cid, dagCborEncodedData)
+			}
 		}
+
 		this.highestCommittedLeafIndex++
 	}
 
@@ -601,6 +656,10 @@ export class AccumulatorClient {
 	 * @returns A Promise that resolves when all data has been pinned to IPFS.
 	 */
 	rePinAllDataToIPFS(): void {
+		if (!this.shouldPin) {
+			console.log(`[Accumulator] ℹ️ rePinAllDataToIPFS skipped because this.shouldPin == false`)
+			return
+		}
 		this.storage.get("dag:trail:maxIndex").then((result) => {
 			const toIndex = Number(result ?? -1)
 			if (toIndex === -1) return // Launch the pinning process in the background
@@ -615,7 +674,7 @@ export class AccumulatorClient {
 						const pair: CIDDataPair | null = await this.getCIDDataPairFromDB(i)
 						if (!pair) throw new Error(`[Accumulator] Expected CIDDataPair for leaf ${i}`)
 
-						const putOk = await this.#putPinProvideToIPFS(pair.cid, pair.data)
+						const putOk = await this.#putPinProvideToIPFS(pair.cid, pair.dagCborEncodedData)
 						if (!putOk) {
 							failed++
 							continue
@@ -634,22 +693,22 @@ export class AccumulatorClient {
 	}
 
 	// Helper for robust IPFS put/pin/provide with logging
-	async #putPinProvideToIPFS(cid: CID, data: Uint8Array): Promise<boolean> {
-		try {
-			await this.ipfs.put(cid, data)
-		} catch (err) {
-			console.error(`[Accumulator] \u{1F4A5} IPFS put failed for CID ${cid}:`, err)
-			return false
+	async #putPinProvideToIPFS(cid: CID<unknown, 113, 18, 1>, dagCborEncodedData: DagCborEncodedData): Promise<boolean> {
+		await verifyCIDAgainstDagCborEncodedDataOrThrow(dagCborEncodedData, cid)
+		if (this.shouldPut) {
+			try {
+				await this.ipfs.putBlock(cid, dagCborEncodedData)
+			} catch (err) {
+				console.error(`[Accumulator] \u{1F4A5} IPFS put failed for CID ${cid}:`, err)
+				return false
+			}
 		}
-		try {
-			await this.ipfs.pin(cid)
-		} catch (err) {
-			console.error(`[Accumulator] IPFS pin failed for CID ${cid}:`, err)
-		}
-		try {
-			await this.ipfs.provide(cid)
-		} catch (err) {
-			console.error(`[Accumulator] IPFS provide failed for CID ${cid}:`, err)
+		if (this.shouldProvide) {
+			try {
+				await this.ipfs.provide(cid)
+			} catch (err) {
+				console.error(`[Accumulator] IPFS provide failed for CID ${cid}:`, err)
+			}
 		}
 		return true
 	}
@@ -669,9 +728,9 @@ export class AccumulatorClient {
 			await this.storage.put(`leaf:${leafIndex}:event`, normalizedLeafInsertEventToString(value.event))
 		if (value.blockNumber !== undefined)
 			await this.storage.put(`leaf:${leafIndex}:blockNumber`, value.blockNumber.toString())
-		if (value.rootCid !== undefined) await this.storage.put(`leaf:${leafIndex}:rootCid`, cidTohexString(value.rootCid))
+		if (value.rootCid !== undefined) await this.storage.put(`leaf:${leafIndex}:rootCid`, value.rootCid.toString())
 		if (value.peaksWithHeights !== undefined)
-			await this.storage.put(`leaf:${leafIndex}:peaksWithHeights`, peakWithHeightArrayToString(value.peaksWithHeights))
+			await this.storage.put(`leaf:${leafIndex}:peaksWithHeights`, peakWithHeightArrayToStringForDB(value.peaksWithHeights))
 	}
 
 	// Retrieve a leaf record by leafIndex, reconstructing from individual fields. Throws if types are not correct. */
@@ -684,7 +743,7 @@ export class AccumulatorClient {
 		const blockNumberStr = await this.storage.get(`leaf:${leafIndex}:blockNumber`)
 		const blockNumber = blockNumberStr !== undefined ? parseInt(blockNumberStr, 10) : undefined
 		const rootCidStr = await this.storage.get(`leaf:${leafIndex}:rootCid`)
-		const rootCid = rootCidStr !== undefined ? await hexStringToCID(rootCidStr) : undefined
+		const rootCid = rootCidStr !== undefined ? CID.parse(rootCidStr) : undefined
 		const peaksWithHeightsStr = await this.storage.get(`leaf:${leafIndex}:peaksWithHeights`)
 		const peaksWithHeights =
 			peaksWithHeightsStr !== undefined ? await stringToPeakWithHeightArray(peaksWithHeightsStr) : undefined
@@ -720,13 +779,14 @@ export class AccumulatorClient {
 	async #appendTrailToDB(trail: MMRLeafInsertTrail): Promise<void> {
 		let maxIndex = Number((await this.storage.get("dag:trail:maxIndex")) ?? -1)
 		for (const pair of trail) {
+			await verifyCIDAgainstDagCborEncodedDataOrThrow(pair.dagCborEncodedData, pair.cid)
 			const cidStr = pair.cid.toString()
 			const seenKey = `cid:${cidStr}`
 			const alreadyStored = await this.storage.get(seenKey)
 			if (alreadyStored) continue
 
 			maxIndex++
-			await this.storage.put(`dag:trail:index:${maxIndex}`, cidDataPairToString(pair))
+			await this.storage.put(`dag:trail:index:${maxIndex}`, cidDataPairToStringForDB(pair))
 			await this.storage.put(seenKey, "1")
 		}
 		await this.storage.put("dag:trail:maxIndex", maxIndex.toString())
@@ -734,14 +794,19 @@ export class AccumulatorClient {
 
 	async getCIDDataPairFromDB(index: number): Promise<CIDDataPair | null> {
 		const value = await this.storage.get(`dag:trail:index:${index}`)
-		if (value && typeof value === "string") return stringToCIDDataPair(value)
+		if (value && typeof value === "string"){ 
+			const cidDataPair: CIDDataPair = await stringFromDBToCIDDataPair(value)
+			// sanity check
+			await verifyCIDAgainstDagCborEncodedDataOrThrow(cidDataPair.dagCborEncodedData, cidDataPair.cid)
+			return cidDataPair
+		}
 		return null
 	}
 
 	// Async generator to efficiently iterate over all stored trail pairs.
 	async *iterateTrailPairs(): AsyncGenerator<CIDDataPair> {
 		for await (const { value } of this.storage.iterate("dag:trail:index:")) {
-			if (value && typeof value === "string") yield stringToCIDDataPair(value)
+			if (value && typeof value === "string") yield stringFromDBToCIDDataPair(value)
 		}
 	}
 

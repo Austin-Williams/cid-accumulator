@@ -1,5 +1,6 @@
 // Minimal IPLD dag-cbor encode/decode (drop-in for @ipld/dag-cbor)
 import { CID } from "./CID.js"
+import { DagCborEncodedData } from "../types/types.ts"
 
 // CBOR major types
 const MT_UINT = 0,
@@ -32,33 +33,33 @@ function concatBytes(...chunks: Uint8Array[]): Uint8Array {
 	return out
 }
 
-function encode(val: any): Uint8Array {
-	if (val === null) return new Uint8Array([0xf6])
-	if (val === false) return new Uint8Array([0xf4])
-	if (val === true) return new Uint8Array([0xf5])
+function encode(val: any): DagCborEncodedData {
+	if (val === null) return new Uint8Array([0xf6]) as DagCborEncodedData
+	if (val === false) return new Uint8Array([0xf4]) as DagCborEncodedData
+	if (val === true) return new Uint8Array([0xf5]) as DagCborEncodedData
 	if (typeof val === "number") {
 		if (Number.isInteger(val)) {
-			if (val >= 0) return encodeUint(val, MT_UINT)
-			else return encodeUint(-(val + 1), MT_NEGINT)
+			if (val >= 0) return encodeUint(val, MT_UINT) as DagCborEncodedData
+			else return encodeUint(-(val + 1), MT_NEGINT) as DagCborEncodedData
 		} else {
 			// float64
 			const buf = new ArrayBuffer(9)
 			const view = new DataView(buf)
 			view.setUint8(0, 0xfb)
 			view.setFloat64(1, val)
-			return new Uint8Array(buf)
+			return new Uint8Array(buf) as DagCborEncodedData
 		}
 	}
 	if (typeof val === "string") {
 		const strBytes = new TextEncoder().encode(val)
-		return concatBytes(encodeUint(strBytes.length, MT_STRING), strBytes)
+		return concatBytes(encodeUint(strBytes.length, MT_STRING), strBytes) as DagCborEncodedData
 	}
 	if (val instanceof Uint8Array) {
-		return concatBytes(encodeUint(val.length, MT_BYTES), val)
+		return concatBytes(encodeUint(val.length, MT_BYTES), val) as DagCborEncodedData
 	}
 	if (Array.isArray(val)) {
 		const parts = val.map(encode)
-		return concatBytes(encodeUint(val.length, MT_ARRAY), ...parts)
+		return concatBytes(encodeUint(val.length, MT_ARRAY), ...parts) as DagCborEncodedData
 	}
 	if (val instanceof CID) {
 		// IPLD: tag 42, bytes = 0x00 + CID bytes
@@ -72,17 +73,17 @@ function encode(val: any): Uint8Array {
 			cidBytes = asCid.bytes
 		}
 		const tagged = concatBytes(new Uint8Array([0]), cidBytes)
-		return concatBytes(tag, encode(tagged))
+		return concatBytes(tag, encode(tagged)) as DagCborEncodedData
 	}
 	if (typeof val === "object") {
 		const keys = Object.keys(val)
 		const parts = keys.map((k) => concatBytes(encode(k), encode(val[k])))
-		return concatBytes(encodeUint(keys.length, MT_OBJECT), ...parts)
+		return concatBytes(encodeUint(keys.length, MT_OBJECT), ...parts) as DagCborEncodedData
 	}
 	throw new Error("Unsupported type for dag-cbor encode")
 }
 
-function decode(buf: Uint8Array): any {
+function decode(buf: DagCborEncodedData): any {
 	let off = 0
 	function _decode(): any {
 		if (off >= buf.length) throw new Error("Unexpected end of data")

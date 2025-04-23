@@ -2,7 +2,7 @@
 import { sha256 } from "./hash.js"
 import * as dagCbor from "./dagCbor.ts"
 import { CID } from "./CID.js"
-import { CIDDataPair, LeafRecord, NormalizedLeafInsertEvent } from "../types/types.ts"
+import { CIDDataPair, DagCborEncodedData, LeafRecord, NormalizedLeafInsertEvent, PeakWithHeight } from "../types/types.ts"
 
 interface Digest<Code, Size extends number = number> {
 	code: Code // hash function code (e.g., 0x12 for sha2-256)
@@ -11,18 +11,18 @@ interface Digest<Code, Size extends number = number> {
 	bytes: Uint8Array // the full multihash bytes (code + length + digest)
 }
 
-function hashToMultiformatsDigest(code: 0x12, hash: Uint8Array): Digest<0x12, 32> {
+export function hashToMultiformatsDigest(code: 0x12, hash: Uint8Array): Digest<0x12, 32> {
 	// Multihash format: [code, length, ...digest]
 	const bytes = new Uint8Array([code, hash.length, ...hash])
 	return { code, digest: hash, size: 32, bytes }
 }
 
-export async function encodeBlock(value: unknown): Promise<{ cid: CID<unknown, 113, 18, 1>; bytes: Uint8Array }> {
-	const encoded = dagCbor.encode(value)
+export async function encodeBlock(value: unknown): Promise<{ cid: CID<unknown, 113, 18, 1>; dagCborEncodedData: DagCborEncodedData }> {
+	const encoded: DagCborEncodedData = dagCbor.encode(value)
 	const hash = await sha256(encoded)
 	const multihash = hashToMultiformatsDigest(0x12, hash) // 0x12 is the code for sha2-256
 	const cid = CID.createV1(dagCbor.code, multihash)
-	return { cid, bytes: encoded }
+	return { cid, dagCborEncodedData: encoded }
 }
 
 // Encodes a link node as per DagCborCIDEncoder.encodeLinkNode in Solidity
@@ -38,68 +38,17 @@ export async function encodeLinkNode(
 	return CID.createV1(dagCbor.code, multihash)
 }
 
-// Robust CID construction from raw bytes32-hex-string hashes (assume dag-cbor + sha2-256, CIDv1)
-// If your accumulator uses a different codec/hash, update these codes!
-export async function hexStringToCID(bytes32hexString: string): Promise<CID<unknown, 113, 18, 1>> {
-	const hash = await sha256(hexStringToUint8Array(bytes32hexString).slice(0, 32))
-	const multihash = hashToMultiformatsDigest(0x12, hash) // 0x12 is the code for sha2-256
-	return CID.createV1(0x71, multihash) // 0x71 = dag-cbor
+export function cidDataPairToStringForDB(pair: CIDDataPair): string {
+	return JSON.stringify({ cid: pair.cid.toString(), dagCborEncodedData: uint8ArrayToHexString(pair.dagCborEncodedData) })
 }
 
-export function cidTohexString(cid: CID<unknown, 113, 18, 1>): string {
-	// Only support dag-cbor + sha2-256, CIDv1
-	if (cid.version !== 1) {
-		console.error("[cidTohexString] CID version mismatch:", {
-			cid: cid.toString(),
-			version: cid.version,
-			code: cid.code,
-			multihashCode: cid.multihash.code,
-		})
-		throw new Error("Only CIDv1 supported")
-	}
-	if (cid.code !== 0x71) {
-		console.error("[cidTohexString] CID codec mismatch:", {
-			cid: cid.toString(),
-			version: cid.version,
-			code: cid.code,
-			multihashCode: cid.multihash.code,
-		})
-		throw new Error("Only dag-cbor supported")
-	}
-	if (cid.multihash.code !== 0x12) {
-		console.error("[cidTohexString] Multihash code mismatch:", {
-			cid: cid.toString(),
-			version: cid.version,
-			code: cid.code,
-			multihashCode: cid.multihash.code,
-		})
-		throw new Error("Only sha2-256 supported")
-	}
-	const digestBytes = cid.multihash.digest
-	if (digestBytes.length !== 32) {
-		console.error("[cidTohexString] Digest length mismatch:", {
-			cid: cid.toString(),
-			version: cid.version,
-			code: cid.code,
-			multihashCode: cid.multihash.code,
-			digestLength: digestBytes.length,
-		})
-		throw new Error("Digest must be 32 bytes")
-	}
-	return uint8ArrayToHexString(digestBytes)
-}
-
-export function cidDataPairToString(pair: CIDDataPair): string {
-	return JSON.stringify({ cid: cidTohexString(pair.cid), data: uint8ArrayToHexString(pair.data) })
-}
-
-export async function stringToCIDDataPair(s: string): Promise<CIDDataPair> {
-	const { cid, data } = JSON.parse(s)
-	return { cid: await hexStringToCID(cid), data: hexStringToUint8Array(data) }
+export async function stringFromDBToCIDDataPair(s: string): Promise<CIDDataPair> {
+	const { cid, dagCborEncodedData } = JSON.parse(s)
+	return { cid: CID.parse(cid), dagCborEncodedData: hexStringToUint8Array(dagCborEncodedData) as DagCborEncodedData}
 }
 
 // Convert contract peak hex (digest) to the exact CID form used by mmr.peaks (wrap digest, do not hash)
-export function contractPeakHexToMmrCid(bytes: Uint8Array) {
+export function contractPeakHexToMmrCid(bytes: Uint8Array): CID<unknown, 113, 18, 1> {
 	const digest = hashToMultiformatsDigest(0x12, bytes) // 0x12 = sha2-256
 	return CID.create(1, 0x71, digest) // 0x71 = dag-cbor
 }
@@ -136,17 +85,17 @@ export function normalizedLeafInsertEventToString(event: NormalizedLeafInsertEve
 }
 
 // Converts PeakWithHeight[] to a JSON string with cids as hex strings
-export function peakWithHeightArrayToString(peaks: { cid: CID<unknown, 113, 18, 1>; height: number }[]): string {
-	return JSON.stringify(peaks.map((p) => ({ cid: cidTohexString(p.cid), height: p.height })))
+export function peakWithHeightArrayToStringForDB(peaks: { cid: CID<unknown, 113, 18, 1>; height: number }[]): string {
+	return JSON.stringify(peaks.map((p) => ({ cid: p.cid.toString(), height: p.height })))
 }
 
 // Converts a JSON string back to PeakWithHeight[] (cids from hex strings)
 export async function stringToPeakWithHeightArray(
 	str: string,
-): Promise<{ cid: CID<unknown, 113, 18, 1>; height: number }[]> {
+): Promise<PeakWithHeight[]> {
 	const arr = JSON.parse(str)
 	return Promise.all(
-		arr.map(async (p: { cid: string; height: number }) => ({ cid: await hexStringToCID(p.cid), height: p.height })),
+		arr.map(async (p: { cid: string; height: number }) => ({ cid: CID.parse(p.cid), height: p.height })),
 	)
 }
 

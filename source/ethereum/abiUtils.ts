@@ -1,5 +1,5 @@
 import { keccak_256 } from "@noble/hashes/sha3"
-import { AccumulatorMetadata, RawEthLog, NormalizedLeafInsertEvent } from "../types/types.ts"
+import { AccumulatorMetadata, RawEthLog, NormalizedLeafInsertEvent, DagCborEncodedData } from "../types/types.ts"
 import { contractPeakHexToMmrCid } from "../utils/codec.ts"
 import { CID } from "../utils/CID.js"
 
@@ -38,15 +38,15 @@ export function parseGetLatestCIDResult(abiResult: string): Uint8Array {
 	return buf.slice(64, 64 + len)
 }
 
-export function parseGetAccumulatorDataResult(hex: string): [bigint, Uint8Array[]] {
+export function parseGetAccumulatorDataResult(hex: string): [bigint, DagCborEncodedData[]] {
 	const data = hex.startsWith("0x") ? hex.slice(2) : hex
 	if (data.length < 64 + 32 * 64) throw new Error("Result too short for ABI-encoded tuple")
 	const mmrMetaBits = BigInt("0x" + data.slice(0, 64))
-	const peaks: Uint8Array[] = []
+	const peaks: DagCborEncodedData[] = []
 	for (let i = 0; i < 32; i++) {
 		const start = 64 + i * 64
 		const end = start + 64
-		peaks.push(hexStringToUint8Array(data.slice(start, end)))
+		peaks.push(hexStringToUint8Array(data.slice(start, end)) as DagCborEncodedData)
 	}
 	return [mmrMetaBits, peaks]
 }

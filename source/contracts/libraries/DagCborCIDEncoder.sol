@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 // Minimal encoder for IPFS CIDs used in an IPLD DAG (dag-cbor codec)
 library DagCborCIDEncoder {
+	// Dag-CBOR encodes `data`, hashes it, and returns the hash
 	function encodeRawBytes(bytes memory data) internal pure returns (bytes32 hash) {
 		uint256 len = data.length;
 

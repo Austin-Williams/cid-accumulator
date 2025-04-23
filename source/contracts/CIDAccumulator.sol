@@ -41,7 +41,7 @@ contract CIDAccumulator {
 	uint256 private constant PREVIOUS_INSERT_BLOCKNUM_MASK = 0xFFFFFFFF;	// 32 bits
 	uint256 private constant DEPLOY_BLOCKNUM_OFFSET = 229;
 	uint256 private constant DEPLOY_BLOCKNUM_MASK = (1 << 27) - 1;	// 0x7FFFFFF
-	uint256 private constant MAX_SIZE_IPFS_BLOCK = 1_048_576; // 1 MB
+	uint256 private constant MAX_SIZE_IPFS_BLOCK = 1_000_000; // Just under 1 MB
 
 	// STATE VARIABLES
 	bytes32[32] private peaks;  // Fixed-size array for node hashes
@@ -117,7 +117,7 @@ contract CIDAccumulator {
 			unchecked { carryHeight++; }
 		}
 
-		peaks[peakCount] = carryHash; // SSTORE
+		peaks[peakCount] = carryHash; // SSTORE the hash of the DAG-CBOR encoded link node
 
 		// Shrink array to actual size
 		bytes32[] memory finalLeftInputs = new bytes32[](mergeCount);
@@ -129,8 +129,8 @@ contract CIDAccumulator {
 		emit LeafInsert(
 			uint32((bits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK),
 			uint32((bits >> PREVIOUS_INSERT_BLOCKNUM_OFFSET) & PREVIOUS_INSERT_BLOCKNUM_MASK),
-			newData,
-			finalLeftInputs
+			newData, // This is NOT DAG-CBOR encoded
+			finalLeftInputs // These are the hashes of the DAG-CBOR encoded nodes on the left of each _combine for this merge
 		);
 
 		// Update packed heights
