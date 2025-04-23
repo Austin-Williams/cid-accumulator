@@ -152,3 +152,9 @@ soljson-*
 config.ts
 test.*
 package-lock.json
+
+eslint.config.js
+.eslintignore
+.eslintrc.json
+.editorconfig
+
