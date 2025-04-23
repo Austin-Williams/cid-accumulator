@@ -39,7 +39,7 @@ Your contract can then call `_addData` with any `bytes` payload you'd like to in
 
 The client-side UI can then call `getLatestCID()` to retrieve the IPFS CID of the file that includes all data added so far. But what if that CID is not available on IPFS?
 
-The `CIDAccumulator` is designed so that you can efficiently compute the _previous_ CID from the current CID + the small amount of data that was emitted by the contract during the last data insert. This allows you to efficiently "walk backwards" from the current CID through previous CIDs until you find one that is available on IPFS.
+The `CIDAccumulator` is designed so that you can efficiently compute the _previous_ CID from the current CID + the small amount of data that was emitted by the contract during the last data insert. This allows you to efficiently "walkback" from the current CID through previous CIDs until you find one that is available on IPFS.
 
 A nice feature of this CID-walkback is that, once you find an older CID that is available on IPFS, you'll have already collected all the data between it and the current CID (because you gathered it as you "walked back"). So you'll be fully synced!
 
@@ -47,33 +47,99 @@ A nice feature of this CID-walkback is that, once you find an older CID that is 
 
 This is all handled by a light-weight `AccumulatorClient` class.
 
-See `source/example.ts` for an example.
+### Accumulator Client
+
+The `AccumulatorClient` is a light-weight universal JS/TS class that:
+- Collects and verifies all historical contract data using IPFS (and filling in gaps with contract event data wherever needed) using the walkback method described above.
+- Stores the data in a local database (IndexedDB in the browser, or as a JSON file in Nodejs).
+- Monitoring the chain for new data inserts and storing them as they happen.
+- (Optionally) Pinning and providing (advertising) the data on IPFS.
+
+The `AccumulatorClient` can be used directly in your front end code, or kept running long term in a NodeJs environment to ensure the data remains pinned and available for everyone.
+
+### Example use
+
+Set your conifguration options in `config.ts`. See `config.example.ts` for options.
+
+```typescript
+// Example config
+export const config: AccumulatorClientConfig = {
+	ETHEREUM_HTTP_RPC_URL: "https://mainnet.infura.io/v3/<YOUR_INFURA_KEY>",
+	ETHEREUM_WS_RPC_URL: undefined,
+	CONTRACT_ADDRESS: "<YOUR_CONTRACT_ADDRESS>",
+	IPFS_GATEWAY_URL: "https://ipfs.io/ipfs",
+	IPFS_API_URL: "http://127.0.0.1:5001", // or undefined` if you don't run your own IPFS node
+	IPFS_PUT_IF_POSSIBLE: true,
+	IPFS_PIN_IF_POSSIBLE: true,
+	IPFS_PROVIDE_IF_POSSIBLE: true,
+	DB_PATH: undefined
+}
+```
+
+Then you can use the client in NodeJs or the browser:
 
 ```typescript
 ...
 
-// Instantiate the client
+// Create the client
 const accumulatorClient = new AccumulatorClient(...)
 
-// Initialize the client
-await accumulatorClient.init()
-
-// Sync backwards from the latest leaf insert
-// This checks IPFS for older root CIDs as you go
-await accumulatorClient.syncBackwardsFromLatest()
-
-// Once you're synced, rebuild the Merkle Mountain Range \
-// and pin all related data to IPFS
-await accumulatorClient.rebuildAndProvideMMR()
-
-// Start watching the chain for new LeafInsert events
-await accumulatorClient.startLiveSync()
+// Start the client
+await accumulatorClient.start()
 
 ...
 
 ```
 
-> 🚧 Brower-compatible version is in progess
+Progress will be shown in console logs. Example:
+
+```console
+ % npx --no-install tsx ./example.ts
+[Accumulator] 📤 Found 0 leafs in DB
+[Accumulator] 👀 Checking Ethereum connection...
+[Accumulator] ✅ Connected to Ethereum node, chainId: 0xaa36a7
+[Accumulator] 👀 Checking IPFS Gateway connection...
+[Accumulator] ✅ Connected to IPFS Gateway.
+[Accumulator] 👀 Checking IPFS API connection (attempting to PUT a block)...
+[Accumulator] ✅ Connected to IPFS API and verified it can PUT blocks.
+[Accumulator] 👀 Checking if IPFS API can provide (advertise) blocks...
+[Accumulator] ✅ Connected to IPFS API and verified it can PROVIDE blocks.
+[Accumulator] ✅ Successfully initialized. Summary:
+[Accumulator] 📜 Summary: IPFS Gateway connected: YES
+[Accumulator] 📜 Summary: IPFS API PUT is set up: YES
+[Accumulator] 📜 Summary: IPFS API PIN is set up: YES
+[Accumulator] 📜 Summary: IPFS API PROVIDE is set up: YES
+[Accumulator] 🔁 Syncing backwards from block 8180977 to block 8147142 (33835 blocks), grabbing 1000 blocks per RPC call.
+[Accumulator] 🔎 Simultaneously checking IPFS for older root CIDs as we discover them.
+[Accumulator] 📦 Checking blocks 8179978 to 8180977 for LeafInsert events...
+[Accumulator] 🍃 Found 23 LeafInsert events
+[Accumulator] 📦 Checking blocks 8178978 to 8179977 for LeafInsert events...
+[Accumulator] 📦 Checking blocks 8177978 to 8178977 for LeafInsert events...
+[Accumulator] 📦 Checking blocks 8176978 to 8177977 for LeafInsert events...
+[Accumulator] 📦 Checking blocks 8175978 to 8176977 for LeafInsert events...
+[Accumulator] 📦 Checking blocks 8174978 to 8175977 for LeafInsert events...
+[Accumulator] 📦 Checking blocks 8173978 to 8174977 for LeafInsert events...
+[Accumulator] 🍃 Found 105 LeafInsert events
+[Accumulator] 📦 Checking blocks 8172978 to 8173977 for LeafInsert events...
+[Accumulator] 🍃 Found 3 LeafInsert events
+[Accumulator] 📦 Checking blocks 8171978 to 8172977 for LeafInsert events...
+[Accumulator] 📥 Downloaded all data for root CID bafyreihty4icxhngqeypbzlfgpmwuecbshkvk5sugy6m7qhgaycx3b2ffi from IPFS.
+[Accumulator] 🙌 Successfully resolved all remaining data from IPFS!
+[Accumulator] ✅ Your accumulator node is synced!
+[Accumulator] ⛰️ Rebuilding the Merkle Mountain Range from synced leaves and pinning to IPFS...
+[Accumulator] ✅ Fully rebuilt the Merkle Mountain Range up to leaf index 177
+[Accumulator] 👎 No ETHEREUM_WS_RPC_URL provided, will use polling.
+[Accumulator] 👀 Using polling for live sync.
+[Accumulator] 📌 Attempting to pin all 522 CIDs (leaves, root, and intermediate nodes) to IPFS. Running in background. Will update you...
+[Accumulator] 📌 UPDATE: Re-pinned 100 CIDs to IPFS so far. Still working...
+[Accumulator] 📌 UPDATE: Re-pinned 200 CIDs to IPFS so far. Still working...
+[Accumulator] 📌 UPDATE: Re-pinned 300 CIDs to IPFS so far. Still working...
+[Accumulator] 📌 UPDATE: Re-pinned 400 CIDs to IPFS so far. Still working...
+[Accumulator] 📌 UPDATE: Re-pinned 500 CIDs to IPFS so far. Still working...
+[Accumulator] ✅ Pinned 522 CIDs to IPFS (0 failures). Done!
+```
+
+You can find a full working example in `./example.ts`.
 
 > 🚧 Mainnet example anyone can submit data to for testing coming soon (maybe).
 

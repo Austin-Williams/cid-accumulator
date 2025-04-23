@@ -292,7 +292,7 @@ export class AccumulatorClient {
 	 */
 	async rebuildAndProvideMMR(): Promise<void> {
 		console.log(
-			`[Accumulator]  Rebuilding the Merkle Mountain Range from synced leaves...`,
+			`[Accumulator] ⛰️ Rebuilding the Merkle Mountain Range from synced leaves and pinning to IPFS...`,
 		)
 		const fromIndex: number = this.highestCommittedLeafIndex + 1
 		const toIndex: number = await this.getHighestContiguousLeafIndexWithData()
