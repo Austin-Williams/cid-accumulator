@@ -52,23 +52,23 @@ This is all handled by a light-weight `AccumulatorClient` class.
 The `AccumulatorClient` is a light-weight universal JS/TS class that:
 - Collects and verifies all historical contract data using IPFS (and filling in gaps with contract event data wherever needed) using the walkback method described above.
 - Stores the data in a local database (IndexedDB in the browser, or as a JSON file in Nodejs).
-- Monitoring the chain for new data inserts and storing them as they happen.
-- (Optionally) Pinning and providing (advertising) the data on IPFS.
+- Monitors the chain for new data inserts and stores them as they happen.
+- (Optionally) Pins and provides (advertises) the data on IPFS.
 
 The `AccumulatorClient` can be used directly in your front end code, or kept running long term in a NodeJs environment to ensure the data remains pinned and available for everyone.
 
 ### Example use
 
-Set your conifguration options in `config.ts`. See `config.example.ts` for options.
+Set your conifguration options in `config.ts`. See `config.example.ts` for a full explaination of the options.
 
 ```typescript
 // Example config
 export const config: AccumulatorClientConfig = {
 	ETHEREUM_HTTP_RPC_URL: "https://mainnet.infura.io/v3/<YOUR_INFURA_KEY>",
-	ETHEREUM_WS_RPC_URL: undefined,
+	ETHEREUM_WS_RPC_URL: undefined, // or "wss://mainnet.infura.io/ws/v3/<YOUR_INFURA_KEY>"
 	CONTRACT_ADDRESS: "<YOUR_CONTRACT_ADDRESS>",
-	IPFS_GATEWAY_URL: "https://ipfs.io/ipfs",
-	IPFS_API_URL: "http://127.0.0.1:5001", // or undefined` if you don't run your own IPFS node
+	IPFS_GATEWAY_URL: "https://ipfs.io/ipfs", // or "http://127.0.0.1:8080" if you run a local IPFS node
+	IPFS_API_URL: "http://127.0.0.1:5001", // or undefined if you don't run your own IPFS node
 	IPFS_PUT_IF_POSSIBLE: true,
 	IPFS_PIN_IF_POSSIBLE: true,
 	IPFS_PROVIDE_IF_POSSIBLE: true,
