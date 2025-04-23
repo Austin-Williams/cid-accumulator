@@ -45,7 +45,7 @@ export class AccumulatorClient {
 	contractAddress: string
 	mmr: MerkleMountainRange
 	highestCommittedLeafIndex: number
-	
+
 	shouldPut: boolean
 	shouldPin: boolean
 	shouldProvide: boolean
@@ -68,10 +68,10 @@ export class AccumulatorClient {
 		this.contractAddress = config.CONTRACT_ADDRESS
 		this.mmr = new MerkleMountainRange()
 		this.highestCommittedLeafIndex = -1
-		this.shouldPut = (config.IPFS_PUT_IF_POSSIBLE) && (config.IPFS_API_URL !== undefined)
-		this.shouldPin = (config.IPFS_PIN_IF_POSSIBLE) && (config.IPFS_API_URL !== undefined)
-		this.shouldProvide = (config.IPFS_PROVIDE_IF_POSSIBLE) && (config.IPFS_API_URL !== undefined) && (isNodeJs())
-		
+		this.shouldPut = config.IPFS_PUT_IF_POSSIBLE && config.IPFS_API_URL !== undefined
+		this.shouldPin = config.IPFS_PIN_IF_POSSIBLE && config.IPFS_API_URL !== undefined
+		this.shouldProvide = config.IPFS_PROVIDE_IF_POSSIBLE && config.IPFS_API_URL !== undefined && isNodeJs()
+
 		if (!this.shouldPut) this.shouldPin = false // Doesn't make sense to pin if they don't put
 		if (!this.shouldPin) this.shouldProvide = false // Doesn't make sense to provide if they don't pin
 	}
@@ -291,9 +291,7 @@ export class AccumulatorClient {
 	 * @returns A Promise that resolves when the MMR has been rebuilt from all uncommitted leaves.
 	 */
 	async rebuildAndProvideMMR(): Promise<void> {
-		console.log(
-			`[Accumulator] ⛰️ Rebuilding the Merkle Mountain Range from synced leaves and pinning to IPFS...`,
-		)
+		console.log(`[Accumulator] ⛰️ Rebuilding the Merkle Mountain Range from synced leaves and pinning to IPFS...`)
 		const fromIndex: number = this.highestCommittedLeafIndex + 1
 		const toIndex: number = await this.getHighestContiguousLeafIndexWithData()
 		if (fromIndex > toIndex)
@@ -349,7 +347,9 @@ export class AccumulatorClient {
 		} else {
 			console.log("[Accumulator] 👎 No ETHEREUM_WS_RPC_URL provided, will use polling.")
 		}
-		console.log(`[Accumulator] \u{1F440} Using ${useSubscription ? "websocket subscription" : "HTTP polling"} to monitor the chain for new data insertions.`)
+		console.log(
+			`[Accumulator] \u{1F440} Using ${useSubscription ? "websocket subscription" : "HTTP polling"} to monitor the chain for new data insertions.`,
+		)
 		if (useSubscription) {
 			this.#startSubscriptionSync()
 		} else {
@@ -730,7 +730,10 @@ export class AccumulatorClient {
 			await this.storage.put(`leaf:${leafIndex}:blockNumber`, value.blockNumber.toString())
 		if (value.rootCid !== undefined) await this.storage.put(`leaf:${leafIndex}:rootCid`, value.rootCid.toString())
 		if (value.peaksWithHeights !== undefined)
-			await this.storage.put(`leaf:${leafIndex}:peaksWithHeights`, peakWithHeightArrayToStringForDB(value.peaksWithHeights))
+			await this.storage.put(
+				`leaf:${leafIndex}:peaksWithHeights`,
+				peakWithHeightArrayToStringForDB(value.peaksWithHeights),
+			)
 	}
 
 	// Retrieve a leaf record by leafIndex, reconstructing from individual fields. Throws if types are not correct. */
@@ -794,7 +797,7 @@ export class AccumulatorClient {
 
 	async getCIDDataPairFromDB(index: number): Promise<CIDDataPair | null> {
 		const value = await this.storage.get(`dag:trail:index:${index}`)
-		if (value && typeof value === "string"){ 
+		if (value && typeof value === "string") {
 			const cidDataPair: CIDDataPair = await stringFromDBToCIDDataPair(value)
 			// sanity check
 			await verifyCIDAgainstDagCborEncodedDataOrThrow(cidDataPair.dagCborEncodedData, cidDataPair.cid)

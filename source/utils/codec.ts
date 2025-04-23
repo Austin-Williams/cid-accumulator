@@ -2,7 +2,13 @@
 import { sha256 } from "./hash.js"
 import * as dagCbor from "./dagCbor.ts"
 import { CID } from "./CID.js"
-import { CIDDataPair, DagCborEncodedData, LeafRecord, NormalizedLeafInsertEvent, PeakWithHeight } from "../types/types.ts"
+import {
+	CIDDataPair,
+	DagCborEncodedData,
+	LeafRecord,
+	NormalizedLeafInsertEvent,
+	PeakWithHeight,
+} from "../types/types.ts"
 
 interface Digest<Code, Size extends number = number> {
 	code: Code // hash function code (e.g., 0x12 for sha2-256)
@@ -17,7 +23,9 @@ export function hashToMultiformatsDigest(code: 0x12, hash: Uint8Array): Digest<0
 	return { code, digest: hash, size: 32, bytes }
 }
 
-export async function encodeBlock(value: unknown): Promise<{ cid: CID<unknown, 113, 18, 1>; dagCborEncodedData: DagCborEncodedData }> {
+export async function encodeBlock(
+	value: unknown,
+): Promise<{ cid: CID<unknown, 113, 18, 1>; dagCborEncodedData: DagCborEncodedData }> {
 	const encoded: DagCborEncodedData = dagCbor.encode(value)
 	const hash = await sha256(encoded)
 	const multihash = hashToMultiformatsDigest(0x12, hash) // 0x12 is the code for sha2-256
@@ -39,12 +47,15 @@ export async function encodeLinkNode(
 }
 
 export function cidDataPairToStringForDB(pair: CIDDataPair): string {
-	return JSON.stringify({ cid: pair.cid.toString(), dagCborEncodedData: uint8ArrayToHexString(pair.dagCborEncodedData) })
+	return JSON.stringify({
+		cid: pair.cid.toString(),
+		dagCborEncodedData: uint8ArrayToHexString(pair.dagCborEncodedData),
+	})
 }
 
 export async function stringFromDBToCIDDataPair(s: string): Promise<CIDDataPair> {
 	const { cid, dagCborEncodedData } = JSON.parse(s)
-	return { cid: CID.parse(cid), dagCborEncodedData: hexStringToUint8Array(dagCborEncodedData) as DagCborEncodedData}
+	return { cid: CID.parse(cid), dagCborEncodedData: hexStringToUint8Array(dagCborEncodedData) as DagCborEncodedData }
 }
 
 // Convert contract peak hex (digest) to the exact CID form used by mmr.peaks (wrap digest, do not hash)
@@ -90,9 +101,7 @@ export function peakWithHeightArrayToStringForDB(peaks: { cid: CID<unknown, 113,
 }
 
 // Converts a JSON string back to PeakWithHeight[] (cids from hex strings)
-export async function stringToPeakWithHeightArray(
-	str: string,
-): Promise<PeakWithHeight[]> {
+export async function stringToPeakWithHeightArray(str: string): Promise<PeakWithHeight[]> {
 	const arr = JSON.parse(str)
 	return Promise.all(
 		arr.map(async (p: { cid: string; height: number }) => ({ cid: CID.parse(p.cid), height: p.height })),

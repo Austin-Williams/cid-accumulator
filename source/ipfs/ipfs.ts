@@ -1,6 +1,6 @@
 import * as dagCbor from "../utils/dagCbor.ts"
 import { CID } from "../utils/CID.js"
-import { IpfsAdapter } from "../interfaces/IpfsAdapter.ts";
+import { IpfsAdapter } from "../interfaces/IpfsAdapter.ts"
 import type { DagCborEncodedData } from "../types/types.ts"
 
 export type IpldNode =
@@ -58,11 +58,14 @@ export async function resolveMerkleTreeOrThrow(
 	}
 	const node: IpldNode = dagCbor.decode(raw) // you either get (NOT DagCbor encoded) leaf data, a leaf's CID, or a (NOT DagCbor encoded) link node
 
-	if (node instanceof Uint8Array) { // then we just got a leaf
+	if (node instanceof Uint8Array) {
+		// then we just got a leaf
 		return [node] // return the leaf
-	} else if (isIpldLink(node)) { // then we just got a leaf's CID
+	} else if (isIpldLink(node)) {
+		// then we just got a leaf's CID
 		return await resolveMerkleTreeOrThrow(node, blockstore) // resolve the leaf's CID to the (NOT DagCbor encoded) leaf data
-	} else if (isInternalNode(node)) { // then we just got a (NOT DagCbor encoded) link node that points to a "left" CID and a "right" CID
+	} else if (isInternalNode(node)) {
+		// then we just got a (NOT DagCbor encoded) link node that points to a "left" CID and a "right" CID
 		const L = await resolveMerkleTreeOrThrow(node.L, blockstore)
 		const R = await resolveMerkleTreeOrThrow(node.R, blockstore)
 		return [...L, ...R]

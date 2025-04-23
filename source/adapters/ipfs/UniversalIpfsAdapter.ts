@@ -24,9 +24,9 @@ export class UniversalIpfsAdapter implements IpfsAdapter {
 	) {
 		this.gatewayUrl = gatewayUrl.replace(/\/$/, "") // Remove trailing slash
 		this.apiUrl = apiUrl?.replace(/\/$/, "") // Remove trailing slash
-		this.shouldPut = (wantsToPut) && (apiUrl !== undefined)
-		this.shouldPin = (wantsToPin) && (apiUrl !== undefined)
-		this.shouldProvide = (wantsToProvide) && (apiUrl !== undefined) && (!isBrowser())
+		this.shouldPut = wantsToPut && apiUrl !== undefined
+		this.shouldPin = wantsToPin && apiUrl !== undefined
+		this.shouldProvide = wantsToProvide && apiUrl !== undefined && !isBrowser()
 	}
 	/**
 	 * Get a block by CID from IPFS.
@@ -35,13 +35,13 @@ export class UniversalIpfsAdapter implements IpfsAdapter {
 		const url = `${this.gatewayUrl}/ipfs/${cid.toString()}`
 		const res = await fetch(url, { method: "GET" })
 		if (!res.ok) throw new Error(`IPFS block/get failed: ${res.status} ${res.statusText}`)
-		const data: DagCborEncodedData = (new Uint8Array(await res.arrayBuffer())) as DagCborEncodedData
-		
+		const data: DagCborEncodedData = new Uint8Array(await res.arrayBuffer()) as DagCborEncodedData
+
 		// Verify that we actually got what we asked for
 		await verifyCIDAgainstDagCborEncodedDataOrThrow(
 			data,
 			cid,
-			`[UniversalIpfsAdapter.getBlock] 🚨 IPFS Gateway returned invalid data!`
+			`[UniversalIpfsAdapter.getBlock] 🚨 IPFS Gateway returned invalid data!`,
 		)
 
 		return data
@@ -53,7 +53,9 @@ export class UniversalIpfsAdapter implements IpfsAdapter {
 	 */
 	async putBlock(cid: CID<unknown, 113, 18, 1>, dagCborEncodedData: DagCborEncodedData): Promise<void> {
 		if (!verifyCIDAgainstDagCborEncodedData(dagCborEncodedData, cid)) {
-			console.warn(`[UniversalIpfsAdapter.putBlock] ‼️ CID/Data pair is invalid. dagCborEncodedData: ${dagCborEncodedData}, expectedCID: ${cid.toString()}`)
+			console.warn(
+				`[UniversalIpfsAdapter.putBlock] ‼️ CID/Data pair is invalid. dagCborEncodedData: ${dagCborEncodedData}, expectedCID: ${cid.toString()}`,
+			)
 		}
 		if (!this.shouldPut) return
 
@@ -71,7 +73,9 @@ export class UniversalIpfsAdapter implements IpfsAdapter {
 		const response = await res.json()
 		const returnedCid = CID.parse(response.Key)
 		if (returnedCid.toString() !== cid.toString()) {
-			console.warn(`[UniversalIpfsAdapter.putBlock] ‼️ CID returned by the IPFS API was ${returnedCid.toString()} but you expected ${cid.toString()}`)
+			console.warn(
+				`[UniversalIpfsAdapter.putBlock] ‼️ CID returned by the IPFS API was ${returnedCid.toString()} but you expected ${cid.toString()}`,
+			)
 		}
 	}
 
