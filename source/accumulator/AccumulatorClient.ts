@@ -10,7 +10,6 @@ import type {
 	CIDDataPair,
 } from "../types/types.ts"
 
-
 import { getAccumulatorData, getLeafInsertLogs, getLatestCID } from "../ethereum/commonCalls.ts"
 import { ethRpcFetch } from "../ethereum/ethRpcFetch.ts"
 import { MerkleMountainRange } from "./MerkleMountainRange.ts"
@@ -19,15 +18,15 @@ import { walkBackLeafInsertLogsOrThrow } from "../utils/walkBackLogsOrThrow.ts"
 import { resolveMerkleTreeOrThrow } from "../ipfs/ipfs.ts"
 import { NULL_CID } from "../utils/constants.ts"
 import {
-	CIDDataPairToString,
-	CIDTohexString,
-	Uint8ArrayToHexString,
-	NormalizedLeafInsertEventToString,
-	PeakWithHeightArrayToString,
-	HexStringToUint8Array,
-	StringToNormalizedLeafInsertEvent,
+	cidDataPairToString,
+	cidTohexString,
+	uint8ArrayToHexString,
+	normalizedLeafInsertEventToString,
+	peakWithHeightArrayToString,
+	hexStringToUint8Array,
+	stringToNormalizedLeafInsertEvent,
 	hexStringToCID,
-	StringToPeakWithHeightArray,
+	stringToPeakWithHeightArray,
 	stringToCIDDataPair,
 	getLeafRecordFromNormalizedLeafInsertEvent,
 } from "../utils/codec.ts"
@@ -50,10 +49,12 @@ export class AccumulatorClient {
 	private _lastProcessedBlock: number = 0
 	private _ws?: WebSocket
 
-	constructor(config: AccumulatorClientConfig & {
-		ipfs: IpfsAdapter
-		storage: StorageAdapter
-	}) {
+	constructor(
+		config: AccumulatorClientConfig & {
+			ipfs: IpfsAdapter
+			storage: StorageAdapter
+		},
+	) {
 		this.ipfs = config.ipfs
 		this.storage = config.storage
 		this.ethereumHttpRpcUrl = config.ETHEREUM_HTTP_RPC_URL
@@ -600,12 +601,13 @@ export class AccumulatorClient {
 	 * @returns A Promise that resolves when all data has been pinned to IPFS.
 	 */
 	rePinAllDataToIPFS(): void {
-		this.storage.get("dag:trail:maxIndex").then(result => {
+		this.storage.get("dag:trail:maxIndex").then((result) => {
 			const toIndex = Number(result ?? -1)
-			if (toIndex === -1) return
-			// Launch the pinning process in the background
-			(async () => {
-				console.log(`[Accumulator] \u{1F4CC} Attempting to pin all ${toIndex + 1} CIDs (leaves, root, and intermediate nodes) to IPFS. Running in background. Will update you...`)
+			if (toIndex === -1) return // Launch the pinning process in the background
+			;(async () => {
+				console.log(
+					`[Accumulator] \u{1F4CC} Attempting to pin all ${toIndex + 1} CIDs (leaves, root, and intermediate nodes) to IPFS. Running in background. Will update you...`,
+				)
 				let count = 0
 				let failed = 0
 				for (let i = 0; i <= toIndex; i++) {
@@ -630,7 +632,6 @@ export class AccumulatorClient {
 			})()
 		})
 	}
-
 
 	// Helper for robust IPFS put/pin/provide with logging
 	async #putPinProvideToIPFS(cid: CID, data: Uint8Array): Promise<boolean> {
@@ -662,31 +663,31 @@ export class AccumulatorClient {
 	// Store a leaf record in the DB by leafIndex, splitting fields into separate keys.
 	async #putLeafRecordInDB(leafIndex: number, value: LeafRecord): Promise<void> {
 		// Store newData
-		await this.storage.put(`leaf:${leafIndex}:newData`, Uint8ArrayToHexString(value.newData))
+		await this.storage.put(`leaf:${leafIndex}:newData`, uint8ArrayToHexString(value.newData))
 		// Store optional fields as strings
 		if (value.event !== undefined)
-			await this.storage.put(`leaf:${leafIndex}:event`, NormalizedLeafInsertEventToString(value.event))
+			await this.storage.put(`leaf:${leafIndex}:event`, normalizedLeafInsertEventToString(value.event))
 		if (value.blockNumber !== undefined)
 			await this.storage.put(`leaf:${leafIndex}:blockNumber`, value.blockNumber.toString())
-		if (value.rootCid !== undefined) await this.storage.put(`leaf:${leafIndex}:rootCid`, CIDTohexString(value.rootCid))
+		if (value.rootCid !== undefined) await this.storage.put(`leaf:${leafIndex}:rootCid`, cidTohexString(value.rootCid))
 		if (value.peaksWithHeights !== undefined)
-			await this.storage.put(`leaf:${leafIndex}:peaksWithHeights`, PeakWithHeightArrayToString(value.peaksWithHeights))
+			await this.storage.put(`leaf:${leafIndex}:peaksWithHeights`, peakWithHeightArrayToString(value.peaksWithHeights))
 	}
 
 	// Retrieve a leaf record by leafIndex, reconstructing from individual fields. Throws if types are not correct. */
 	async getLeafRecord(leafIndex: number): Promise<LeafRecord | undefined> {
 		const newDataStr = await this.storage.get(`leaf:${leafIndex}:newData`)
 		if (!newDataStr) return undefined
-		const newData = HexStringToUint8Array(newDataStr)
+		const newData = hexStringToUint8Array(newDataStr)
 		const eventStr = await this.storage.get(`leaf:${leafIndex}:event`)
-		const event = eventStr !== undefined ? StringToNormalizedLeafInsertEvent(eventStr) : undefined
+		const event = eventStr !== undefined ? stringToNormalizedLeafInsertEvent(eventStr) : undefined
 		const blockNumberStr = await this.storage.get(`leaf:${leafIndex}:blockNumber`)
 		const blockNumber = blockNumberStr !== undefined ? parseInt(blockNumberStr, 10) : undefined
 		const rootCidStr = await this.storage.get(`leaf:${leafIndex}:rootCid`)
 		const rootCid = rootCidStr !== undefined ? await hexStringToCID(rootCidStr) : undefined
 		const peaksWithHeightsStr = await this.storage.get(`leaf:${leafIndex}:peaksWithHeights`)
 		const peaksWithHeights =
-			peaksWithHeightsStr !== undefined ? await StringToPeakWithHeightArray(peaksWithHeightsStr) : undefined
+			peaksWithHeightsStr !== undefined ? await stringToPeakWithHeightArray(peaksWithHeightsStr) : undefined
 
 		return {
 			newData,
@@ -725,7 +726,7 @@ export class AccumulatorClient {
 			if (alreadyStored) continue
 
 			maxIndex++
-			await this.storage.put(`dag:trail:index:${maxIndex}`, CIDDataPairToString(pair))
+			await this.storage.put(`dag:trail:index:${maxIndex}`, cidDataPairToString(pair))
 			await this.storage.put(seenKey, "1")
 		}
 		await this.storage.put("dag:trail:maxIndex", maxIndex.toString())

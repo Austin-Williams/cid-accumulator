@@ -26,16 +26,16 @@ export function getEventTopic(signature: string): string {
  * @param abiResult string (0x-prefixed hex string)
  * @returns Uint8Array (decoded bytes)
  */
-import { hexToUint8Array } from "../utils/buffer.js";
+import { hexStringToUint8Array } from "../utils/codec.ts"
 
 export function parseGetLatestCIDResult(abiResult: string): Uint8Array {
 	// ABI encoding for bytes: 32 bytes offset, then 32 bytes length, then data
-	const buf = hexToUint8Array(abiResult)
-	if (buf.length < 64) throw new Error("Result too short for ABI-encoded bytes");
+	const buf = hexStringToUint8Array(abiResult)
+	if (buf.length < 64) throw new Error("Result too short for ABI-encoded bytes")
 	// Read length as big-endian uint32 from offset 60
-	const len = (buf[60] << 24) | (buf[61] << 16) | (buf[62] << 8) | buf[63];
-	if (buf.length < 64 + len) throw new Error("Result too short for declared length");
-	return buf.slice(64, 64 + len);
+	const len = (buf[60] << 24) | (buf[61] << 16) | (buf[62] << 8) | buf[63]
+	if (buf.length < 64 + len) throw new Error("Result too short for declared length")
+	return buf.slice(64, 64 + len)
 }
 
 export function parseGetAccumulatorDataResult(hex: string): [bigint, Uint8Array[]] {
@@ -46,7 +46,7 @@ export function parseGetAccumulatorDataResult(hex: string): [bigint, Uint8Array[
 	for (let i = 0; i < 32; i++) {
 		const start = 64 + i * 64
 		const end = start + 64
-		peaks.push(hexToUint8Array(data.slice(start, end)))
+		peaks.push(hexStringToUint8Array(data.slice(start, end)))
 	}
 	return [mmrMetaBits, peaks]
 }
@@ -71,17 +71,6 @@ export function parseAccumulatorMetaBits(mmrMetaBits: bigint): AccumulatorMetada
 	}
 }
 
-// Helper for robust hex to Uint8Array conversion
-export function hexStringToUint8Array(hex: string): Uint8Array {
-	if (hex.startsWith("0x")) hex = hex.slice(2)
-	if (hex.length % 2 !== 0) hex = "0" + hex
-	const bytes = new Uint8Array(hex.length / 2)
-	for (let i = 0; i < bytes.length; i++) {
-		bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-	}
-	return bytes
-}
-
 export async function parseLeafInsertLog(log: RawEthLog): Promise<NormalizedLeafInsertEvent> {
 	// Helper to parse a 32-byte hex as uint32 (big-endian)
 	function parseUint32FromTopic(topic: string): number {
@@ -103,7 +92,7 @@ export async function parseLeafInsertLog(log: RawEthLog): Promise<NormalizedLeaf
 	// newData: at newDataOffset, first 32 bytes = length, then bytes
 	const newDataLen = parseInt(data.slice(newDataOffset, newDataOffset + 64), 16)
 	const newDataHex = data.slice(newDataOffset + 64, newDataOffset + 64 + newDataLen * 2)
-	const newData = hexToUint8Array(newDataHex)
+	const newData = hexStringToUint8Array(newDataHex)
 
 	// leftInputs: at leftInputsOffset, first 32 bytes = length, then array of bytes32
 	const leftInputsLen = parseInt(data.slice(leftInputsOffset, leftInputsOffset + 64), 16)

@@ -1,11 +1,12 @@
 import { CID } from "../utils/CID.js"
 
 export interface AccumulatorClientConfig {
-  ETHEREUM_HTTP_RPC_URL: string;
-  CONTRACT_ADDRESS: string;
-  IPFS_API_URL: string;
-  ETHEREUM_WS_RPC_URL?: string;
-  // Add any additional config fields as needed
+	ETHEREUM_HTTP_RPC_URL: string
+	ETHEREUM_WS_RPC_URL?: string
+	CONTRACT_ADDRESS: string
+	IPFS_API_URL: string
+	IPFS_READ_ONLY: boolean
+	DB_PATH?: string
 }
 
 export interface RawEthLog {
