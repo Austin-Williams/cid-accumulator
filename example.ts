@@ -1,7 +1,7 @@
 import type { IpfsAdapter } from "./source/interfaces/IpfsAdapter.ts"
 import type { StorageAdapter } from "./source/interfaces/StorageAdapter.ts"
 
-import { AccumulatorClient } from "./source/accumulator/AccumulatorClient.ts"
+import { AccumulatorClient } from "./source/accumulator/client/AccumulatorClient.ts"
 import { config } from "./config.ts";import { registerGracefulShutdown } from "./source/utils/gracefulShutdown.ts"
 import { isBrowser, isNodeJs } from "./source/utils/envDetection.ts"
 import { IndexedDBAdapter } from "./source/adapters/storage/IndexedDBAdapter.ts"

@@ -1,8 +1,8 @@
-import * as dagCbor from "../utils/dagCbor.ts"
-import { CID } from "../utils/CID.ts"
-import type { IpfsAdapter } from "../interfaces/IpfsAdapter.ts"
-import type { AccumulatorClientConfig } from "../types/types.ts"
-import type { StorageAdapter } from "../interfaces/StorageAdapter.ts"
+import * as dagCbor from "../../utils/dagCbor.ts"
+import { CID } from "../../utils/CID.ts"
+import type { IpfsAdapter } from "../../interfaces/IpfsAdapter.ts"
+import type { AccumulatorClientConfig } from "../../types/types.ts"
+import type { StorageAdapter } from "../../interfaces/StorageAdapter.ts"
 import type {
 	PeakWithHeight,
 	LeafRecord,
@@ -10,16 +10,16 @@ import type {
 	MMRLeafInsertTrail,
 	DagCborEncodedData,
 	CIDDataPair,
-} from "../types/types.ts"
+} from "../../types/types.ts"
 
-import { getAccumulatorData, getLeafInsertLogs, getLatestCID } from "../ethereum/commonCalls.ts"
-import { ethRpcFetch } from "../ethereum/ethRpcFetch.ts"
-import { MerkleMountainRange } from "./MerkleMountainRange.ts"
-import { computePreviousRootCIDAndPeaksWithHeights, getRootCIDFromPeaks } from "./mmrUtils.ts"
-import { walkBackLeafInsertLogsOrThrow } from "../utils/walkBackLogsOrThrow.ts"
-import { resolveMerkleTreeOrThrow } from "../ipfs/ipfs.ts"
-import { isNodeJs } from "../utils/envDetection.ts"
-import { NULL_CID } from "../utils/constants.ts"
+import { getAccumulatorData, getLeafInsertLogs, getLatestCID } from "../../ethereum/commonCalls.ts"
+import { ethRpcFetch } from "../../ethereum/ethRpcFetch.ts"
+import { MerkleMountainRange } from "../merkleMountainRange/MerkleMountainRange.ts"
+import { computePreviousRootCIDAndPeaksWithHeights, getRootCIDFromPeaks } from "../merkleMountainRange/mmrUtils.ts"
+import { walkBackLeafInsertLogsOrThrow } from "../../utils/walkBackLogsOrThrow.ts"
+import { resolveMerkleTreeOrThrow } from "../../ipfs/ipfs.ts"
+import { isNodeJs } from "../../utils/envDetection.ts"
+import { NULL_CID } from "../../utils/constants.ts"
 import {
 	cidDataPairToStringForDB,
 	uint8ArrayToHexString,
@@ -30,8 +30,8 @@ import {
 	stringToPeakWithHeightArray,
 	stringFromDBToCIDDataPair,
 	getLeafRecordFromNormalizedLeafInsertEvent,
-} from "../utils/codec.ts"
-import { verifyCIDAgainstDagCborEncodedDataOrThrow } from "../utils/verifyCID.ts"
+} from "../../utils/codec.ts"
+import { verifyCIDAgainstDagCborEncodedDataOrThrow } from "../../utils/verifyCID.ts"
 
 /**
  * AccumulatorClient: Unified entry point for accumulator logic in any environment.

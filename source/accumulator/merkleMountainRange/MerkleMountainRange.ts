@@ -1,7 +1,7 @@
-import { CID } from "../utils/CID.js"
-import { encodeBlock } from "../utils/codec.ts"
-import { MMRLeafInsertTrail } from "../types/types.ts"
-import { NULL_CID } from "../utils/constants.ts"
+import { CID } from "../../utils/CID.ts"
+import { encodeBlock } from "../../utils/codec.ts"
+import { MMRLeafInsertTrail } from "../../types/types.ts"
+import { NULL_CID } from "../../utils/constants.ts"
 
 export class MerkleMountainRange {
 	public peaks: CID<unknown, 113, 18, 1>[] = []

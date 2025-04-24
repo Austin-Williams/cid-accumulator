@@ -1,4 +1,4 @@
-import { AccumulatorClient } from "../accumulator/AccumulatorClient.ts"
+import { AccumulatorClient } from "../accumulator/client/AccumulatorClient.ts"
 import { isNodeJs, isBrowser } from "./envDetection.ts"
 
 export function registerGracefulShutdown(node: AccumulatorClient) {
