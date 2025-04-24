@@ -8,16 +8,16 @@ import { DagCborCIDEncoder } from "./libraries/DagCborCIDEncoder.sol";
 error DataBlockTooLargeForIPFS(uint256 actualSize);
 
 /**
- * An on-chain Merkle Mountain Range (MMR) accumulator that allows arbitrary
- * data (bytes) to be appended as leaves (via the _addData function). The
- * contract maintains a root hash encoded as an IPFS CID (Content Identifier),
- * which is updated trustlessly -- by this contract itself -- with each insertion.
- * The CID can be used to fetch and verify the complete data set from IPFS, so
- * users don't need their own Ethereum nodes or paid-tier RPC providers to
- * acquire and verify arbitrarily large sets of data from the contract. It is
- * suitable for applications requiring efficient, verifiable access to
- * historical data.
- */
+* An on-chain Merkle Mountain Range (MMR) accumulator that allows arbitrary
+* data (bytes) to be appended as leaves (via the _addData function). The
+* contract maintains a root hash encoded as an IPFS CID (Content Identifier),
+* which is updated trustlessly -- by this contract itself -- with each insertion.
+* The CID can be used to fetch and verify the complete data set from IPFS, so
+* users don't need their own Ethereum nodes or paid-tier RPC providers to
+* acquire and verify arbitrarily large sets of data from the contract. It is
+* suitable for applications requiring efficient, verifiable access to
+* historical data.
+*/
 
 contract CIDAccumulator {
 	// LIBRARIES
@@ -34,17 +34,17 @@ contract CIDAccumulator {
 	// CONSTANTS
 	// Packed bitfield layout for mmrMetaBits
 	uint256 private constant PEAK_COUNT_OFFSET = 160;
-	uint256 private constant PEAK_COUNT_MASK   = 0x1F;	// 5 bits
+	uint256 private constant PEAK_COUNT_MASK = 0x1F; // 5 bits
 	uint256 private constant LEAF_COUNT_OFFSET = 165;
-	uint256 private constant LEAF_COUNT_MASK   = 0xFFFFFFFF;	// 32 bits
+	uint256 private constant LEAF_COUNT_MASK = 0xFFFFFFFF; // 32 bits
 	uint256 private constant PREVIOUS_INSERT_BLOCKNUM_OFFSET = 197;
-	uint256 private constant PREVIOUS_INSERT_BLOCKNUM_MASK = 0xFFFFFFFF;	// 32 bits
+	uint256 private constant PREVIOUS_INSERT_BLOCKNUM_MASK = 0xFFFFFFFF; // 32 bits
 	uint256 private constant DEPLOY_BLOCKNUM_OFFSET = 229;
-	uint256 private constant DEPLOY_BLOCKNUM_MASK = (1 << 27) - 1;	// 0x7FFFFFF
+	uint256 private constant DEPLOY_BLOCKNUM_MASK = 0x7FFFFFF; // 27 bits
 	uint256 private constant MAX_SIZE_IPFS_BLOCK = 1_000_000; // Just under 1 MB
 
 	// STATE VARIABLES
-	bytes32[32] private peaks;  // Fixed-size array for node hashes
+	bytes32[32] private peaks; // Fixed-size array for node hashes
 	/**
 	* Packed bitfield containing all peak node heights, peak count,
 	* total leaf count, the previous insert block number, and the contract
@@ -80,24 +80,23 @@ contract CIDAccumulator {
 
 	// INTERNAL FUNCTIONS
 	function _addData(bytes calldata newData) internal {
+		// Defensive: Reject blocks too large for IPFS
 		if (newData.length > MAX_SIZE_IPFS_BLOCK) revert DataBlockTooLargeForIPFS(newData.length);
 
-		uint256 bits = mmrMetaBits; // SLOAD
+		// SLOAD the packed bitfield and get the peakCount
+		uint256 bits = mmrMetaBits;
+		uint256 peakCount = uint256((bits >> PEAK_COUNT_OFFSET) & PEAK_COUNT_MASK);
 
-		bytes32 carryHash = DagCborCIDEncoder.encodeRawBytes(newData);
-		uint256 carryHeight = 0;
-
-		// Get current peak count
-		uint8 peakCount = uint8((bits >> PEAK_COUNT_OFFSET) & PEAK_COUNT_MASK);
-
-		// Collect combine steps (max 32 possible for 32 peaks)
+		// Collect the left half of all _combine steps (required for off-chain integration)
 		bytes32[32] memory leftInputs;
-		uint8 mergeCount = 0;
 
 		// Merge peaks of equal height
+		bytes32 carryHash = DagCborCIDEncoder.encodeRawBytes(newData);
+		uint256 carryHeight = 0;
+		uint256 mergeCount = 0;
 		while (
 			peakCount > 0 &&
-			uint8((bits >> ((peakCount - 1) * 5)) & 0x1F) == carryHeight
+			uint256((bits >> ((peakCount - 1) * 5)) & 0x1F) == carryHeight
 		) {
 			bytes32 topHash = peaks[peakCount - 1]; // SLOAD
 			peakCount--;
@@ -116,7 +115,7 @@ contract CIDAccumulator {
 
 		// Shrink array to actual size
 		bytes32[] memory finalLeftInputs = new bytes32[](mergeCount);
-		for (uint8 i = 0; i < mergeCount;) {
+		for (uint256 i = 0; i < mergeCount;) {
 			finalLeftInputs[i] = leftInputs[i];
 			unchecked { i++; }
 		}
@@ -130,8 +129,8 @@ contract CIDAccumulator {
 
 		// Update packed heights
 		uint256 heightShift = peakCount * 5;
-		bits &= ~(uint256(0x1F) << heightShift);       // clear old height
-		bits |= uint256(carryHeight) << heightShift;   // set new height
+		bits &= ~(uint256(0x1F) << heightShift); // clear old height
+		bits |= uint256(carryHeight) << heightShift; // set new height
 
 		// Update peak count
 		bits &= ~(PEAK_COUNT_MASK << PEAK_COUNT_OFFSET);
@@ -149,8 +148,8 @@ contract CIDAccumulator {
 		mmrMetaBits = bits; // SSTORE
 	}
 
-	function _getLeafCount() internal view returns (uint32) {
-		return uint32((mmrMetaBits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK);
+	function _getLeafCount() internal view returns (uint256) {
+		return uint256((mmrMetaBits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK);
 	}
 
 	// PRIVATE FUNCTIONS
@@ -159,7 +158,7 @@ contract CIDAccumulator {
 	}
 
 	function _getMMRRoot() private view returns (bytes32 root) {
-		uint8 peakCount = uint8((mmrMetaBits >> PEAK_COUNT_OFFSET) & PEAK_COUNT_MASK);
+		uint256 peakCount = (mmrMetaBits >> PEAK_COUNT_OFFSET) & PEAK_COUNT_MASK;
 		if (peakCount == 0) { return bytes32(0); }
 		root = peaks[0];
 		for (uint256 i = 1; i < peakCount; i++) {
