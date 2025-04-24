@@ -23,7 +23,7 @@ async function main() {
 		storage = new IndexedDBAdapter();
 	} else {
 		const { JSMapAdapter } = await import("./source/adapters/storage/JSMapAdapter.ts");
-		storage = new JSMapAdapter(config.DB_PATH ?? `./cid-accumulator-${config.CONTRACT_ADDRESS}.db.json`);
+		storage = new JSMapAdapter(config.DB_PATH);
 	}
 
 	// Create the client

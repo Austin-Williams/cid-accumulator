@@ -49,6 +49,6 @@ export const config: AccumulatorClientConfig = {
 	// (Optional, Node.js only) Path to the local DB file for storing leaves and metadata.
 	// Example: "./myDB.json"
 	// Leave as `undefined` to use the default path.
-	// The default path is "./cid-accumulator-<CONTRACT_ADDRESS>.db.json"
+	// The default path is "./db/cid-accumulator.json"
 	DB_PATH: undefined
 }

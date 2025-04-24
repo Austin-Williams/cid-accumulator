@@ -158,3 +158,4 @@ eslint.config.js
 .eslintrc.json
 .editorconfig
 
+db/

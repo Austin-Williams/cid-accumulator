@@ -10,8 +10,8 @@ export class JSMapAdapter implements StorageAdapter {
 	private store: Map<string, string> = new Map()
 	private filePath: string
 
-	constructor(filePath: string) {
-		this.filePath = filePath
+	constructor(filePath: string | undefined) {
+		this.filePath = filePath ?? './db/cli-accumulator.json'
 	}
 
 	async put(key: string, value: string): Promise<void> {

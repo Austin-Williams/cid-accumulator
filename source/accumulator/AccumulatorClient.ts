@@ -739,7 +739,7 @@ export class AccumulatorClient {
 	// Retrieve a leaf record by leafIndex, reconstructing from individual fields. Throws if types are not correct. */
 	async getLeafRecord(leafIndex: number): Promise<LeafRecord | undefined> {
 		const newDataStr = await this.storage.get(`leaf:${leafIndex}:newData`)
-		if (!newDataStr) return undefined
+		if (newDataStr === undefined || newDataStr === null) return undefined
 		const newData = hexStringToUint8Array(newDataStr)
 		const eventStr = await this.storage.get(`leaf:${leafIndex}:event`)
 		const event = eventStr !== undefined ? stringToNormalizedLeafInsertEvent(eventStr) : undefined
@@ -769,7 +769,8 @@ export class AccumulatorClient {
 		const missing: number[] = []
 		for (let i = 0; i <= maxLeafIndex; i++) {
 			const rec = await this.getLeafRecord(i)
-			if (!rec || !rec.newData) missing.push(i)
+			// Only count as missing if rec is undefined or newData is not a Uint8Array
+			if (!rec || !(rec.newData instanceof Uint8Array)) missing.push(i)
 		}
 		return missing
 	}
