@@ -50,10 +50,10 @@ export class AccumulatorClient {
 	shouldPin: boolean
 	shouldProvide: boolean
 
-	private _liveSyncRunning: boolean = false
-	private _liveSyncInterval?: ReturnType<typeof setTimeout>
-	private _lastProcessedBlock: number = 0
-	private _ws?: WebSocket
+	protected _liveSyncRunning: boolean = false
+	protected _liveSyncInterval?: ReturnType<typeof setTimeout>
+	protected _lastProcessedBlock: number = 0
+	protected _ws?: WebSocket
 
 	constructor(
 		config: AccumulatorClientConfig & {
@@ -223,7 +223,7 @@ export class AccumulatorClient {
 					event.leftInputs,
 				)
 				// Store the relevat data in the DB
-				await this.#putLeafRecordInDB(event.leafIndex, {
+				await this.putLeafRecordInDB(event.leafIndex, {
 					newData: event.newData,
 					event,
 					blockNumber: event.blockNumber,
@@ -291,7 +291,9 @@ export class AccumulatorClient {
 	 * @returns A Promise that resolves when the MMR has been rebuilt from all uncommitted leaves.
 	 */
 	async rebuildAndProvideMMR(): Promise<void> {
-		console.log(`[Accumulator] ⛰️ Rebuilding the Merkle Mountain Range from synced leaves and pinning to IPFS...`)
+		console.log(
+			`[Accumulator] ⛰️ Rebuilding the Merkle Mountain Range from synced leaves${this.shouldPin ? " and pinning to IPFS" : ""}...`,
+		)
 		const fromIndex: number = this.highestCommittedLeafIndex + 1
 		const toIndex: number = await this.getHighestContiguousLeafIndexWithData()
 		if (fromIndex > toIndex)
@@ -304,7 +306,7 @@ export class AccumulatorClient {
 			if (!record || !record.newData) throw new Error(`[Accumulator] Expected newData for leaf ${i}`)
 			if (!(record.newData instanceof Uint8Array))
 				throw new Error(`[Accumulator] newData for leaf ${i} is not a Uint8Array`)
-			await this.#commitLeaf(i, record.newData)
+			await this.commitLeaf(i, record.newData)
 		}
 		console.log(`[Accumulator] \u{2705} Fully rebuilt the Merkle Mountain Range up to leaf index ${toIndex}`)
 		await this.storage.persist()
@@ -340,7 +342,7 @@ export class AccumulatorClient {
 		let useSubscription = false
 		if (this.ethereumWsRpcUrl) {
 			console.log(`[Accumulator] \u{2705} Detected ETHEREUM_WS_RPC_URL: ${this.ethereumWsRpcUrl}`)
-			useSubscription = await this.#detectSubscriptionSupport(this.ethereumWsRpcUrl)
+			useSubscription = await this.detectSubscriptionSupport(this.ethereumWsRpcUrl)
 			if (!useSubscription) {
 				console.log("[Accumulator] \u{274C} WS endpoint does not support eth_subscribe, falling back to polling.")
 			}
@@ -351,9 +353,9 @@ export class AccumulatorClient {
 			`[Accumulator] \u{1F440} Using ${useSubscription ? "websocket subscription" : "HTTP polling"} to monitor the chain for new data insertions.`,
 		)
 		if (useSubscription) {
-			this.#startSubscriptionSync()
+			this.startSubscriptionSync()
 		} else {
-			this.#startPollingSync(pollIntervalMs)
+			this.startPollingSync(pollIntervalMs)
 		}
 	}
 
@@ -374,7 +376,7 @@ export class AccumulatorClient {
 	 * Attempts to detect if the given wsUrl supports Ethereum subscriptions (eth_subscribe).
 	 * Returns true if successful, false otherwise.
 	 */
-	async #detectSubscriptionSupport(wsUrl: string): Promise<boolean> {
+	protected async detectSubscriptionSupport(wsUrl: string): Promise<boolean> {
 		if (!wsUrl.startsWith("ws://") && !wsUrl.startsWith("wss://")) {
 			console.log(`[Accumulator] 👎 ETHEREUM_WS_RPC_URL is not a ws:// or wss:// URL: ${wsUrl}`)
 			return false
@@ -444,7 +446,7 @@ export class AccumulatorClient {
 		})
 	}
 
-	#startPollingSync(pollIntervalMs: number) {
+	protected startPollingSync(pollIntervalMs: number) {
 		const poll = async () => {
 			try {
 				const { meta } = await getAccumulatorData(this.ethereumHttpRpcUrl, this.contractAddress)
@@ -457,7 +459,7 @@ export class AccumulatorClient {
 						latestBlock,
 					)
 					for (const event of newEvents) {
-						await this.#processNewLeafEvent(event)
+						await this.processNewLeafEvent(event)
 					}
 					this._lastProcessedBlock = latestBlock
 				}
@@ -471,7 +473,7 @@ export class AccumulatorClient {
 		poll()
 	}
 
-	#startSubscriptionSync() {
+	protected startSubscriptionSync() {
 		if (!this.ethereumWsRpcUrl) {
 			console.error("[Accumulator] No ETHEREUM_WS_RPC_URL set. Cannot start subscription sync.")
 			return
@@ -517,7 +519,7 @@ export class AccumulatorClient {
 								latestBlock,
 							)
 							for (const event of newEvents) {
-								await this.#processNewLeafEvent(event)
+								await this.processNewLeafEvent(event)
 							}
 							this._lastProcessedBlock = latestBlock
 						}
@@ -539,7 +541,7 @@ export class AccumulatorClient {
 	}
 
 	// Processes a new leaf event and commits it to the MMR.
-	async #processNewLeafEvent(event: NormalizedLeafInsertEvent): Promise<void> {
+	protected async processNewLeafEvent(event: NormalizedLeafInsertEvent): Promise<void> {
 		// return if we have already processed this leaf
 		if (event.leafIndex <= this.highestCommittedLeafIndex) return
 
@@ -557,16 +559,16 @@ export class AccumulatorClient {
 				this.highestCommittedLeafIndex + 1,
 			)
 			for (let i = 0; i < pastEvents.length; i++) {
-				await this.#processNewLeafEvent(pastEvents[i])
+				await this.processNewLeafEvent(pastEvents[i])
 			}
 			console.log(`[Accumulator] \u{1F44D} Got the missing events.`)
 		}
 
 		// Store the event in the DB
-		await this.#putLeafRecordInDB(event.leafIndex, getLeafRecordFromNormalizedLeafInsertEvent(event))
+		await this.putLeafRecordInDB(event.leafIndex, getLeafRecordFromNormalizedLeafInsertEvent(event))
 
 		// Commit the leaf to the MMR
-		await this.#commitLeaf(event.leafIndex, event.newData)
+		await this.commitLeaf(event.leafIndex, event.newData)
 
 		// === THE FOLLOWING CODE BLOCK CAN BE REMOVED. IT IS JUST A SANITY CHECK. ===
 		const { meta } = await getAccumulatorData(this.ethereumHttpRpcUrl, this.contractAddress)
@@ -592,15 +594,15 @@ export class AccumulatorClient {
 	}
 
 	// Adds a leaf to the MMR, stores the trail in the DB, and pins the full trail to IPFS (if applicable).
-	async #commitLeaf(leafIndex: number, newData: Uint8Array): Promise<void> {
+	protected async commitLeaf(leafIndex: number, newData: Uint8Array): Promise<void> {
 		// Add leaf to MMR
 		const trail = await this.mmr.addLeafWithTrail(leafIndex, newData)
 		// Store trail in local DB (efficient append-only)
-		await this.#appendTrailToDB(trail)
+		await this.appendTrailToDB(trail)
 		// Pin and provide trail to IPFS
 		if (this.shouldPut) {
 			for (const { cid, dagCborEncodedData } of trail) {
-				await this.#putPinProvideToIPFS(cid, dagCborEncodedData)
+				await this.putPinProvideToIPFS(cid, dagCborEncodedData)
 			}
 		}
 
@@ -637,7 +639,7 @@ export class AccumulatorClient {
 			const leavesPromise = resolveMerkleTreeOrThrow(cid, this.ipfs)
 			const leaves = await (abortPromise ? Promise.race([leavesPromise, abortPromise]) : leavesPromise)
 			for (let i = 0; i < leaves.length; i++)
-				await this.#putLeafRecordInDB(i, { newData: leaves[i], __type: "LeafRecord" })
+				await this.putLeafRecordInDB(i, { newData: leaves[i], __type: "LeafRecord" })
 			return true
 		} catch {
 			// Always return false on any error (including AbortError)
@@ -674,7 +676,7 @@ export class AccumulatorClient {
 						const pair: CIDDataPair | null = await this.getCIDDataPairFromDB(i)
 						if (!pair) throw new Error(`[Accumulator] Expected CIDDataPair for leaf ${i}`)
 
-						const putOk = await this.#putPinProvideToIPFS(pair.cid, pair.dagCborEncodedData)
+						const putOk = await this.putPinProvideToIPFS(pair.cid, pair.dagCborEncodedData)
 						if (!putOk) {
 							failed++
 							continue
@@ -693,7 +695,10 @@ export class AccumulatorClient {
 	}
 
 	// Helper for robust IPFS put/pin/provide with logging
-	async #putPinProvideToIPFS(cid: CID<unknown, 113, 18, 1>, dagCborEncodedData: DagCborEncodedData): Promise<boolean> {
+	protected async putPinProvideToIPFS(
+		cid: CID<unknown, 113, 18, 1>,
+		dagCborEncodedData: DagCborEncodedData,
+	): Promise<boolean> {
 		await verifyCIDAgainstDagCborEncodedDataOrThrow(dagCborEncodedData, cid)
 		if (this.shouldPut) {
 			try {
@@ -720,7 +725,7 @@ export class AccumulatorClient {
 	// ====================================================
 
 	// Store a leaf record in the DB by leafIndex, splitting fields into separate keys.
-	async #putLeafRecordInDB(leafIndex: number, value: LeafRecord): Promise<void> {
+	protected async putLeafRecordInDB(leafIndex: number, value: LeafRecord): Promise<void> {
 		// Store newData
 		await this.storage.put(`leaf:${leafIndex}:newData`, uint8ArrayToHexString(value.newData))
 		// Store optional fields as strings
@@ -780,7 +785,7 @@ export class AccumulatorClient {
 	 * Each pair is stored as dag:trail:<index>. The max index is tracked by dag:trail:maxIndex.
 	 * Does not store a CID/Data pair if it is already in the DB
 	 */
-	async #appendTrailToDB(trail: MMRLeafInsertTrail): Promise<void> {
+	protected async appendTrailToDB(trail: MMRLeafInsertTrail): Promise<void> {
 		let maxIndex = Number((await this.storage.get("dag:trail:maxIndex")) ?? -1)
 		for (const pair of trail) {
 			await verifyCIDAgainstDagCborEncodedDataOrThrow(pair.dagCborEncodedData, pair.cid)

@@ -11,7 +11,7 @@ export class JSMapAdapter implements StorageAdapter {
 	private filePath: string
 
 	constructor(filePath: string | undefined) {
-		this.filePath = filePath ?? './db/cli-accumulator.json'
+		this.filePath = filePath ?? "./db/cli-accumulator.json"
 	}
 
 	async put(key: string, value: string): Promise<void> {
