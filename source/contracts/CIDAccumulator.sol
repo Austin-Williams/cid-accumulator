@@ -63,11 +63,6 @@ contract CIDAccumulator {
 	uint256 private mmrMetaBits;
 
 	constructor() {
-		// Insert non-zero data into all 32 peaks storage slots for gas optimization
-		for (uint256 i = 0; i < 32; i++) {
-			peaks[i] = bytes32(uint256(1));
-		}
-
 		mmrMetaBits = uint256(block.number) << DEPLOY_BLOCKNUM_OFFSET;
 	}
 
