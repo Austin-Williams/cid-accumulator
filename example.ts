@@ -17,7 +17,7 @@ async function main() {
 		config.IPFS_PROVIDE_IF_POSSIBLE
 	)
 
-	// Set up storage adapter (see source/adapters/storage for other options, or create your own)
+	// Create a Storage adapter appropriate for your environment (e.g. IndexedDBAdapter for browser, JSMapAdapter for NodeJs)
 	let storage: StorageAdapter
 	if (isBrowser()) {
 		storage = new IndexedDBAdapter();
@@ -29,11 +29,17 @@ async function main() {
 	// Create the client
 	const accumulatorClient = new AccumulatorClient({...config, ipfs, storage})
 
-	// (Optional) Register SIGINT handler for graceful shutdown (only applicable in NodeJs environment)
+	// (Optional) Register SIGINT handler for graceful shutdown in NodeJs
 	if (isNodeJs()) registerGracefulShutdown(accumulatorClient)
 
 	// Start the client
 	await accumulatorClient.start()
+
+	// Keep the process running if in NodeJs (not needed in browser)
+	if (isNodeJs()) {
+		console.log("[Accumulator] Running in persistent mode. Press Ctrl+C to exit.");
+		await new Promise(() => {})
+	}
 }
 
 await main().catch((e) => {
