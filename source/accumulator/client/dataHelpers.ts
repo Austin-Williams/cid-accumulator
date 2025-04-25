@@ -4,12 +4,11 @@ import { isNodeJs } from "../../utils/envDetection.ts"
 export async function downloadAll(storageAdapter: StorageAdapter, prefix: string): Promise<string> {
 	// Gather all leaf data
 	const allData: Array<{ index: number; data: string }> = []
-	let index = 0
-	while (true) {
-		const dataString: string | undefined = await storageAdapter.get(`${prefix}${index}`)
-		if (!dataString) break
-		allData.push({ index, data: dataString })
-		index++
+	for await (const { key, value } of storageAdapter.iterate(prefix)) {
+		const match = key.match(/^leaf:(\d+):newData$/)
+		if (match) {
+			allData.push({ index: Number(match[1]), data: value })
+		}
 	}
 	const json = JSON.stringify(allData, null, 2)
 
