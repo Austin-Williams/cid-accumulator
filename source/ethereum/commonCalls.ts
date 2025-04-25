@@ -68,8 +68,9 @@ export async function getLeafInsertLogs(
 	contractAddress: string,
 	fromBlock: number,
 	toBlock: number,
+	eventTopicOverride?: string,
 ): Promise<NormalizedLeafInsertEvent[]> {
-	const eventTopic = getEventTopic("LeafInsert(uint32,uint32,bytes,bytes32[])")
+	const eventTopic = eventTopicOverride ?? getEventTopic("LeafInsert(uint32,uint32,bytes,bytes32[])")
 	const rawLogs: RawEthLog[] = await ethRpcFetch(rpcUrl, "eth_getLogs", [
 		{
 			address: contractAddress,
@@ -102,8 +103,9 @@ export async function getLeafInsertLogForTargetLeafIndex(
 	fromBlock: number,
 	toBlock: number,
 	targetLeafIndex: number,
+	eventTopicOverride?: string,
 ): Promise<NormalizedLeafInsertEvent | null> {
-	const eventTopic = getEventTopic("LeafInsert(uint32,uint32,bytes,bytes32[])")
+	const eventTopic = eventTopicOverride ?? getEventTopic("LeafInsert(uint32,uint32,bytes,bytes32[])")
 	const leafIndexTopic = "0x" + targetLeafIndex.toString(16).padStart(64, "0")
 	const topics = [eventTopic, leafIndexTopic]
 	const rawLogs: RawEthLog[] = await ethRpcFetch(rpcUrl, "eth_getLogs", [
