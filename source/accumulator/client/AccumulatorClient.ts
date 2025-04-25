@@ -1,4 +1,5 @@
 import * as dagCbor from "../../utils/dagCbor.ts"
+import { isBrowser } from "../../utils/envDetection.ts"
 import type { IpfsAdapter } from "../../interfaces/IpfsAdapter.ts"
 import type { AccumulatorClientConfig } from "../../types/types.ts"
 import type { StorageAdapter } from "../../interfaces/StorageAdapter.ts"
@@ -138,6 +139,13 @@ export class AccumulatorClient {
 			() => this.highestCommittedLeafIndex,
 			(block: number) => (this.highestCommittedLeafIndex = block),
 		)
+
+		// Expose client in browser (to give user access control)
+		if (isBrowser()) {
+			// @ts-ignore
+			window.accumulatorClient = this
+		}
+
 		this.rePinAllDataToIPFS() // Fire-and-forget, no-ops if this.shouldPin is false
 
 		startLiveSync( // Fire-and-forget
