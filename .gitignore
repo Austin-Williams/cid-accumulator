@@ -159,3 +159,5 @@ eslint.config.js
 .editorconfig
 
 db/
+
+vite.config.ts

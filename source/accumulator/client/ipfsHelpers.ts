@@ -90,7 +90,7 @@ export function rePinAllDataToIPFS(
 						continue
 					}
 					count++
-					if (count % 100 === 0) {
+					if (count % 1000 === 0) {
 						console.log(`[Accumulator] \u{1F4CC} UPDATE: Re-pinned ${count} CIDs to IPFS so far. Still working...`)
 					}
 				} catch (err) {

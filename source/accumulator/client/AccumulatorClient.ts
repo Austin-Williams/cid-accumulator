@@ -1,84 +1,79 @@
 import * as dagCbor from "../../utils/dagCbor.ts"
-import { isBrowser } from "../../utils/envDetection.ts"
 import type { IpfsAdapter } from "../../interfaces/IpfsAdapter.ts"
-import type { AccumulatorClientConfig } from "../../types/types.ts"
+import type { AccumulatorClientConfig, IpfsNamespace, StorageNamespace, SyncNamespace } from "../../types/types.ts"
 import type { StorageAdapter } from "../../interfaces/StorageAdapter.ts"
-import { syncBackwardsFromLatest, startLiveSync, stopLiveSync } from "./syncHelpers.ts"
+import { isBrowser, isNodeJs } from "../../utils/envDetection.ts"
+import { getAccumulatorData } from "../../ethereum/commonCalls.ts"
 import { rebuildAndProvideMMR } from "./mmrHelpers.ts"
-import { rePinAllDataToIPFS } from "./ipfsHelpers.ts"
 import { getHighestContiguousLeafIndexWithData } from "./storageHelpers.ts"
-import { ethRpcFetch } from "../../ethereum/ethRpcFetch.ts"
 import { MerkleMountainRange } from "../merkleMountainRange/MerkleMountainRange.ts"
-import { isNodeJs } from "../../utils/envDetection.ts"
 import { NULL_CID } from "../../utils/constants.ts"
+import { getStorageNamespace } from "./storageNamespace.ts"
+import { getIpfsNamespace } from "./ipfsNamespace.ts"
+import { getSyncNamespace } from "./syncNamespace.ts"
+import { startLiveSync, stopLiveSync, syncBackwardsFromLatest } from "./syncHelpers.ts";
+import { UniversalIpfsAdapter } from "../../adapters/ipfs/UniversalIpfsAdapter.ts"
+import { IndexedDBAdapter } from "../../adapters/storage/IndexedDBAdapter.ts"
 
 /**
  * AccumulatorClient: Unified entry point for accumulator logic in any environment.
  * Pass in the appropriate IpfsAdapter and StorageAdapter for your environment.
  */
 export class AccumulatorClient {
-	ipfs: IpfsAdapter
-	storage: StorageAdapter
-	ethereumHttpRpcUrl: string
-	ethereumWsRpcUrl?: string
-	contractAddress: string
-	mmr: MerkleMountainRange
-	highestCommittedLeafIndex: number
-
-	shouldPut: boolean
-	shouldPin: boolean
-	shouldProvide: boolean
-
-	protected liveSyncRunning: boolean = false
-	protected liveSyncInterval: ReturnType<typeof setTimeout> | undefined
-	protected lastProcessedBlock: number = 0
-	protected ws: WebSocket | undefined
+	public config: AccumulatorClientConfig
+	public storage?: StorageNamespace
+	public ipfs?: IpfsNamespace
+	public sync?: SyncNamespace
+	public mmr: MerkleMountainRange
 
 	constructor(
-		config: AccumulatorClientConfig & {
-			ipfs: IpfsAdapter
-			storage: StorageAdapter
-		},
+		config: AccumulatorClientConfig
 	) {
-		this.ipfs = config.ipfs
-		this.storage = config.storage
-		this.ethereumHttpRpcUrl = config.ETHEREUM_HTTP_RPC_URL
-		this.ethereumWsRpcUrl = config.ETHEREUM_WS_RPC_URL
-		this.contractAddress = config.CONTRACT_ADDRESS
+		this.config = config
 		this.mmr = new MerkleMountainRange()
-		this.highestCommittedLeafIndex = -1
-		this.shouldPut = config.IPFS_PUT_IF_POSSIBLE && config.IPFS_API_URL !== undefined
-		this.shouldPin = config.IPFS_PIN_IF_POSSIBLE && config.IPFS_API_URL !== undefined
-		this.shouldProvide = config.IPFS_PROVIDE_IF_POSSIBLE && config.IPFS_API_URL !== undefined && isNodeJs()
-
-		if (!this.shouldPut) this.shouldPin = false // Doesn't make sense to pin if they don't put
-		if (!this.shouldPin) this.shouldProvide = false // Doesn't make sense to provide if they don't pin
 	}
 
 	async init(): Promise<void> {
-		// Ensure DB is open
-		await this.storage.open()
+		// SET UP STORAGE
+		// Create a Storage adapter appropriate for the environment
+		let storageAdapter: StorageAdapter
+		if (isBrowser()) {
+			storageAdapter = new IndexedDBAdapter()
+		} else {
+			const { JSMapAdapter } = await import("../../adapters/storage/JSMapAdapter.ts")
+			storageAdapter = new JSMapAdapter(this.config.DB_PATH)
+		}
+		// Initialize the Storage namespace
+		this.storage = getStorageNamespace(storageAdapter)
 
-		// Log how many leafs we have in the DB
-		const highestLeafIndexInDB = await getHighestContiguousLeafIndexWithData(this.storage)
+		// Ensure DB is open
+		await this.storage.storageAdapter.open()
+
+		// Log how many leaves are in the DB
+		const highestLeafIndexInDB = await getHighestContiguousLeafIndexWithData(this.storage.storageAdapter)
 		console.log(`[Accumulator] \u{1F4E4} Found ${highestLeafIndexInDB + 1} leafs in DB`)
 
-		// Check if Ethereum connection is working
-		console.log("[Accumulator] \u{1F440} Checking Ethereum connection...")
-		try {
-			// Use eth_chainId as a lightweight check
-			const chainId = await ethRpcFetch(this.ethereumHttpRpcUrl, "eth_chainId", [])
-			console.log(`[Accumulator] \u{2705} Connected to Ethereum node, chainId: ${chainId}`)
-		} catch (e) {
-			console.error("[Accumulator] \u{274C} Failed to connect to Ethereum node:", e)
-			throw new Error("Failed to connect to Ethereum node. See above error.")
-		}
+		// SET UP IPFS
+		// Create an IPFS adapter
+		const ipfsAdapter: IpfsAdapter = new UniversalIpfsAdapter(
+			this.config.IPFS_GATEWAY_URL,
+			this.config.IPFS_API_URL,
+			this.config.IPFS_PUT_IF_POSSIBLE,
+			this.config.IPFS_PIN_IF_POSSIBLE,
+			this.config.IPFS_PROVIDE_IF_POSSIBLE
+		)
 
+		let shouldPut = this.config.IPFS_PUT_IF_POSSIBLE && this.config.IPFS_API_URL !== undefined
+		let shouldPin = this.config.IPFS_PIN_IF_POSSIBLE && this.config.IPFS_API_URL !== undefined
+		let shouldProvide = this.config.IPFS_PROVIDE_IF_POSSIBLE && this.config.IPFS_API_URL !== undefined && isNodeJs()
+		if (!shouldPut) shouldPin = false // Doesn't make sense to pin if they don't put
+		if (!shouldPin) shouldProvide = false // Doesn't make sense to provide if they don't pin
+			
 		// Check if IPFS Gateway connection is working
 		console.log("[Accumulator] \u{1F440} Checking IPFS Gateway connection...")
 		try {
 			// Attempt to fetch a block
-			await this.ipfs.getBlock(NULL_CID)
+			await ipfsAdapter.getBlock(NULL_CID)
 			console.log("[Accumulator] \u{2705} Connected to IPFS Gateway.")
 		} catch (e) {
 			console.error("[Accumulator] \u{274C} Failed to connect to IPFS Gateway:", e)
@@ -86,86 +81,122 @@ export class AccumulatorClient {
 		}
 
 		// If relevant, check that IPFS API connection can PUT/PIN
-		if (this.shouldPut) {
+		if (shouldPut) {
 			console.log("[Accumulator] \u{1F440} Checking IPFS API connection (attempting to PUT a block)...")
 			try {
 				// Attempt to put a block
-				await this.ipfs.putBlock(NULL_CID, dagCbor.encode(null))
+				await ipfsAdapter.putBlock(NULL_CID, dagCbor.encode(null))
 				console.log("[Accumulator] \u{2705} Connected to IPFS API and verified it can PUT blocks.")
 			} catch (e) {
-				this.shouldPut = false
-				this.shouldPin = false
+				shouldPut = false
+				shouldPin = false
 				console.error("[Accumulator] \u{274C} Failed to connect to IPFS API:", e)
 				console.log("[Accumulator] 🤷‍♂️ Will continue without IPFS API connection (Using IPFS Gateway only).")
 			}
 		}
 
 		// If relevant, check that IPFS API connection can PUT/PIN
-		if (this.shouldProvide && this.shouldPut) {
+		if (shouldProvide && shouldPut) {
 			console.log("[Accumulator] \u{1F440} Checking if IPFS API can provide (advertise) blocks...")
 			try {
 				// Attempt to provide a block
-				await this.ipfs.provide(NULL_CID)
+				await ipfsAdapter.provide(NULL_CID)
 				console.log("[Accumulator] \u{2705} Connected to IPFS API and verified it can PROVIDE blocks.")
 			} catch (e) {
-				this.shouldProvide = false
+				shouldProvide = false
 				console.error("[Accumulator] \u{274C} Failed to verify that the IPFS API can provide (advertise) blocks.", e)
 				console.log("[Accumulator] 🤷‍♂️ Will continue without telling IPFS API to provide (advertise) blocks.")
 			}
 		}
-		console.log("[Accumulator] \u{2705} Successfully initialized. Summary:")
+
+		// Initialize the IPFS namespace object
+		this.ipfs = getIpfsNamespace(ipfsAdapter, this.storage.storageAdapter, shouldPut, shouldPin, shouldProvide)
+
+		console.log("[Accumulator] 📜 IPFS Capability Summary:")
 		console.log(`[Accumulator] 📜 Summary: IPFS Gateway connected: YES`)
-		console.log(`[Accumulator] 📜 Summary: IPFS API PUT is set up: ${this.shouldPut ? "YES" : "NO"}`)
-		console.log(`[Accumulator] 📜 Summary: IPFS API PIN is set up: ${this.shouldPin ? "YES" : "NO"}`)
-		console.log(`[Accumulator] 📜 Summary: IPFS API PROVIDE is set up: ${this.shouldProvide ? "YES" : "NO"}`)
+		console.log(`[Accumulator] 📜 Summary: IPFS API PUT is set up: ${shouldPut ? "YES" : "NO"}`)
+		console.log(`[Accumulator] 📜 Summary: IPFS API PIN is set up: ${shouldPin ? "YES" : "NO"}`)
+		console.log(`[Accumulator] 📜 Summary: IPFS API PROVIDE is set up: ${shouldProvide ? "YES" : "NO"}`)
+
+		// SET UP SYNC
+		// Check if Ethereum connection is working
+		console.log("[Accumulator] \u{1F440} Checking Ethereum connection...")
+		let lastProcessedBlock: number = 0
+		try {
+			const { meta } = await getAccumulatorData(this.config.ETHEREUM_HTTP_RPC_URL, this.config.CONTRACT_ADDRESS)
+			console.log(`[Accumulator] \u{2705} Connected to Ethereum. Target contract address: ${this.config.CONTRACT_ADDRESS}`)
+			lastProcessedBlock = meta.deployBlockNumber - 1
+		} catch (e) {
+			console.error("[Accumulator] \u{274C} Failed to connect to Ethereum node:", e)
+			throw new Error("Failed to connect to Ethereum node. See above error.")
+		}
+		// Initialize a Sync namespace object
+		this.sync = getSyncNamespace(
+			this.ipfs.ipfsAdapter,
+			this.mmr,
+			this.storage.storageAdapter,
+			this.config.ETHEREUM_HTTP_RPC_URL,
+			this.config.ETHEREUM_WS_RPC_URL,
+			this.config.CONTRACT_ADDRESS,
+			lastProcessedBlock,
+			this.ipfs.shouldPut,
+			this.ipfs.shouldPin,
+			this.ipfs.shouldProvide
+		)
+
+		console.log("[Accumulator] \u{2705} Successfully initialized.")
 	}
 
 	async start(): Promise<void> {
-		await this.init()
+		await this.init();
+	
+		if (!this.ipfs || !this.sync || !this.storage) throw new Error("Not all namespaces present. This should never happen.")
+	
 		await syncBackwardsFromLatest(
-			this.ipfs,
-			this.storage,
-			this.ethereumHttpRpcUrl,
-			this.contractAddress,
-			(block: number) => (this.lastProcessedBlock = block),
-			1000, // maxBlockRangePerRpcCall
-		)
-		await rebuildAndProvideMMR(
-			this.ipfs,
-			this.mmr,
-			this.storage,
-			this.shouldPin,
-			this.shouldProvide,
-			() => this.highestCommittedLeafIndex,
-			(block: number) => (this.highestCommittedLeafIndex = block),
+			this.ipfs.ipfsAdapter,
+			this.storage.storageAdapter,
+			this.sync.ethereumHttpRpcUrl,
+			this.sync.contractAddress,
+			(block: number) => (this.sync!.lastProcessedBlock = block),
+			1000,
 		)
 
-		// Expose client in browser (to give user access control)
+		await rebuildAndProvideMMR(
+			this.ipfs.ipfsAdapter,
+			this.mmr,
+			this.storage.storageAdapter,
+			this.ipfs.shouldPin,
+			this.ipfs.shouldProvide,
+			() => this.sync!.highestCommittedLeafIndex,
+			(block: number) => (this.sync!.highestCommittedLeafIndex = block),
+		)
+
+		// Expose client in browser (to give user control)
 		if (isBrowser()) {
 			// @ts-ignore
 			window.accumulatorClient = this
 		}
 
-		this.rePinAllDataToIPFS() // Fire-and-forget, no-ops if this.shouldPin is false
+		this.ipfs.rePinAllDataToIPFS() // Fire-and-forget, no-ops if this.ipfs.shouldPin is false
 
 		startLiveSync( // Fire-and-forget
-			this.ipfs,
+			this.ipfs.ipfsAdapter,
 			this.mmr,
-			this.storage,
-			this.contractAddress,
-			this.ethereumHttpRpcUrl,
-			this.ethereumWsRpcUrl,
-			this.ws,
-			(newWs: WebSocket | undefined) => (this.ws = newWs),
-			() => this.liveSyncRunning,
-			(isRunning: boolean) => (this.liveSyncRunning = isRunning),
-			(interval: ReturnType<typeof setTimeout> | undefined) => (this.liveSyncInterval = interval),
-			this.lastProcessedBlock,
-			(block: number) => (this.lastProcessedBlock = block),
-			() => this.highestCommittedLeafIndex,
-			(leafIndex: number) => (this.highestCommittedLeafIndex = leafIndex),
-			this.shouldPin,
-			this.shouldProvide,
+			this.storage.storageAdapter,
+			this.sync.contractAddress,
+			this.sync.ethereumHttpRpcUrl,
+			this.sync.ethereumWsRpcUrl,
+			this.sync.websocket,
+			(newWs: WebSocket | undefined) => (this.sync!.websocket = newWs),
+			() => this.sync!.liveSyncRunning,
+			(isRunning: boolean) => (this.sync!.liveSyncRunning = isRunning),
+			(interval: ReturnType<typeof setTimeout> | undefined) => (this.sync!.liveSyncInterval = interval),
+			this.sync.lastProcessedBlock,
+			(block: number) => (this.sync!.lastProcessedBlock = block),
+			() => this.sync!.highestCommittedLeafIndex,
+			(leafIndex: number) => (this.sync!.highestCommittedLeafIndex = leafIndex),
+			this.ipfs.shouldPin,
+			this.ipfs.shouldProvide,
 		)
 	}
 
@@ -174,44 +205,18 @@ export class AccumulatorClient {
 	 * Safe to call multiple times.
 	 */
 	public async shutdown(): Promise<void> {
+		if (!this.sync || !this.ipfs || !this.storage) throw new Error("Not all namespaces present. This should never happen.")
 		console.log("[Accumulator] 👋 Shutting down gracefully.")
 		// Stop live sync (polling or WS)
 		stopLiveSync(
-			this.ws,
-			(newWs: WebSocket | undefined) => (this.ws = newWs),
-			this.liveSyncInterval,
-			(isRunning: boolean) => (this.liveSyncRunning = isRunning),
-			(interval: ReturnType<typeof setTimeout> | undefined) => (this.liveSyncInterval = interval),
+			this.sync!.websocket,
+			(newWs: WebSocket | undefined) => (this.sync!.websocket = newWs),
+			() => this.sync!.liveSyncInterval,
+			(isRunning: boolean) => (this.sync!.liveSyncRunning = isRunning),
+			(interval: ReturnType<typeof setTimeout> | undefined) => (this.sync!.liveSyncInterval = interval),
 		)
 		// Close DB if possible
-		await this.storage.close()
+		await this.storage.storageAdapter.close()
 		console.log("[Accumulator] 🏁 Done.")
-	}
-
-	// TODO behind a .sync namespace:
-	// - startSubscriptionSync
-	// - startPollingSync
-	// - startLiveSync (autodetects subscription support)
-	// - stopLiveSync
-	// - syncBackwardsFromLatest
-
-	/**
-	 * Initiates a background process to re-pin all CIDs and associated data (leaves, roots, and intermediate nodes)
-	 * to the configured IPFS node. This is useful for recovering or ensuring pinning of all
-	 * data previously synced by the accumulator, especially if the IPFS node has lost data.
-	 *
-	 * This operation is typically not required during normal operation, as data is automatically pinned
-	 * during MMR rebuilds and new leaf insertions. It is provided as a utility for
-	 * maintenance and data recovery scenarios.
-	 *
-	 * This method is non-blocking and fire-and-forget: it does not wait for completion and does not return a Promise.
-	 * Progress and errors are logged to the console asynchronously.
-	 *
-	 * @remarks
-	 * - If you need to track completion or handle errors, consider refactoring to return a Promise.
-	 * - For normal operation, manual re-pinning is not necessary.
-	 */
-	public rePinAllDataToIPFS(): void {
-		rePinAllDataToIPFS(this.ipfs, this.storage, this.shouldPut, this.shouldPin, this.shouldProvide)
 	}
 }

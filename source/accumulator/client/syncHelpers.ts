@@ -234,13 +234,13 @@ export async function startLiveSync(
 export function stopLiveSync(
 	ws: WebSocket | undefined,
 	setWs: (ws: WebSocket | undefined) => void,
-	liveSyncInterval: ReturnType<typeof setTimeout> | undefined,
+	getLiveSyncInterval: () => ReturnType<typeof setTimeout> | undefined,
 	setLiveSyncRunning: (isRunning: boolean) => void,
 	setLiveSyncInterval: (interval: ReturnType<typeof setTimeout> | undefined) => void,
 ) {
 	setLiveSyncRunning(false)
-	if (liveSyncInterval) {
-		clearTimeout(liveSyncInterval)
+	if (getLiveSyncInterval()) {
+		clearTimeout(getLiveSyncInterval())
 		setLiveSyncInterval(undefined)
 	}
 	if (ws) {
