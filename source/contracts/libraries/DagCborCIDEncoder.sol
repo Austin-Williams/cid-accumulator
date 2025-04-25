@@ -18,8 +18,8 @@ library DagCborCIDEncoder {
 		} else if (len < 65536) {
 			prefixLen = 3;
 		} else {
-				prefixLen = 5;
-	}
+			prefixLen = 5;
+		}
 
 		bytes memory cbor = new bytes(prefixLen + len);
 

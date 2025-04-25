@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { DagCborCIDEncoder } from "./libraries/DagCborCIDEncoder.sol";
+import { DagCborCIDEncoder } from "../libraries/DagCborCIDEncoder.sol";
 
 
 // CUSTOM ERRORS
