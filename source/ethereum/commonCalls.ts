@@ -11,9 +11,16 @@ import { contractPeakHexToMmrCid } from "../utils/codec.ts"
  * @param contractAddress - The deployed contract address
  * @returns The latest CID as a multiformats.CID object
  */
-export async function getLatestCID(rpcUrl: string, contractAddress: string): Promise<CID> {
-	const selector = getSelector("getLatestCID()")
-	const contractRootHex: string = await callContractView(rpcUrl, contractAddress, selector, "latest")
+export async function getLatestCID(
+	rpcUrl: string,
+	contractAddress: string,
+	signatureOverride?: string,
+	callDataOverride?: string,
+): Promise<CID> {
+	const signature = signatureOverride ?? "getLatestCID()"
+	const selector = getSelector(signature)
+	const callData = callDataOverride ?? selector
+	const contractRootHex: string = await callContractView(rpcUrl, contractAddress, callData, "latest")
 	const contractRootBytes = parseGetLatestCIDResult(contractRootHex)
 	return CID.decode(Uint8Array.from(contractRootBytes))
 }
@@ -22,10 +29,14 @@ export async function getAccumulatorData(
 	rpcUrl: string,
 	contractAddress: string,
 	blockTag?: number,
+	signatureOverride?: string,
+	callDataOverride?: string,
 ): Promise<{ meta: AccumulatorMetadata; peaks: PeakWithHeight[] }> {
 	const blockTagHex: string = blockTag ? "0x" + blockTag.toString(16) : "latest"
-	const selector = getSelector("getAccumulatorData()")
-	const accumulatorDataHex: string = await callContractView(rpcUrl, contractAddress, selector, blockTagHex)
+	const signature = signatureOverride ?? "getAccumulatorData()"
+	const selector = getSelector(signature)
+	const callData = callDataOverride ?? selector
+	const accumulatorDataHex: string = await callContractView(rpcUrl, contractAddress, callData, blockTagHex)
 	const [mmrMetaBits, peaks] = parseGetAccumulatorDataResult(accumulatorDataHex)
 	const meta = parseAccumulatorMetaBits(mmrMetaBits)
 	const activePeaks: Uint8Array[] = peaks.slice(0, meta.peakCount) // only active peaks
