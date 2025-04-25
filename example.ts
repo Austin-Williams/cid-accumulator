@@ -29,7 +29,13 @@ async function main() {
 	// Create the client
 	const accumulatorClient = new AccumulatorClient({...config, ipfs, storage})
 
-	// (Optional) Register SIGINT handler for graceful shutdown in NodeJs
+	// (optional) Expose client in browser (to give user access to it in the console)
+	if (isBrowser()) {
+		// @ts-ignore
+		window.accumulatorClient = accumulatorClient 
+	}
+
+	// (Optional) Register SIGINT handler for graceful shutdown in NodeJs (not needed in browser)
 	if (isNodeJs()) registerGracefulShutdown(accumulatorClient)
 
 	// Start the client

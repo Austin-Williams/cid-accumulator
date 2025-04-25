@@ -341,7 +341,6 @@ export function startPollingSync(
 ): void {
 	const poll = async () => {
 		try {
-			console.log(`DEBUG: 🐞🐞🐞🐞Polling for new events...`)
 			const { meta } = await getAccumulatorData(ethereumHttpRpcUrl, contractAddress)
 			const latestBlock = meta.previousInsertBlockNumber
 			if (latestBlock > lastProcessedBlock) {

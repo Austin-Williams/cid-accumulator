@@ -140,7 +140,7 @@ export class AccumulatorClient {
 		)
 		this.rePinAllDataToIPFS() // Fire-and-forget, no-ops if this.shouldPin is false
 
-		await startLiveSync(
+		startLiveSync( // Fire-and-forget
 			this.ipfs,
 			this.mmr,
 			this.storage,
