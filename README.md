@@ -2,6 +2,17 @@
 
 > ⚠️ **Warning:** This project is unaudited and has not been thoroughly tested.
 
+## Table of Contents
+- [What it does](#what-it-does)
+- [Why we need it](#why-we-need-it)
+- [How to use it](#how-to-use-it)
+  - [On-chain component](#on-chain-component)
+  - [Off-chain component](#off-chain-component)
+  - [Accumulator Client](#accumulator-client)
+  - [Example use](#example-use)
+  - [Browser Usage](#browser-usage)
+- [⛽ Gas Costs](#-gas-costs)
+
 ## What it does
 
 - Trustlessly computes and stores an IPFS CID on-chain that represents **all emitted event data**
@@ -79,16 +90,14 @@ export const config: AccumulatorClientConfig = {
 Then you can use the client in NodeJs or the browser:
 
 ```typescript
-...
-
 // Create the client
 const accumulatorClient = new AccumulatorClient(...)
 
 // Start the client
 await accumulatorClient.start()
 
-...
-
+// Keep the process running to monitor for new data (not necessary in browser)
+if (isNodeJs()) await new Promise(() => {})
 ```
 
 Progress will be shown in console logs. Example:
@@ -137,6 +146,27 @@ Progress will be shown in console logs. Example:
 [Accumulator] 📌 UPDATE: Re-pinned 400 CIDs to IPFS so far. Still working...
 [Accumulator] 📌 UPDATE: Re-pinned 500 CIDs to IPFS so far. Still working...
 [Accumulator] ✅ Pinned 522 CIDs to IPFS (0 failures). Done!
+```
+
+In the browser, once the client has synced and rebuilt the MMR, it will be attached to the `window`, so you'll have full access to it via `window.accumulatorClient`. For example, you can open the console and access the data in the following ways:
+
+```typescript
+// Get the data (Uint8Array) for a specific data payload by its index
+await accumulatorClient.data.getData(<index>)
+
+// Get the data (Uint8Array[]) for a range of data payloads by their indexes
+await accumulatorClient.data.getRange(<fromIndex>, <toIndex>)
+
+// Download the full dataset as a JSON file
+// accumulatorClient.data..downloadAll() returns a Promise that resolves to the filename (Node.js) or triggers a download (browser).
+await accumulatorClient.data.downloadAll()
+
+// Subscribe to new data insertions
+const unsubscribe = accumulatorClient.data.subscribe((index, data) => {
+    console.log("New data inserted:", { index, data })
+})
+// To unsubscribe later, call: unsubscribe()
+
 ```
 
 You can find a full working example in `./example.ts`.
