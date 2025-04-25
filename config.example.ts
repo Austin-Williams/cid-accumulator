@@ -50,5 +50,14 @@ export const config: AccumulatorClientConfig = {
 	// Example: "./myDB.json"
 	// Leave as `undefined` to use the default path.
 	// The default path is "./db/cid-accumulator.json"
-	DB_PATH: undefined
+	DB_PATH: undefined,
+
+	// (Optional) Signature and calldata overrides for getLatestCID, getAccumulatorData, and getLeafInsertLogs
+	// This is only relevant if you want to use a custom Accumulator contract (e.g. replacement for CIDAccumulator contract) 
+	// that doesn't have the same function signatures.
+	GET_LATEST_CID_SIGNATURE_OVERRIDE: undefined,
+	GET_LATEST_CID_CALLDATA_OVERRIDE: undefined,
+	GET_ACCUMULATOR_DATA_SIGNATURE_OVERRIDE: undefined,
+	GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE: undefined,
+	LEAF_INSERT_EVENT_SIGNATURE_OVERRIDE: undefined
 }

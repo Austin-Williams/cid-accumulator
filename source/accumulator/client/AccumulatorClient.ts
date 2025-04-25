@@ -39,6 +39,10 @@ export class AccumulatorClient {
 		this.mmr = new MerkleMountainRange()
 	}
 
+	// TODO Break this out into initStorage, initIpfs, initSync and then call them here in init()
+	// Move them into their own files to reduce clutter here.
+	// Make sure the initSync uses the optional signature and calldata override parameters in config.
+	// That will allows us to customize the initialization process if we want to (e.g. for the community version)
 	async init(): Promise<void> {
 		// SET UP STORAGE
 		// Create a Storage adapter appropriate for the environment
@@ -125,6 +129,8 @@ export class AccumulatorClient {
 		console.log(`[Accumulator] 📜 Summary: IPFS API PROVIDE is set up: ${shouldProvide ? "YES" : "NO"}`)
 
 		// SET UP SYNC
+		// TODO: add support for signature and calldata overrides for getLatestCID, getAccumulatorData, and
+		// signature overrides for getLeafInsertLogs and getLeafInsertLogForTargetLeafIndex
 		// Check if Ethereum connection is working
 		console.log("[Accumulator] \u{1F440} Checking Ethereum connection...")
 		let lastProcessedBlock: number = 0

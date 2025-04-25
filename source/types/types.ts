@@ -12,6 +12,11 @@ export interface AccumulatorClientConfig {
 	IPFS_PIN_IF_POSSIBLE: boolean
 	IPFS_PROVIDE_IF_POSSIBLE: boolean
 	DB_PATH: string | undefined
+	GET_LATEST_CID_SIGNATURE_OVERRIDE: string | undefined
+	GET_LATEST_CID_CALLDATA_OVERRIDE: string | undefined
+	GET_ACCUMULATOR_DATA_SIGNATURE_OVERRIDE: string | undefined
+	GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE: string | undefined
+	LEAF_INSERT_EVENT_SIGNATURE_OVERRIDE: string | undefined
 }
 
 export interface RawEthLog {
