@@ -348,6 +348,8 @@ export function startPollingSync(params: {
 	shouldProvide: boolean
 	getAccumulatorDataSignatureOverride?: string
 	getAccumulatorDataCalldataOverride?: string
+	getLatestCidSignatureOverride?: string
+	getLatestCidCalldataOverride?: string
 	eventTopicOverride?: string
 	pollIntervalMs?: number
 }) {
@@ -367,6 +369,8 @@ export function startPollingSync(params: {
 		shouldProvide,
 		getAccumulatorDataSignatureOverride,
 		getAccumulatorDataCalldataOverride,
+		getLatestCidSignatureOverride,
+		getLatestCidCalldataOverride,
 		eventTopicOverride,
 		pollIntervalMs,
 	} = params
@@ -399,6 +403,10 @@ export function startPollingSync(params: {
 						shouldPut,
 						shouldProvide,
 						event,
+						getAccumulatorDataSignatureOverride,
+						getAccumulatorDataCalldataOverride,
+						getLatestCidSignatureOverride,
+						getLatestCidCalldataOverride,
 					)
 				}
 				setLastProcessedBlock(latestBlock)

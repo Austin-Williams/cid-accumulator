@@ -10,6 +10,9 @@ export async function initSync(
 	storageAdapter: StorageAdapter,
 	ipfs: IpfsNamespace,
 	mmr: MerkleMountainRange,
+	getAccumulatorDataSignatureOverride: string | undefined,
+	getAccumulatorDataCalldataOverride: string | undefined,
+	eventTopicOverride: string | undefined,
 ): Promise<SyncNamespace> {
 	// TODO: add support for signature and calldata overrides for getLatestCID, getAccumulatorData, and
 	// signature overrides for getLeafInsertLogs and getLeafInsertLogForTargetLeafIndex
@@ -42,6 +45,9 @@ export async function initSync(
 		ipfs.shouldPut,
 		ipfs.shouldPin,
 		ipfs.shouldProvide,
+		getAccumulatorDataSignatureOverride,
+		getAccumulatorDataCalldataOverride,
+		eventTopicOverride,
 	)
 	return sync
 }

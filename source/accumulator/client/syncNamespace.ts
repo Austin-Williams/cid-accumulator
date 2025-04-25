@@ -23,6 +23,9 @@ export function getSyncNamespace(
 	shouldPut: boolean,
 	shouldPin: boolean,
 	shouldProvide: boolean,
+	getAccumulatorDataSignatureOverride: string | undefined,
+	getAccumulatorDataCalldataOverride: string | undefined,
+	eventTopicOverride: string | undefined,
 ): SyncNamespace {
 	let sync: SyncNamespace = {
 		ethereumHttpRpcUrl,
@@ -59,27 +62,30 @@ export function getSyncNamespace(
 				shouldProvide,
 			),
 		startPollingSync: () =>
-			startPollingSync(
+			startPollingSync({
 				ipfs,
 				mmr,
 				storage,
 				ethereumHttpRpcUrl,
 				contractAddress,
-				() => sync.liveSyncRunning,
-				(interval) => {
+				getLiveSyncRunning: () => sync.liveSyncRunning,
+				setLiveSyncInterval: (interval) => {
 					sync.liveSyncInterval = interval
 				},
 				lastProcessedBlock,
-				(b) => {
+				setLastProcessedBlock: (b) => {
 					lastProcessedBlock = b
 				},
-				() => sync.highestCommittedLeafIndex,
-				(i) => {
+				getHighestCommittedLeafIndex: () => sync.highestCommittedLeafIndex,
+				setHighestCommittedLeafIndex: (i) => {
 					sync.highestCommittedLeafIndex = i
 				},
 				shouldPut,
 				shouldProvide,
-			),
+				getAccumulatorDataSignatureOverride,
+				getAccumulatorDataCalldataOverride,
+				eventTopicOverride,
+			}),
 		startLiveSync: () =>
 			startLiveSync(
 				ipfs,

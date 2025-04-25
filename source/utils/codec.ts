@@ -129,3 +129,13 @@ export function getLeafRecordFromNormalizedLeafInsertEvent(event: NormalizedLeaf
 		blockNumber: event.blockNumber,
 	}
 }
+
+export function getEthereumAddressAsLeftPaddedBytes32HexString(address: string): string {
+	// Remove 0x prefix if present
+	let clean = address.startsWith("0x") ? address.slice(2) : address
+	// Validate length (should be 40 hex chars for an address)
+	if (clean.length !== 40) throw new Error("Invalid Ethereum address length")
+	// Left pad with zeros to 64 chars (32 bytes)
+	const padded = clean.padStart(64, "0")
+	return "0x" + padded
+}

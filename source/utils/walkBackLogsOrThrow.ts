@@ -10,24 +10,26 @@ import { NormalizedLeafInsertEvent } from "../types/types.ts"
  * and are processing live events.
  */
 export async function walkBackLeafInsertLogsOrThrow(
-	rpcUrl: string,
+	ethereumHttpRpcUrl: string,
 	contractAddress: string,
 	fromLeafIndex: number,
 	fromLeafIndexBlockNumber: number,
 	toLeafIndex: number, // inclusive; oldest leaf index to walk back to
+	eventTopicOverride?: string,
 ): Promise<NormalizedLeafInsertEvent[]> {
 	let currentLeafIndex = fromLeafIndex
 	let currentLeafIndexBlockNumber = fromLeafIndexBlockNumber
 	const logs: NormalizedLeafInsertEvent[] = []
 
 	while (currentLeafIndex >= toLeafIndex) {
-		const log: NormalizedLeafInsertEvent | null = await getLeafInsertLogForTargetLeafIndex(
-			rpcUrl,
+		const log: NormalizedLeafInsertEvent | null = await getLeafInsertLogForTargetLeafIndex({
+			ethereumHttpRpcUrl,
 			contractAddress,
-			currentLeafIndexBlockNumber,
-			currentLeafIndexBlockNumber,
-			currentLeafIndex,
-		)
+			fromBlock: currentLeafIndexBlockNumber,
+			toBlock: currentLeafIndexBlockNumber,
+			targetLeafIndex: currentLeafIndex,
+			eventTopicOverride,
+		})
 		if (!log) {
 			throw new Error(
 				`Missing LeafInsert log for leafIndex=${currentLeafIndex} in block=${currentLeafIndexBlockNumber}`,

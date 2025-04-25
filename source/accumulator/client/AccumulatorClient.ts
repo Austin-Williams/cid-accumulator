@@ -44,7 +44,15 @@ export class AccumulatorClient {
 		this.ipfs = await initIpfs(this.config, this.storage.storageAdapter)
 
 		// SET UP SYNC
-		this.sync = await initSync(this.config, this.storage.storageAdapter, this.ipfs, this.mmr)
+		this.sync = await initSync(
+			this.config,
+			this.storage.storageAdapter,
+			this.ipfs,
+			this.mmr,
+			this.config.GET_ACCUMULATOR_DATA_SIGNATURE_OVERRIDE,
+			this.config.GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE,
+			this.config.LEAF_INSERT_EVENT_SIGNATURE_OVERRIDE,
+		)
 	}
 
 	async start(): Promise<void> {
