@@ -8,8 +8,9 @@ import {
 	startPollingSync,
 	startLiveSync,
 	stopLiveSync,
-	syncBackwardsFromLatest
-} from "./syncHelpers.ts";
+	syncBackwardsFromLatest,
+	onNewLeaf,
+} from "./syncHelpers.ts"
 
 export function getSyncNamespace(
 	ipfs: IpfsAdapter,
@@ -32,11 +33,101 @@ export function getSyncNamespace(
 		liveSyncRunning: false,
 		liveSyncInterval: undefined,
 		websocket: undefined,
-		startSubscriptionSync: () => startSubscriptionSync(ipfs, mmr, storage, ethereumHttpRpcUrl, ethereumWsRpcUrl, sync.ws, (newWs) => { sync.ws = newWs }, lastProcessedBlock, (b) => { lastProcessedBlock = b }, contractAddress, () => sync.highestCommittedLeafIndex, (i) => { sync.highestCommittedLeafIndex = i; }, shouldPut, shouldProvide),
-		startPollingSync: () => startPollingSync(ipfs, mmr, storage, ethereumHttpRpcUrl, contractAddress, () => sync.liveSyncRunning, (interval) => { sync.liveSyncInterval = interval; }, lastProcessedBlock, (b) => { lastProcessedBlock = b; }, () => sync.highestCommittedLeafIndex, (i) => { sync.highestCommittedLeafIndex = i; }, shouldPut, shouldProvide),
-		startLiveSync: () => startLiveSync(ipfs, mmr, storage, contractAddress, ethereumHttpRpcUrl, ethereumWsRpcUrl, sync.ws, (newWs) => { sync.ws = newWs }, () => sync.liveSyncRunning, (r) => { sync.liveSyncRunning = r; }, (interval) => { sync.liveSyncInterval = interval; }, lastProcessedBlock, (b) => { lastProcessedBlock = b; }, () => sync.highestCommittedLeafIndex, (i) => { sync.highestCommittedLeafIndex = i; }, shouldPin, shouldProvide),
-		stopLiveSync: () => stopLiveSync(sync.ws, (newWs) => { sync.ws = newWs }, () => sync.liveSyncInterval, (r) => { sync.liveSyncRunning = r; }, (interval) => { sync.liveSyncInterval = interval; }),
-		syncBackwardsFromLatest: () => syncBackwardsFromLatest(ipfs, storage, ethereumHttpRpcUrl, contractAddress, (b) => { lastProcessedBlock = b; })
+		newLeafSubscribers: [],
+		onNewLeaf,
+		startSubscriptionSync: () =>
+			startSubscriptionSync(
+				ipfs,
+				mmr,
+				storage,
+				ethereumHttpRpcUrl,
+				ethereumWsRpcUrl,
+				sync.websocket,
+				(newWs) => {
+					sync.websocket = newWs
+				},
+				lastProcessedBlock,
+				(b) => {
+					lastProcessedBlock = b
+				},
+				contractAddress,
+				() => sync.highestCommittedLeafIndex,
+				(i) => {
+					sync.highestCommittedLeafIndex = i
+				},
+				shouldPut,
+				shouldProvide,
+			),
+		startPollingSync: () =>
+			startPollingSync(
+				ipfs,
+				mmr,
+				storage,
+				ethereumHttpRpcUrl,
+				contractAddress,
+				() => sync.liveSyncRunning,
+				(interval) => {
+					sync.liveSyncInterval = interval
+				},
+				lastProcessedBlock,
+				(b) => {
+					lastProcessedBlock = b
+				},
+				() => sync.highestCommittedLeafIndex,
+				(i) => {
+					sync.highestCommittedLeafIndex = i
+				},
+				shouldPut,
+				shouldProvide,
+			),
+		startLiveSync: () =>
+			startLiveSync(
+				ipfs,
+				mmr,
+				storage,
+				contractAddress,
+				ethereumHttpRpcUrl,
+				ethereumWsRpcUrl,
+				sync.websocket,
+				(newWs) => {
+					sync.websocket = newWs
+				},
+				() => sync.liveSyncRunning,
+				(r) => {
+					sync.liveSyncRunning = r
+				},
+				(interval) => {
+					sync.liveSyncInterval = interval
+				},
+				lastProcessedBlock,
+				(b) => {
+					lastProcessedBlock = b
+				},
+				() => sync.highestCommittedLeafIndex,
+				(i) => {
+					sync.highestCommittedLeafIndex = i
+				},
+				shouldPin,
+				shouldProvide,
+			),
+		stopLiveSync: () =>
+			stopLiveSync(
+				sync.websocket,
+				(newWs) => {
+					sync.websocket = newWs
+				},
+				() => sync.liveSyncInterval,
+				(r) => {
+					sync.liveSyncRunning = r
+				},
+				(interval) => {
+					sync.liveSyncInterval = interval
+				},
+			),
+		syncBackwardsFromLatest: () =>
+			syncBackwardsFromLatest(ipfs, storage, ethereumHttpRpcUrl, contractAddress, (b) => {
+				lastProcessedBlock = b
+			}),
 	}
 	return sync
 }

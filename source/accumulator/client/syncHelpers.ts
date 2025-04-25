@@ -534,6 +534,8 @@ export async function processNewLeafEvent(
 		event.newData,
 	)
 
+	for (const callback of newLeafSubscribers) callback(event.leafIndex, event.newData)
+
 	// === THE FOLLOWING CODE BLOCK CAN BE REMOVED. IT IS JUST A SANITY CHECK. ===
 	const { meta } = await getAccumulatorData(ethereumHttpRpcUrl, contractAddress)
 	// This sanity check only makes sense when the node is fully synced
@@ -555,4 +557,22 @@ export async function processNewLeafEvent(
 	// =============================== END SANITY CHECK. ===============================
 
 	console.log(`[Accumulator] \u{1F343} Processed new leaf with index ${event.leafIndex}`)
+}
+
+const newLeafSubscribers: Array<(index: number, data: Uint8Array) => void> = []
+
+export function processNewLeaf(index: number, data: Uint8Array) {
+	// ...existing logic...
+	for (const cb of newLeafSubscribers) {
+		cb(index, data)
+	}
+}
+
+export function onNewLeaf(callback: (index: number, data: Uint8Array) => void): () => void {
+	newLeafSubscribers.push(callback)
+	// Return unsubscribe function
+	return () => {
+		const idx = newLeafSubscribers.indexOf(callback)
+		if (idx !== -1) newLeafSubscribers.splice(idx, 1)
+	}
 }

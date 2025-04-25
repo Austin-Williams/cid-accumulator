@@ -1,6 +1,12 @@
 import * as dagCbor from "../../utils/dagCbor.ts"
 import type { IpfsAdapter } from "../../interfaces/IpfsAdapter.ts"
-import type { AccumulatorClientConfig, IpfsNamespace, StorageNamespace, SyncNamespace } from "../../types/types.ts"
+import type {
+	AccumulatorClientConfig,
+	DataNamespace,
+	IpfsNamespace,
+	StorageNamespace,
+	SyncNamespace,
+} from "../../types/types.ts"
 import type { StorageAdapter } from "../../interfaces/StorageAdapter.ts"
 import { isBrowser, isNodeJs } from "../../utils/envDetection.ts"
 import { getAccumulatorData } from "../../ethereum/commonCalls.ts"
@@ -11,9 +17,10 @@ import { NULL_CID } from "../../utils/constants.ts"
 import { getStorageNamespace } from "./storageNamespace.ts"
 import { getIpfsNamespace } from "./ipfsNamespace.ts"
 import { getSyncNamespace } from "./syncNamespace.ts"
-import { startLiveSync, stopLiveSync, syncBackwardsFromLatest } from "./syncHelpers.ts";
+import { startLiveSync, stopLiveSync, syncBackwardsFromLatest } from "./syncHelpers.ts"
 import { UniversalIpfsAdapter } from "../../adapters/ipfs/UniversalIpfsAdapter.ts"
 import { IndexedDBAdapter } from "../../adapters/storage/IndexedDBAdapter.ts"
+import { getDataNamespace } from "./dataNamespace.ts"
 
 /**
  * AccumulatorClient: Unified entry point for accumulator logic in any environment.
@@ -21,14 +28,13 @@ import { IndexedDBAdapter } from "../../adapters/storage/IndexedDBAdapter.ts"
  */
 export class AccumulatorClient {
 	public config: AccumulatorClientConfig
-	public storage?: StorageNamespace
+	public data?: DataNamespace
 	public ipfs?: IpfsNamespace
+	public storage?: StorageNamespace
 	public sync?: SyncNamespace
 	public mmr: MerkleMountainRange
 
-	constructor(
-		config: AccumulatorClientConfig
-	) {
+	constructor(config: AccumulatorClientConfig) {
 		this.config = config
 		this.mmr = new MerkleMountainRange()
 	}
@@ -60,7 +66,7 @@ export class AccumulatorClient {
 			this.config.IPFS_API_URL,
 			this.config.IPFS_PUT_IF_POSSIBLE,
 			this.config.IPFS_PIN_IF_POSSIBLE,
-			this.config.IPFS_PROVIDE_IF_POSSIBLE
+			this.config.IPFS_PROVIDE_IF_POSSIBLE,
 		)
 
 		let shouldPut = this.config.IPFS_PUT_IF_POSSIBLE && this.config.IPFS_API_URL !== undefined
@@ -68,7 +74,7 @@ export class AccumulatorClient {
 		let shouldProvide = this.config.IPFS_PROVIDE_IF_POSSIBLE && this.config.IPFS_API_URL !== undefined && isNodeJs()
 		if (!shouldPut) shouldPin = false // Doesn't make sense to pin if they don't put
 		if (!shouldPin) shouldProvide = false // Doesn't make sense to provide if they don't pin
-			
+
 		// Check if IPFS Gateway connection is working
 		console.log("[Accumulator] \u{1F440} Checking IPFS Gateway connection...")
 		try {
@@ -124,7 +130,9 @@ export class AccumulatorClient {
 		let lastProcessedBlock: number = 0
 		try {
 			const { meta } = await getAccumulatorData(this.config.ETHEREUM_HTTP_RPC_URL, this.config.CONTRACT_ADDRESS)
-			console.log(`[Accumulator] \u{2705} Connected to Ethereum. Target contract address: ${this.config.CONTRACT_ADDRESS}`)
+			console.log(
+				`[Accumulator] \u{2705} Connected to Ethereum. Target contract address: ${this.config.CONTRACT_ADDRESS}`,
+			)
 			lastProcessedBlock = meta.deployBlockNumber - 1
 		} catch (e) {
 			console.error("[Accumulator] \u{274C} Failed to connect to Ethereum node:", e)
@@ -141,17 +149,24 @@ export class AccumulatorClient {
 			lastProcessedBlock,
 			this.ipfs.shouldPut,
 			this.ipfs.shouldPin,
-			this.ipfs.shouldProvide
+			this.ipfs.shouldProvide,
+		)
+
+		this.data = getDataNamespace(
+			this.storage.storageAdapter,
+			() => this.sync!.highestCommittedLeafIndex,
+			this.sync!.onNewLeaf,
 		)
 
 		console.log("[Accumulator] \u{2705} Successfully initialized.")
 	}
 
 	async start(): Promise<void> {
-		await this.init();
-	
-		if (!this.ipfs || !this.sync || !this.storage) throw new Error("Not all namespaces present. This should never happen.")
-	
+		await this.init()
+
+		if (!this.ipfs || !this.sync || !this.storage)
+			throw new Error("Not all namespaces present. This should never happen.")
+
 		await syncBackwardsFromLatest(
 			this.ipfs.ipfsAdapter,
 			this.storage.storageAdapter,
@@ -179,7 +194,8 @@ export class AccumulatorClient {
 
 		this.ipfs.rePinAllDataToIPFS() // Fire-and-forget, no-ops if this.ipfs.shouldPin is false
 
-		startLiveSync( // Fire-and-forget
+		startLiveSync(
+			// Fire-and-forget
 			this.ipfs.ipfsAdapter,
 			this.mmr,
 			this.storage.storageAdapter,
@@ -205,7 +221,8 @@ export class AccumulatorClient {
 	 * Safe to call multiple times.
 	 */
 	public async shutdown(): Promise<void> {
-		if (!this.sync || !this.ipfs || !this.storage) throw new Error("Not all namespaces present. This should never happen.")
+		if (!this.sync || !this.ipfs || !this.storage)
+			throw new Error("Not all namespaces present. This should never happen.")
 		console.log("[Accumulator] 👋 Shutting down gracefully.")
 		// Stop live sync (polling or WS)
 		stopLiveSync(

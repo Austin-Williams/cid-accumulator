@@ -80,6 +80,8 @@ export type SyncNamespace = {
 	liveSyncRunning: boolean
 	liveSyncInterval: ReturnType<typeof setTimeout> | undefined
 	websocket: WebSocket | undefined
+	newLeafSubscribers: Array<(index: number, data: Uint8Array) => void>
+	onNewLeaf: (callback: (index: number, data: Uint8Array) => void) => () => void
 	startSubscriptionSync: () => void
 	startPollingSync: () => void
 	startLiveSync: () => Promise<void>
@@ -88,24 +90,32 @@ export type SyncNamespace = {
 }
 
 export type IpfsNamespace = {
-	ipfsAdapter: IpfsAdapter,
-	shouldPut: boolean,
-	shouldPin: boolean,
-	shouldProvide: boolean,
-  getAndResolveCID: (cid: CID<unknown, 113, 18, 1>, opts?: { signal?: AbortSignal }) => Promise<boolean>,
-  rePinAllDataToIPFS: () => void,
-  putPinProvideToIPFS: (cid: CID<unknown, 113, 18, 1>, dagCborEncodedData: DagCborEncodedData) => Promise<boolean>
+	ipfsAdapter: IpfsAdapter
+	shouldPut: boolean
+	shouldPin: boolean
+	shouldProvide: boolean
+	getAndResolveCID: (cid: CID<unknown, 113, 18, 1>, opts?: { signal?: AbortSignal }) => Promise<boolean>
+	rePinAllDataToIPFS: () => void
+	putPinProvideToIPFS: (cid: CID<unknown, 113, 18, 1>, dagCborEncodedData: DagCborEncodedData) => Promise<boolean>
 }
 
 export type StorageNamespace = {
-	storageAdapter: StorageAdapter,
-  getLeafRecord: (index: number) => Promise<LeafRecord | null>
-  putLeafRecord: (index: number, value: LeafRecord) => Promise<void>
-  getHighestContiguousLeafIndexWithData: () => Promise<number>
-  getLeafIndexesWithMissingNewData: () => Promise<number[]>
-  getCIDDataPairFromDB: (index: number) => Promise<CIDDataPair | null>
-  iterateTrailPairs: () => AsyncGenerator<CIDDataPair>
-  get: (key: string) => Promise<string | undefined>;
-  put: (key: string, value: string) => Promise<void>;
-  delete: (key: string) => Promise<void>;
+	storageAdapter: StorageAdapter
+	getLeafRecord: (index: number) => Promise<LeafRecord | null>
+	putLeafRecord: (index: number, value: LeafRecord) => Promise<void>
+	getHighestContiguousLeafIndexWithData: () => Promise<number>
+	getLeafIndexesWithMissingNewData: () => Promise<number[]>
+	getCIDDataPairFromDB: (index: number) => Promise<CIDDataPair | null>
+	iterateTrailPairs: () => AsyncGenerator<CIDDataPair>
+	get: (key: string) => Promise<string | undefined>
+	put: (key: string, value: string) => Promise<void>
+	delete: (key: string) => Promise<void>
+}
+
+export type DataNamespace = {
+	getHighestIndex: () => Promise<number>
+	getData: (index: number) => Promise<Uint8Array | undefined>
+	getRange: (start: number, end: number) => Promise<Array<{ index: number; data: Uint8Array }>>
+	subscribe: (callback: (index: number, data: Uint8Array) => void) => () => void
+	downloadAll: (prefix: string) => Promise<string>
 }
