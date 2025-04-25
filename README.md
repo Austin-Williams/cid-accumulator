@@ -150,27 +150,33 @@ Progress will be shown in console logs. Example:
 
 ### Browser Usage
 
-In the browser, once the client has synced and rebuilt the MMR, it will be attached to the `window`, so you'll have full access to it via `window.accumulatorClient`. For example, you can open the console and access the data in the following ways:
+In the browser, after the client has synced and rebuilt the Merkle Mountain Range, it will be attached to the `window`, so you'll have full access to it via `window.accumulatorClient`. For example, you can open the console and access the data in the following ways:
 
-```typescript
-// Get the data (Uint8Array) for a specific data payload by its index
-await accumulatorClient.data.getData(<index>)
+```js
+// Get any data (hex string) by its index:
+await accumulatorClient.data.getData(135)
+// 5a8c9a999547577c45efefa0d9caf46736898d664164b37746d35b626934c1d248d57d6cf15fa20b52e04bf4b1
 
-// Get the data (Uint8Array[]) for a range of data payloads by their indexes
-await accumulatorClient.data.getRange(<fromIndex>, <toIndex>)
+// Get the data for a range of indexes:
+await accumulatorClient.data.getRange(133, 135)
+// [
+//   { "index": 133, "data": "177f0f...d7b065" },
+//   { "index": 134, "data": "fd7b90...e46916" },
+//   { "index": 135, "data": "5a8c9a...4bf4b1" }
+// ]
 
 // Download the full dataset as a JSON file
-// accumulatorClient.data.downloadAll() returns a Promise that resolves to the
-// filename (Node.js) or triggers a download (browser).
 await accumulatorClient.data.downloadAll()
+// In Node.js, saves the file as leaves-1714052940000.json
+// In browse	: triggers a file download dialog
 
 // Subscribe to new data insertions
 const unsubscribe = accumulatorClient.data.subscribe((index, data) => {
-    console.log("New data inserted:", { index, data })
+  console.log("New data inserted:", { index, data })
 })
 // To unsubscribe later, call: unsubscribe()
-
 ```
+
 
 You can find a full working example in `./example.ts`.
 

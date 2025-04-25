@@ -81,7 +81,7 @@ export type SyncNamespace = {
 	liveSyncInterval: ReturnType<typeof setTimeout> | undefined
 	websocket: WebSocket | undefined
 	newLeafSubscribers: Array<(index: number, data: Uint8Array) => void>
-	onNewLeaf: (callback: (index: number, data: Uint8Array) => void) => () => void
+	onNewLeaf: (callback: (index: number, data: string) => void) => () => void
 	startSubscriptionSync: () => void
 	startPollingSync: () => void
 	startLiveSync: () => Promise<void>
@@ -114,8 +114,8 @@ export type StorageNamespace = {
 
 export type DataNamespace = {
 	getHighestIndex: () => Promise<number>
-	getData: (index: number) => Promise<Uint8Array | undefined>
-	getRange: (start: number, end: number) => Promise<Array<{ index: number; data: Uint8Array }>>
-	subscribe: (callback: (index: number, data: Uint8Array) => void) => () => void
+	getData: (index: number) => Promise<string | undefined>
+	getRange: (start: number, end: number) => Promise<Array<{ index: number; data: string }>>
+	subscribe: (callback: (index: number, data: string) => void) => () => void
 	downloadAll: (prefix: string) => Promise<string>
 }

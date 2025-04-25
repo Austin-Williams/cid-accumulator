@@ -12,7 +12,7 @@ import { StorageAdapter } from "../../interfaces/StorageAdapter.ts"
 import { walkBackLeafInsertLogsOrThrow } from "../../utils/walkBackLogsOrThrow.ts"
 import { computePreviousRootCIDAndPeaksWithHeights, getRootCIDFromPeaks } from "../merkleMountainRange/mmrUtils.ts"
 import { IpfsAdapter } from "../../interfaces/IpfsAdapter.ts"
-import { getLeafRecordFromNormalizedLeafInsertEvent } from "../../utils/codec.ts"
+import { getLeafRecordFromNormalizedLeafInsertEvent, uint8ArrayToHexString } from "../../utils/codec.ts"
 import { MerkleMountainRange } from "../merkleMountainRange/MerkleMountainRange.ts"
 // ================================================
 // REAL-TIME EVENT MONITORING
@@ -534,7 +534,7 @@ export async function processNewLeafEvent(
 		event.newData,
 	)
 
-	for (const callback of newLeafSubscribers) callback(event.leafIndex, event.newData)
+	for (const callback of newLeafSubscribers) callback(event.leafIndex, uint8ArrayToHexString(event.newData))
 
 	// === THE FOLLOWING CODE BLOCK CAN BE REMOVED. IT IS JUST A SANITY CHECK. ===
 	const { meta } = await getAccumulatorData(ethereumHttpRpcUrl, contractAddress)
@@ -559,16 +559,15 @@ export async function processNewLeafEvent(
 	console.log(`[Accumulator] \u{1F343} Processed new leaf with index ${event.leafIndex}`)
 }
 
-const newLeafSubscribers: Array<(index: number, data: Uint8Array) => void> = []
+const newLeafSubscribers: Array<(index: number, data: string) => void> = []
 
-export function processNewLeaf(index: number, data: Uint8Array) {
-	// ...existing logic...
+export function processNewLeaf(index: number, data: string) {
 	for (const cb of newLeafSubscribers) {
 		cb(index, data)
 	}
 }
 
-export function onNewLeaf(callback: (index: number, data: Uint8Array) => void): () => void {
+export function onNewLeaf(callback: (index: number, data: string) => void): () => void {
 	newLeafSubscribers.push(callback)
 	// Return unsubscribe function
 	return () => {
