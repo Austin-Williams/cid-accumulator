@@ -4,6 +4,7 @@ import { CID } from "../utils/CID.js"
 
 export interface AccumulatorClientConfig {
 	ETHEREUM_HTTP_RPC_URL: string
+	ETHEREUM_MAX_BLOCK_RANGE_PER_HTTP_RPC_CALL: number | undefined
 	ETHEREUM_WS_RPC_URL: string | undefined
 	CONTRACT_ADDRESS: string
 	IPFS_GATEWAY_URL: string

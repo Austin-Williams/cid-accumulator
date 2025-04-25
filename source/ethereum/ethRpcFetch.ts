@@ -1,13 +1,13 @@
 /**
  * Makes a raw Ethereum JSON-RPC call using fetch.
- * @param rpcUrl string (Ethereum node endpoint)
+ * @param ethereumHttpRpcUrl string (Ethereum node endpoint)
  * @param method string (JSON-RPC method)
  * @param params any[] (JSON-RPC params)
  * @param id number (request id, default 1)
  * @returns Promise<any> (result field from response)
  */
-export async function ethRpcFetch(rpcUrl: string, method: string, params: any[], id = 1): Promise<any> {
-	const res = await fetch(rpcUrl, {
+export async function ethRpcFetch(ethereumHttpRpcUrl: string, method: string, params: any[], id = 1): Promise<any> {
+	const res = await fetch(ethereumHttpRpcUrl, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
@@ -21,7 +21,7 @@ export async function ethRpcFetch(rpcUrl: string, method: string, params: any[],
 	let json
 	try {
 		json = JSON.parse(text)
-	} catch (e) {
+	} catch {
 		throw new Error(`Failed to parse JSON from Ethereum RPC response: ${text}`)
 	}
 	if (json.error) {

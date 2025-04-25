@@ -9,6 +9,10 @@ export const config: AccumulatorClientConfig = {
 	// Required for all on-chain operations.
 	ETHEREUM_HTTP_RPC_URL: "<YOUR_ETHEREUM_RPC_URL>",
 
+	// (Optional) The maximum number of blocks to request in a single HTTP RPC call.
+	// Defaults to 1000.
+	ETHEREUM_MAX_BLOCK_RANGE_PER_HTTP_RPC_CALL: 1000,
+
 	// (Optional) WebSocket endpoint for Ethereum. Used for real-time event subscriptions.
 	// If left undefined, will fallback to HTTP polling.
 	// Example: "wss://mainnet.infura.io/ws/v3/<YOUR_INFURA_KEY>"

@@ -1,3 +1,5 @@
+console.log("example.ts loaded (very top)");
+
 import { AccumulatorClient } from "./source/accumulator/client/AccumulatorClient.ts"
 import { config } from "./config.ts";import { registerGracefulShutdown } from "./source/utils/gracefulShutdown.ts"
 import { isNodeJs } from "./source/utils/envDetection.ts"
@@ -5,7 +7,6 @@ import { isNodeJs } from "./source/utils/envDetection.ts"
 async function main() {	
 	// Create the client
 	const accumulatorClient = new AccumulatorClient(config)
-
 	// Start the client
 	await accumulatorClient.start()
 

@@ -7,36 +7,47 @@ import { contractPeakHexToMmrCid } from "../utils/codec.ts"
 
 /**
  * Fetches the latest CID from the contract using a raw JSON-RPC call and ABI decoding.
- * @param rpcUrl - The Ethereum node RPC URL
+ * @param ethereumHttpRpcUrl - The Ethereum node RPC URL
  * @param contractAddress - The deployed contract address
  * @returns The latest CID as a multiformats.CID object
  */
-export async function getLatestCID(
-	rpcUrl: string,
-	contractAddress: string,
-	signatureOverride?: string,
-	callDataOverride?: string,
-): Promise<CID> {
-	const signature = signatureOverride ?? "getLatestCID()"
+export async function getLatestCID(params: {
+	ethereumHttpRpcUrl: string
+	contractAddress: string
+	getLatestCidSignatureOverride?: string
+	getLatestCidCalldataOverride?: string
+	blockTag?: number
+}): Promise<CID> {
+	const { ethereumHttpRpcUrl, contractAddress, getLatestCidSignatureOverride, getLatestCidCalldataOverride, blockTag } =
+		params
+	const blockTagHex: string = blockTag ? "0x" + blockTag.toString(16) : "latest"
+	const signature = getLatestCidSignatureOverride ?? "getLatestCID()"
 	const selector = getSelector(signature)
-	const callData = callDataOverride ?? selector
-	const contractRootHex: string = await callContractView(rpcUrl, contractAddress, callData, "latest")
+	const callData = getLatestCidCalldataOverride ?? selector
+	const contractRootHex: string = await callContractView(ethereumHttpRpcUrl, contractAddress, callData, blockTagHex)
 	const contractRootBytes = parseGetLatestCIDResult(contractRootHex)
 	return CID.decode(Uint8Array.from(contractRootBytes))
 }
 
-export async function getAccumulatorData(
-	rpcUrl: string,
-	contractAddress: string,
-	blockTag?: number,
-	signatureOverride?: string,
-	callDataOverride?: string,
-): Promise<{ meta: AccumulatorMetadata; peaks: PeakWithHeight[] }> {
+export async function getAccumulatorData(params: {
+	ethereumHttpRpcUrl: string
+	contractAddress: string
+	getAccumulatorDataSignatureOverride?: string
+	getAccumulatorDataCalldataOverride?: string
+	blockTag?: number
+}): Promise<{ meta: AccumulatorMetadata; peaks: PeakWithHeight[] }> {
+	const {
+		ethereumHttpRpcUrl,
+		contractAddress,
+		getAccumulatorDataSignatureOverride,
+		getAccumulatorDataCalldataOverride,
+		blockTag,
+	} = params
 	const blockTagHex: string = blockTag ? "0x" + blockTag.toString(16) : "latest"
-	const signature = signatureOverride ?? "getAccumulatorData()"
+	const signature = getAccumulatorDataSignatureOverride ?? "getAccumulatorData()"
 	const selector = getSelector(signature)
-	const callData = callDataOverride ?? selector
-	const accumulatorDataHex: string = await callContractView(rpcUrl, contractAddress, callData, blockTagHex)
+	const callData = getAccumulatorDataCalldataOverride ?? selector
+	const accumulatorDataHex: string = await callContractView(ethereumHttpRpcUrl, contractAddress, callData, blockTagHex)
 	const [mmrMetaBits, peaks] = parseGetAccumulatorDataResult(accumulatorDataHex)
 	const meta = parseAccumulatorMetaBits(mmrMetaBits)
 	const activePeaks: Uint8Array[] = peaks.slice(0, meta.peakCount) // only active peaks
@@ -48,7 +59,7 @@ export async function getAccumulatorData(
 	return { meta, peaks: activePeaksWithHeight }
 }
 
-// --------------------- events
+// --------------------- EVENTS --------------------
 // Helper to format block numbers as 0x-prefixed hex strings
 function toHexBlock(n: number): string {
 	return "0x" + n.toString(16)
@@ -56,22 +67,23 @@ function toHexBlock(n: number): string {
 
 /**
  * Finds LeafInsert events using eth_getLogs.
- * @param rpcUrl string
+ * @param ethereumHttpRpcUrl string
  * @param contractAddress string
  * @param eventTopic string (keccak256 hash of event signature)
  * @param fromBlock string (hex or "latest")
  * @param toBlock string (hex or "latest")
  * @returns Promise<any[]> (array of log objects)
  */
-export async function getLeafInsertLogs(
-	rpcUrl: string,
-	contractAddress: string,
-	fromBlock: number,
-	toBlock: number,
-	eventTopicOverride?: string,
-): Promise<NormalizedLeafInsertEvent[]> {
+export async function getLeafInsertLogs(params: {
+	ethereumHttpRpcUrl: string
+	contractAddress: string
+	fromBlock: number
+	toBlock: number
+	eventTopicOverride?: string
+}): Promise<NormalizedLeafInsertEvent[]> {
+	const { ethereumHttpRpcUrl, contractAddress, fromBlock, toBlock, eventTopicOverride } = params
 	const eventTopic = eventTopicOverride ?? getEventTopic("LeafInsert(uint32,uint32,bytes,bytes32[])")
-	const rawLogs: RawEthLog[] = await ethRpcFetch(rpcUrl, "eth_getLogs", [
+	const rawLogs: RawEthLog[] = await ethRpcFetch(ethereumHttpRpcUrl, "eth_getLogs", [
 		{
 			address: contractAddress,
 			topics: [eventTopic],
@@ -89,7 +101,7 @@ export async function getLeafInsertLogs(
 
 /**
  * Finds a LeafInsert log for a specific leaf index using eth_getLogs.
- * @param rpcUrl string
+ * @param ethereumHttpRpcUrl string
  * @param contractAddress string
  * @param eventTopic string (keccak256 hash of event signature)
  * @param fromBlock string (hex or "latest")
@@ -97,18 +109,19 @@ export async function getLeafInsertLogs(
  * @param targetLeafIndex number (the leaf index to filter for)
  * @returns Promise<any[]> (array of log objects for that leaf index)
  */
-export async function getLeafInsertLogForTargetLeafIndex(
-	rpcUrl: string,
-	contractAddress: string,
-	fromBlock: number,
-	toBlock: number,
-	targetLeafIndex: number,
-	eventTopicOverride?: string,
-): Promise<NormalizedLeafInsertEvent | null> {
+export async function getLeafInsertLogForTargetLeafIndex(params: {
+	ethereumHttpRpcUrl: string
+	contractAddress: string
+	fromBlock: number
+	toBlock: number
+	targetLeafIndex: number
+	eventTopicOverride?: string
+}): Promise<NormalizedLeafInsertEvent | null> {
+	const { ethereumHttpRpcUrl, contractAddress, fromBlock, toBlock, targetLeafIndex, eventTopicOverride } = params
 	const eventTopic = eventTopicOverride ?? getEventTopic("LeafInsert(uint32,uint32,bytes,bytes32[])")
 	const leafIndexTopic = "0x" + targetLeafIndex.toString(16).padStart(64, "0")
 	const topics = [eventTopic, leafIndexTopic]
-	const rawLogs: RawEthLog[] = await ethRpcFetch(rpcUrl, "eth_getLogs", [
+	const rawLogs: RawEthLog[] = await ethRpcFetch(ethereumHttpRpcUrl, "eth_getLogs", [
 		{
 			address: contractAddress,
 			topics,

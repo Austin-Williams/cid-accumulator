@@ -30,9 +30,17 @@ export async function syncBackwardsFromLatest(
 	ethereumHttpRpcUrl: string,
 	contractAddress: string,
 	setLastProcessedBlock: (block: number) => void,
+	getAccumulatorDataSignatureOverride?: string,
+	getAccumulatorDataCalldataOverride?: string,
+	eventTopicOverride?: string,
 	maxBlockRangePerRpcCall = 1000,
 ): Promise<void> {
-	const { meta, peaks } = await getAccumulatorData(ethereumHttpRpcUrl, contractAddress)
+	const { meta, peaks } = await getAccumulatorData({
+		ethereumHttpRpcUrl,
+		contractAddress,
+		getAccumulatorDataSignatureOverride,
+		getAccumulatorDataCalldataOverride,
+	})
 	const currentLeafIndex = meta.leafCount - 1
 	const currentBlock = meta.previousInsertBlockNumber
 	const minBlock = meta.deployBlockNumber
@@ -73,12 +81,13 @@ export async function syncBackwardsFromLatest(
 		const startBlock = Math.max(minBlock, endBlock - maxBlockRangePerRpcCall + 1)
 		console.log(`[Accumulator] \u{1F4E6} Checking blocks ${startBlock} to ${endBlock} for LeafInsert events...`)
 		// Get the LeafInsert event logs
-		const logs: NormalizedLeafInsertEvent[] = await getLeafInsertLogs(
+		const logs: NormalizedLeafInsertEvent[] = await getLeafInsertLogs({
 			ethereumHttpRpcUrl,
 			contractAddress,
-			startBlock,
-			endBlock,
-		)
+			fromBlock: startBlock,
+			toBlock: endBlock,
+			eventTopicOverride,
+		})
 
 		if (logs.length > 0) console.log(`[Accumulator] \u{1F343} Found ${logs.length} LeafInsert events`)
 
@@ -211,7 +220,7 @@ export async function startLiveSync(
 			shouldProvide,
 		)
 	} else {
-		startPollingSync(
+		startPollingSync({
 			ipfs,
 			mmr,
 			storage,
@@ -226,7 +235,7 @@ export async function startLiveSync(
 			shouldPut,
 			shouldProvide,
 			pollIntervalMs,
-		)
+		})
 	}
 }
 
@@ -323,33 +332,61 @@ export async function detectSubscriptionSupport(wsUrl: string): Promise<boolean>
 	})
 }
 
-export function startPollingSync(
-	ipfs: IpfsAdapter,
-	mmr: MerkleMountainRange,
-	storage: StorageAdapter,
-	ethereumHttpRpcUrl: string,
-	contractAddress: string,
-	getLiveSyncRunning: () => boolean,
-	setLiveSyncInterval: (interval: ReturnType<typeof setTimeout> | undefined) => void,
-	lastProcessedBlock: number,
-	setLastProcessedBlock: (blockNumber: number) => void,
-	getHighestCommittedLeafIndex: () => number,
-	setHighestCommittedLeafIndex: (index: number) => void,
-	shouldPut: boolean,
-	shouldProvide: boolean,
-	pollIntervalMs: number = 10_000,
-): void {
+export function startPollingSync(params: {
+	ipfs: IpfsAdapter
+	mmr: MerkleMountainRange
+	storage: StorageAdapter
+	ethereumHttpRpcUrl: string
+	contractAddress: string
+	getLiveSyncRunning: () => boolean
+	setLiveSyncInterval: (interval: ReturnType<typeof setTimeout> | undefined) => void
+	lastProcessedBlock: number
+	setLastProcessedBlock: (blockNumber: number) => void
+	getHighestCommittedLeafIndex: () => number
+	setHighestCommittedLeafIndex: (index: number) => void
+	shouldPut: boolean
+	shouldProvide: boolean
+	getAccumulatorDataSignatureOverride?: string
+	getAccumulatorDataCalldataOverride?: string
+	eventTopicOverride?: string
+	pollIntervalMs?: number
+}) {
+	const {
+		ipfs,
+		mmr,
+		storage,
+		ethereumHttpRpcUrl,
+		contractAddress,
+		getLiveSyncRunning,
+		setLiveSyncInterval,
+		lastProcessedBlock,
+		setLastProcessedBlock,
+		getHighestCommittedLeafIndex,
+		setHighestCommittedLeafIndex,
+		shouldPut,
+		shouldProvide,
+		getAccumulatorDataSignatureOverride,
+		getAccumulatorDataCalldataOverride,
+		eventTopicOverride,
+		pollIntervalMs,
+	} = params
 	const poll = async () => {
 		try {
-			const { meta } = await getAccumulatorData(ethereumHttpRpcUrl, contractAddress)
+			const { meta } = await getAccumulatorData({
+				ethereumHttpRpcUrl,
+				contractAddress,
+				getAccumulatorDataSignatureOverride,
+				getAccumulatorDataCalldataOverride,
+			})
 			const latestBlock = meta.previousInsertBlockNumber
 			if (latestBlock > lastProcessedBlock) {
-				const newEvents = await getLeafInsertLogs(
+				const newEvents = await getLeafInsertLogs({
 					ethereumHttpRpcUrl,
 					contractAddress,
-					lastProcessedBlock + 1,
-					latestBlock,
-				)
+					fromBlock: lastProcessedBlock + 1,
+					toBlock: latestBlock,
+					eventTopicOverride,
+				})
 				for (const event of newEvents) {
 					await processNewLeafEvent(
 						ipfs,
@@ -370,7 +407,7 @@ export function startPollingSync(
 			console.error("[LiveSync] Error during polling:", err)
 		}
 		if (getLiveSyncRunning()) {
-			setLiveSyncInterval(setTimeout(poll, pollIntervalMs))
+			setLiveSyncInterval(setTimeout(poll, pollIntervalMs ?? 10_000))
 		}
 	}
 	poll()
@@ -391,6 +428,9 @@ export function startSubscriptionSync(
 	setHighestCommittedLeafIndex: (index: number) => void,
 	shouldPut: boolean,
 	shouldProvide: boolean,
+	getAccumulatorDataSignatureOverride?: string,
+	getAccumulatorDataCalldataOverride?: string,
+	eventTopicOverride?: string,
 ): void {
 	if (!ethereumWsRpcUrl) {
 		console.error("[Accumulator] No ETHEREUM_WS_RPC_URL set. Cannot start subscription sync.")
@@ -430,15 +470,21 @@ export function startSubscriptionSync(
 				console.log(`[Accumulator] New block: ${blockHash}. Fetching events...`)
 				// Get latest block number and process new events
 				try {
-					const { meta } = await getAccumulatorData(ethereumHttpRpcUrl, contractAddress)
+					const { meta } = await getAccumulatorData({
+						ethereumHttpRpcUrl,
+						contractAddress,
+						getAccumulatorDataSignatureOverride,
+						getAccumulatorDataCalldataOverride,
+					})
 					const latestBlock = meta.previousInsertBlockNumber
 					if (latestBlock > lastProcessedBlock) {
-						const newEvents = await getLeafInsertLogs(
+						const newEvents = await getLeafInsertLogs({
 							ethereumHttpRpcUrl,
 							contractAddress,
-							lastProcessedBlock + 1,
-							latestBlock,
-						)
+							fromBlock: lastProcessedBlock + 1,
+							toBlock: latestBlock,
+							eventTopicOverride,
+						})
 						for (const event of newEvents) {
 							await processNewLeafEvent(
 								ipfs,
@@ -484,6 +530,10 @@ export async function processNewLeafEvent(
 	shouldPut: boolean,
 	shouldProvide: boolean,
 	event: NormalizedLeafInsertEvent,
+	getAccumulatorDataSignatureOverride?: string,
+	getAccumulatorDataCalldataOverride?: string,
+	getLatestCidSignatureOverride?: string,
+	getLatestCidCalldataOverride?: string,
 ): Promise<void> {
 	// return if we have already processed this leaf
 	if (event.leafIndex <= getHighestCommittedLeafIndex()) return
@@ -537,12 +587,22 @@ export async function processNewLeafEvent(
 	for (const callback of newLeafSubscribers) callback(event.leafIndex, uint8ArrayToHexString(event.newData))
 
 	// === THE FOLLOWING CODE BLOCK CAN BE REMOVED. IT IS JUST A SANITY CHECK. ===
-	const { meta } = await getAccumulatorData(ethereumHttpRpcUrl, contractAddress)
+	const { meta } = await getAccumulatorData({
+		ethereumHttpRpcUrl,
+		contractAddress,
+		getAccumulatorDataSignatureOverride,
+		getAccumulatorDataCalldataOverride,
+	})
 	// This sanity check only makes sense when the node is fully synced
 	if (getHighestCommittedLeafIndex() === meta.leafCount - 1) {
 		try {
 			const localRootCid = await mmr.rootCIDAsBase32()
-			const onChainRootCid = await getLatestCID(ethereumHttpRpcUrl, contractAddress)
+			const onChainRootCid = await getLatestCID({
+				ethereumHttpRpcUrl,
+				contractAddress,
+				getLatestCidSignatureOverride,
+				getLatestCidCalldataOverride,
+			})
 			if (localRootCid !== onChainRootCid.toString()) {
 				console.warn(
 					`[Accumulator:SanityCheck] \u{274C} Local (${localRootCid} )and on-chain (${onChainRootCid.toString()}) root CIDs do NOT match!`,
