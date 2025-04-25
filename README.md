@@ -160,7 +160,7 @@ await accumulatorClient.data.getData(<index>)
 await accumulatorClient.data.getRange(<fromIndex>, <toIndex>)
 
 // Download the full dataset as a JSON file
-// accumulatorClient.data..downloadAll() returns a Promise that resolves to the
+// accumulatorClient.data.downloadAll() returns a Promise that resolves to the
 // filename (Node.js) or triggers a download (browser).
 await accumulatorClient.data.downloadAll()
 
