@@ -148,6 +148,8 @@ Progress will be shown in console logs. Example:
 [Accumulator] ✅ Pinned 522 CIDs to IPFS (0 failures). Done!
 ```
 
+### Browser Usage
+
 In the browser, once the client has synced and rebuilt the MMR, it will be attached to the `window`, so you'll have full access to it via `window.accumulatorClient`. For example, you can open the console and access the data in the following ways:
 
 ```typescript
