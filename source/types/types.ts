@@ -122,4 +122,5 @@ export type DataNamespace = {
 	getRange: (start: number, end: number) => Promise<Array<{ index: number; data: string }>>
 	subscribe: (callback: (index: number, data: string) => void) => () => void
 	downloadAll: (prefix: string) => Promise<string>
+	createIndexByPayloadSlice: (keyPrefix: string, offset: number, length: number) => Promise<Map<string, string[]>>
 }

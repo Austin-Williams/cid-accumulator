@@ -34,5 +34,6 @@ export function getDataNamespace(
 		},
 		subscribe: (callback) => onNewLeaf(callback),
 		downloadAll: async () => downloadAll(storageAdapter, "leaf:"),
+		createIndexByPayloadSlice: async (keyPrefix: string, offset: number, length: number) => storageAdapter.createIndexByPayloadSlice(keyPrefix, offset, length)
 	}
 }
