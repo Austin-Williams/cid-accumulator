@@ -4,24 +4,33 @@
 import type { StorageAdapter } from "../../interfaces/StorageAdapter.js"
 
 export class IndexedDBAdapter implements StorageAdapter {
+	private _instanceId: number
+	private static _nextId = 1
 	private dbName: string
 	private storeName: string
 	private dbPromise: Promise<IDBDatabase>
 
 	constructor(dbName = "cid-accumulator", storeName = "kv") {
+		this._instanceId = IndexedDBAdapter._nextId++
 		this.dbName = dbName
 		this.storeName = storeName
 		this.dbPromise = this.openDB()
 	}
 
 	private openDB(): Promise<IDBDatabase> {
+		if (typeof indexedDB === "undefined") throw new Error("IndexedDB is not available in this environment.")
 		return new Promise((resolve, reject) => {
 			const req = indexedDB.open(this.dbName, 1)
 			req.onupgradeneeded = () => {
 				req.result.createObjectStore(this.storeName)
 			}
-			req.onsuccess = () => resolve(req.result)
-			req.onerror = () => reject(req.error)
+			req.onsuccess = () => {
+				resolve(req.result)
+			}
+			req.onerror = () => {
+				console.error(`[IndexedDBAdapter] onerror (instanceId=${this._instanceId})`, req.error)
+				reject(req.error)
+			}
 		})
 	}
 
@@ -50,6 +59,7 @@ export class IndexedDBAdapter implements StorageAdapter {
 
 	async *iterate(prefix: string): AsyncIterable<{ key: string; value: string }> {
 		const db = await this.dbPromise
+		if (!db) throw new Error("IndexedDB database not initialized.")
 		const tx = db.transaction(this.storeName, "readonly")
 		const store = tx.objectStore(this.storeName)
 		const req = store.openCursor()
@@ -88,13 +98,12 @@ export class IndexedDBAdapter implements StorageAdapter {
 
 	/**
 	 * Creates an index of all entries keyed by a substring of their payload.
-	 * @param keyPrefix The prefix of the keys to index (e.g. "leaf:")
 	 * @param offset The starting index of the substring.
 	 * @param length The length of the substring.
 	 */
-	async createIndexByPayloadSlice(keyPrefix: string, offset: number, length: number): Promise<Map<string, string[]>> {
+	async createIndexByPayloadSlice(offset: number, length: number): Promise<Map<string, string[]>> {
 		const index = new Map<string, string[]>()
-		for await (const { value } of this.iterate(keyPrefix)) {
+		for await (const { value } of this.iterate("leaf:")) {
 			const slice = value.slice(offset, offset + length)
 			if (!index.has(slice)) index.set(slice, [])
 			index.get(slice)!.push(value)

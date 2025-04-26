@@ -14,9 +14,8 @@ export interface StorageAdapter {
 
 	/**
 	 * Creates an index of all entries keyed by a substring of their payload.
-	 * @param keyPrefix The prefix of the keys to index (e.g. "leaf:")
 	 * @param offset The starting index of the substring of the payload.
 	 * @param length The length of the substring of the payload.
 	 */
-	createIndexByPayloadSlice(keyPrefix: string, offset: number, length: number): Promise<Map<string, string[]>>
+	createIndexByPayloadSlice(offset: number, length: number): Promise<Map<string, string[]>>
 }

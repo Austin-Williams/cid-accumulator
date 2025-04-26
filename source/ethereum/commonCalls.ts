@@ -114,7 +114,7 @@ export async function getLeafInsertLogs(params: {
 	const parsedLogs: NormalizedLeafInsertEvent[] = await Promise.all(
 		rawLogs
 			.filter((log) => log.topics && log.topics[0] && log.topics[0].toLowerCase() === eventTopic.toLowerCase())
-			.map(async (log, idx) => {
+			.map(async (log) => {
 				return await parseLeafInsertLog(log)
 			}),
 	)

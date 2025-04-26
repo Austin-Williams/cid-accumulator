@@ -1,5 +1,3 @@
-console.log("example.ts loaded (very top)");
-
 import { AccumulatorClient } from "./source/accumulator/client/AccumulatorClient.ts"
 import { config } from "./config.ts";import { registerGracefulShutdown } from "./source/utils/gracefulShutdown.ts"
 import { isNodeJs } from "./source/utils/envDetection.ts"

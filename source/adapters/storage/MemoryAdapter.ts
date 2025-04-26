@@ -41,10 +41,10 @@ export class MemoryAdapter implements StorageAdapter {
 		}
 	}
 
-	async createIndexByPayloadSlice(keyPrefix: string, offset: number, length: number): Promise<Map<string, string[]>> {
+	async createIndexByPayloadSlice(offset: number, length: number): Promise<Map<string, string[]>> {
 		const index = new Map<string, string[]>()
 		for (const [key, value] of this.store.entries()) {
-			if (!key.startsWith(keyPrefix)) continue
+			if (!key.startsWith("leaf:")) continue
 			const slice = value.slice(offset, offset + length)
 			if (!index.has(slice)) index.set(slice, [])
 			index.get(slice)!.push(value)

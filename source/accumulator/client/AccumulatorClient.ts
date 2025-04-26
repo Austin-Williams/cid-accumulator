@@ -13,6 +13,7 @@ import { startLiveSync, stopLiveSync, syncBackwardsFromLatest } from "./syncHelp
 import { initStorage } from "./initStorage.ts"
 import { initIpfs } from "./initIpfs.ts"
 import { initSync } from "./initSync.ts"
+import { getDataNamespace } from "./dataNamespace.ts"
 
 /**
  * AccumulatorClient: Unified entry point for accumulator logic in any environment.
@@ -51,6 +52,13 @@ export class AccumulatorClient {
 			this.mmr,
 			this.config.GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE,
 			this.config.LEAF_INSERT_EVENT_SIGNATURE_OVERRIDE,
+		)
+
+		// SET UP DATA (firnedly "front-end" to storage)
+		this.data = getDataNamespace(
+			this.storage.storageAdapter,
+			() => this.sync!.highestCommittedLeafIndex,
+			(_callback: (index: number, data: string) => void) => () => {},
 		)
 	}
 
