@@ -48,7 +48,7 @@ export async function rebuildAndProvideMMR(
 	setHighestCommittedLeafIndex: (index: number) => void,
 ): Promise<void> {
 	console.log(
-		`[Accumulator] ⛰️ Rebuilding the Merkle Mountain Range from synced leaves${shouldPin ? " and pinning to IPFS" : ""}...`,
+		`[Accumulator] ⛰️ Rebuilding the Merkle Mountain Range from synced leaves${shouldPin ? " and pinning to IPFS" : ""}. (This can take a while)...`,
 	)
 	const fromIndex: number = getHighestCommittedLeafIndex() + 1
 	const toIndex: number = await getHighestContiguousLeafIndexWithData(storageAdapter)

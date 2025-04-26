@@ -1,0 +1,14 @@
+{
+  "ETHEREUM_HTTP_RPC_URL": "https://your.ethereum.rpc.url",
+  "ETHEREUM_MAX_BLOCK_RANGE_PER_HTTP_RPC_CALL": null,
+  "ETHEREUM_WS_RPC_URL": null,
+  "IPFS_GATEWAY_URL": "http://127.0.0.1:8080",
+  "IPFS_API_URL": null,
+  "IPFS_PUT_IF_POSSIBLE": true,
+  "IPFS_PIN_IF_POSSIBLE": true,
+  "IPFS_PROVIDE_IF_POSSIBLE": true,
+  "DB_PATH": "./your-db-path.json",
+  "GET_LATEST_CID_CALLDATA_OVERRIDE": null,
+  "GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE": null,
+  "LEAF_INSERT_EVENT_SIGNATURE_OVERRIDE": null
+}

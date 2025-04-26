@@ -6,6 +6,7 @@ import { getAccumulatorData } from "../../ethereum/commonCalls.ts"
 import { MerkleMountainRange } from "../merkleMountainRange/MerkleMountainRange.ts"
 
 export async function initSync(
+	contractAddress: string,
 	config: AccumulatorClientConfig,
 	storageAdapter: StorageAdapter,
 	ipfs: IpfsNamespace,
@@ -22,10 +23,10 @@ export async function initSync(
 	try {
 		const { meta } = await getAccumulatorData({
 			ethereumHttpRpcUrl: config.ETHEREUM_HTTP_RPC_URL,
-			contractAddress: config.CONTRACT_ADDRESS,
+			contractAddress: contractAddress,
 			getAccumulatorDataCalldataOverride: config.GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE,
 		})
-		console.log(`[Accumulator] \u{2705} Connected to Ethereum. Target contract address: ${config.CONTRACT_ADDRESS}`)
+		console.log(`[Accumulator] \u{2705} Connected to Ethereum. Target contract address: ${contractAddress}`)
 		lastProcessedBlock = meta.deployBlockNumber - 1
 	} catch (e) {
 		console.error("[Accumulator] \u{274C} Failed to connect to Ethereum node:", e)
@@ -38,7 +39,7 @@ export async function initSync(
 		storageAdapter,
 		config.ETHEREUM_HTTP_RPC_URL,
 		config.ETHEREUM_WS_RPC_URL,
-		config.CONTRACT_ADDRESS,
+		contractAddress,
 		lastProcessedBlock,
 		ipfs.shouldPut,
 		ipfs.shouldPin,

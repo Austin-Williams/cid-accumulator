@@ -1,10 +1,15 @@
+import type { AccumulatorClientConfig } from "./source/types/types.ts"
 import { AccumulatorClient } from "./source/accumulator/client/AccumulatorClient.ts"
-import { config } from "./config.ts";import { registerGracefulShutdown } from "./source/utils/gracefulShutdown.ts"
+import { registerGracefulShutdown } from "./source/utils/gracefulShutdown.ts"
 import { isNodeJs } from "./source/utils/envDetection.ts"
 
+// Load config.json dynamically
+// After loading config
+const config = await import("./config.json").then(m => m.default ?? m) as AccumulatorClientConfig
 async function main() {	
 	// Create the client
-	const accumulatorClient = new AccumulatorClient(config)
+	const contractAddress = "0x7BD24761E84a9003B346168B5F84FC2045b60E0e"
+	const accumulatorClient = new AccumulatorClient(contractAddress, config)
 	// Start the client
 	await accumulatorClient.start()
 

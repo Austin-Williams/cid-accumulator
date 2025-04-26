@@ -620,13 +620,13 @@ export async function processNewLeafEvent(
 			})
 			if (localRootCid !== onChainRootCid.toString()) {
 				console.warn(
-					`[Accumulator:SanityCheck] \u{274C} Local (${localRootCid} )and on-chain (${onChainRootCid.toString()}) root CIDs do NOT match!`,
+					`[Accumulator] 🧠 Sanity check: \u{274C} Local (${localRootCid} )and on-chain (${onChainRootCid.toString()}) root CIDs do NOT match!`,
 				)
 			} else {
-				console.log("[Accumulator:SanityCheck] \u{2705} Local and on-chain root CIDs match!")
+				console.log("[Accumulator] 🧠 Sanity check: \u{2705} Local and on-chain root CIDs match!")
 			}
 		} catch (err) {
-			console.warn("[Accumulator:SanityCheck] \u{274C} Failed to compare root CIDs:", err)
+			console.warn("[Accumulator] 🧠 Sanity check: \u{274C} Failed to compare root CIDs:", err)
 		}
 	}
 	// =============================== END SANITY CHECK. ===============================

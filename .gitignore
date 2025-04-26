@@ -164,3 +164,4 @@ vite.config.ts
 
 # Integration test output
 testing-community.json
+config.json

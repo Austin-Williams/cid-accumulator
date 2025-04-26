@@ -5,6 +5,7 @@ import type {
 	StorageNamespace,
 	SyncNamespace,
 } from "../../types/types.ts"
+import { defaultConfig } from "./defaultConfig.ts"
 import { isBrowser } from "../../utils/envDetection.ts"
 import { rebuildAndProvideMMR } from "./mmrHelpers.ts"
 import { getHighestContiguousLeafIndexWithData } from "./storageHelpers.ts"
@@ -14,12 +15,14 @@ import { initStorage } from "./initStorage.ts"
 import { initIpfs } from "./initIpfs.ts"
 import { initSync } from "./initSync.ts"
 import { getDataNamespace } from "./dataNamespace.ts"
+import { logConfig } from "../../utils/configLogger.ts"
 
 /**
  * AccumulatorClient: Unified entry point for accumulator logic in any environment.
  * Pass in the appropriate IpfsAdapter and StorageAdapter for your environment.
  */
 export class AccumulatorClient {
+	public contractAddress: string
 	public config: AccumulatorClientConfig
 	public data?: DataNamespace
 	public ipfs?: IpfsNamespace
@@ -27,12 +30,20 @@ export class AccumulatorClient {
 	public sync?: SyncNamespace
 	public mmr: MerkleMountainRange
 
-	constructor(config: AccumulatorClientConfig) {
-		this.config = config
+	constructor(contractAddress: string, config?: AccumulatorClientConfig) {
+		this.contractAddress = contractAddress
+		this.config = config ?? defaultConfig
 		this.mmr = new MerkleMountainRange()
+		logConfig(this.config)
 	}
 
 	async init(): Promise<void> {
+		// Expose client in browser (to give user control)
+		if (isBrowser()) {
+			// @ts-ignore
+			window.accumulatorClient = this
+		}
+
 		// SET UP STORAGE
 		this.storage = await initStorage(this.config)
 		// Ensure DB is open
@@ -46,6 +57,7 @@ export class AccumulatorClient {
 
 		// SET UP SYNC
 		this.sync = await initSync(
+			this.contractAddress,
 			this.config,
 			this.storage.storageAdapter,
 			this.ipfs,
@@ -63,6 +75,7 @@ export class AccumulatorClient {
 	}
 
 	async start(): Promise<void> {
+		console.log("[Accumulator] 🚀 Starting AccumulatorClient...")
 		await this.init()
 
 		if (!this.ipfs || !this.sync || !this.storage)
@@ -88,13 +101,7 @@ export class AccumulatorClient {
 			() => this.sync!.highestCommittedLeafIndex,
 			(block: number) => (this.sync!.highestCommittedLeafIndex = block),
 		)
-
-		// Expose client in browser (to give user control)
-		if (isBrowser()) {
-			// @ts-ignore
-			window.accumulatorClient = this
-		}
-
+		
 		this.ipfs.rePinAllDataToIPFS() // Fire-and-forget, no-ops if this.ipfs.shouldPin is false
 
 		startLiveSync(
@@ -121,6 +128,7 @@ export class AccumulatorClient {
 			this.config.GET_LATEST_CID_CALLDATA_OVERRIDE,
 			this.config.LEAF_INSERT_EVENT_SIGNATURE_OVERRIDE,
 		)
+		console.log("[Accumulator] 🟢 Completed initialization. Ready to use.")
 	}
 
 	/**
