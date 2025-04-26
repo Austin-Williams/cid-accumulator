@@ -12,9 +12,9 @@ import {
 /**
  * Returns a StorageNamespace object with methods bound to the given storage adapter.
  */
-export function getStorageNamespace(storage: StorageAdapter): StorageNamespace {
+export function getStorageNamespace(storageAdapter: StorageAdapter): StorageNamespace {
 	const sync = {
-		storageAdapter: storage,
+		storageAdapter: storageAdapter,
 		getLeafRecord: async (index: number) => {
 			const result = await getLeafRecord(sync.storageAdapter, index)
 			return result === undefined ? null : result

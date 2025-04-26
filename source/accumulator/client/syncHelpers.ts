@@ -26,7 +26,7 @@ import { MerkleMountainRange } from "../merkleMountainRange/MerkleMountainRange.
  */
 export async function syncBackwardsFromLatest(
 	ipfs: IpfsAdapter,
-	storage: StorageAdapter,
+	storageAdapter: StorageAdapter,
 	ethereumHttpRpcUrl: string,
 	contractAddress: string,
 	setLastProcessedBlock: (block: number) => void,
@@ -44,7 +44,7 @@ export async function syncBackwardsFromLatest(
 	const minBlock = meta.deployBlockNumber
 	setLastProcessedBlock(meta.previousInsertBlockNumber)
 
-	const highestLeafIndexInDB = await getHighestContiguousLeafIndexWithData(storage)
+	const highestLeafIndexInDB = await getHighestContiguousLeafIndexWithData(storageAdapter)
 
 	console.log(
 		`[Accumulator] \u{1F501} Syncing backwards from block ${meta.previousInsertBlockNumber} to block ${meta.deployBlockNumber} (${meta.previousInsertBlockNumber - meta.deployBlockNumber} blocks), grabbing ${maxBlockRangePerRpcCall} blocks per RPC call.`,
@@ -102,7 +102,7 @@ export async function syncBackwardsFromLatest(
 				event.leftInputs,
 			)
 			// Store the relevat data in the DB
-			await putLeafRecordInDB(storage, event.leafIndex, {
+			await putLeafRecordInDB(storageAdapter, event.leafIndex, {
 				newData: event.newData,
 				event,
 				blockNumber: event.blockNumber,
@@ -117,7 +117,7 @@ export async function syncBackwardsFromLatest(
 		// After processing all events in this batch, fire off an IPFS check for the oldestRootCid
 		const controller = new AbortController()
 		const tracked = makeTrackedPromise(
-			getAndResolveCID(ipfs, storage, oldestRootCid, { signal: controller.signal }).catch((err) => {
+			getAndResolveCID(ipfs, storageAdapter, oldestRootCid, { signal: controller.signal }).catch((err) => {
 				if (err?.name === "AbortError") return false
 				throw err
 			}),
@@ -130,14 +130,14 @@ export async function syncBackwardsFromLatest(
 			ipfsChecks.forEach((c) => c.controller.abort())
 			const foundIpfsCid = ipfsChecks[successfulIndex].cid
 			// Sanity check to make sure we didn't unexpectedly miss any datda
-			const missing = await getLeafIndexesWithMissingNewData(storage, currentLeafIndex)
+			const missing = await getLeafIndexesWithMissingNewData(storageAdapter, currentLeafIndex)
 			if (missing.length !== 0) throw new Error("Unexpectedly missing newData for leaf indices: " + missing.join(", "))
 			console.log(
 				`[Accumulator] \u{1F4E5} Downloaded all data for root CID ${foundIpfsCid?.toString() ?? "undefined"} from IPFS.`,
 			)
 			console.log(`[Accumulator] \u{1F64C} Successfully resolved all remaining data from IPFS!`)
 			console.log(`[Accumulator] \u{2705} Your accumulator client is synced!`)
-			await storage.persist()
+			await storageAdapter.persist()
 			return
 		}
 		// We can also stop syncing backwards if we get back to a leaf that we laready have
@@ -149,7 +149,7 @@ export async function syncBackwardsFromLatest(
 	// Wait for all outstanding IPFS check promises to settle (resolve or reject)
 	await Promise.allSettled(ipfsChecks.map((c) => c.promise))
 	// Sanity check to make sure we didn't unexpectedly miss any datda
-	const missing = await getLeafIndexesWithMissingNewData(storage, currentLeafIndex)
+	const missing = await getLeafIndexesWithMissingNewData(storageAdapter, currentLeafIndex)
 	if (missing.length !== 0) {
 		throw new Error("[Accumulator] Missing newData for leaf indices: " + missing.join(", "))
 	}
@@ -157,7 +157,7 @@ export async function syncBackwardsFromLatest(
 		"[Accumulator] \u{1F9BE} Fully synced backwards using only event data and local DB data (no data used from IPFS)",
 	)
 	console.log(`[Accumulator] \u{2705} Your accumulator client is synced!`)
-	await storage.persist()
+	await storageAdapter.persist()
 }
 
 /**
@@ -167,7 +167,7 @@ export async function syncBackwardsFromLatest(
 export async function startLiveSync(
 	ipfs: IpfsAdapter,
 	mmr: MerkleMountainRange,
-	storage: StorageAdapter,
+	storageAdapter: StorageAdapter,
 	contractAddress: string,
 	ethereumHttpRpcUrl: string,
 	ethereumWsRpcUrl: string | undefined,
@@ -207,7 +207,7 @@ export async function startLiveSync(
 		startSubscriptionSync(
 			ipfs,
 			mmr,
-			storage,
+			storageAdapter,
 			ethereumHttpRpcUrl,
 			ethereumWsRpcUrl,
 			ws,
@@ -224,7 +224,7 @@ export async function startLiveSync(
 		startPollingSync({
 			ipfs,
 			mmr,
-			storage,
+			storageAdapter,
 			ethereumHttpRpcUrl,
 			contractAddress,
 			getLiveSyncRunning,
@@ -339,7 +339,7 @@ export async function detectSubscriptionSupport(wsUrl: string): Promise<boolean>
 export function startPollingSync(params: {
 	ipfs: IpfsAdapter
 	mmr: MerkleMountainRange
-	storage: StorageAdapter
+	storageAdapter: StorageAdapter
 	ethereumHttpRpcUrl: string
 	contractAddress: string
 	getLiveSyncRunning: () => boolean
@@ -358,7 +358,7 @@ export function startPollingSync(params: {
 	const {
 		ipfs,
 		mmr,
-		storage,
+		storageAdapter,
 		ethereumHttpRpcUrl,
 		contractAddress,
 		getLiveSyncRunning,
@@ -395,7 +395,7 @@ export function startPollingSync(params: {
 					await processNewLeafEvent(
 						ipfs,
 						mmr,
-						storage,
+						storageAdapter,
 						ethereumHttpRpcUrl,
 						contractAddress,
 						getHighestCommittedLeafIndex,
@@ -422,7 +422,7 @@ export function startPollingSync(params: {
 export function startSubscriptionSync(
 	ipfs: IpfsAdapter,
 	mmr: MerkleMountainRange,
-	storage: StorageAdapter,
+	storageAdapter: StorageAdapter,
 	ethereumHttpRpcUrl: string,
 	ethereumWsRpcUrl: string | undefined,
 	ws: WebSocket | undefined,
@@ -493,7 +493,7 @@ export function startSubscriptionSync(
 							await processNewLeafEvent(
 								ipfs,
 								mmr,
-								storage,
+								storageAdapter,
 								ethereumHttpRpcUrl,
 								contractAddress,
 								getHighestCommittedLeafIndex,
@@ -526,7 +526,7 @@ export function startSubscriptionSync(
 export async function processNewLeafEvent(
 	ipfs: IpfsAdapter,
 	mmr: MerkleMountainRange,
-	storage: StorageAdapter,
+	storageAdapter: StorageAdapter,
 	ethereumHttpRpcUrl: string,
 	contractAddress: string,
 	getHighestCommittedLeafIndex: () => number,
@@ -559,7 +559,7 @@ export async function processNewLeafEvent(
 			await processNewLeafEvent(
 				ipfs,
 				mmr,
-				storage,
+				storageAdapter,
 				ethereumHttpRpcUrl,
 				contractAddress,
 				getHighestCommittedLeafIndex,
@@ -576,13 +576,13 @@ export async function processNewLeafEvent(
 	}
 
 	// Store the event in the DB
-	await putLeafRecordInDB(storage, event.leafIndex, getLeafRecordFromNormalizedLeafInsertEvent(event))
+	await putLeafRecordInDB(storageAdapter, event.leafIndex, getLeafRecordFromNormalizedLeafInsertEvent(event))
 
 	// Commit the leaf to the MMR
 	await commitLeaf(
 		ipfs,
 		mmr,
-		storage,
+		storageAdapter,
 		shouldPut,
 		shouldProvide,
 		getHighestCommittedLeafIndex,

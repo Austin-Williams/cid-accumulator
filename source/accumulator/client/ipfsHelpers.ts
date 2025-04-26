@@ -22,7 +22,7 @@ import { getCIDDataPairFromDB, putLeafRecordInDB } from "./storageHelpers.ts"
  */
 export async function getAndResolveCID(
 	ipfs: IpfsAdapter,
-	storage: StorageAdapter,
+	storageAdapter: StorageAdapter,
 	cid: CID<unknown, 113, 18, 1>,
 	opts?: { signal?: AbortSignal },
 ): Promise<boolean> {
@@ -41,7 +41,7 @@ export async function getAndResolveCID(
 		const leavesPromise = resolveMerkleTreeOrThrow(cid, ipfs)
 		const leaves = await (abortPromise ? Promise.race([leavesPromise, abortPromise]) : leavesPromise)
 		for (let i = 0; i < leaves.length; i++)
-			await putLeafRecordInDB(storage, i, { newData: leaves[i], __type: "LeafRecord" })
+			await putLeafRecordInDB(storageAdapter, i, { newData: leaves[i], __type: "LeafRecord" })
 		return true
 	} catch {
 		// Always return false on any error (including AbortError)
@@ -61,7 +61,7 @@ export async function getAndResolveCID(
  */
 export function rePinAllDataToIPFS(
 	ipfs: IpfsAdapter,
-	storage: StorageAdapter,
+	storageAdapter: StorageAdapter,
 	shouldPut: boolean,
 	shouldPin: boolean,
 	shouldProvide: boolean,
@@ -70,7 +70,7 @@ export function rePinAllDataToIPFS(
 		console.log(`[Accumulator] ℹ️ rePinAllDataToIPFS skipped because this.shouldPin == false`)
 		return
 	}
-	storage.get("dag:trail:maxIndex").then((result) => {
+	storageAdapter.get("dag:trail:maxIndex").then((result) => {
 		const toIndex = Number(result ?? -1)
 		if (toIndex === -1) return // Launch the pinning process in the background
 		;(async () => {
@@ -81,7 +81,7 @@ export function rePinAllDataToIPFS(
 			let failed = 0
 			for (let i = 0; i <= toIndex; i++) {
 				try {
-					const pair: CIDDataPair | null = await getCIDDataPairFromDB(storage, i)
+					const pair: CIDDataPair | null = await getCIDDataPairFromDB(storageAdapter, i)
 					if (!pair) throw new Error(`[Accumulator] Expected CIDDataPair for leaf ${i}`)
 
 					const putOk = await putPinProvideToIPFS(ipfs, shouldPut, shouldProvide, pair.cid, pair.dagCborEncodedData)

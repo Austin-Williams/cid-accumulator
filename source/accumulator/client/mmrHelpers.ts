@@ -8,7 +8,7 @@ import { IpfsAdapter } from "../../interfaces/IpfsAdapter.ts"
 export async function commitLeaf(
 	ipfs: IpfsAdapter,
 	mmr: MerkleMountainRange,
-	storage: StorageAdapter,
+	storageAdapter: StorageAdapter,
 	shouldPut: boolean,
 	shouldProvide: boolean,
 	getHighestCommittedLeafIndex: () => number,
@@ -19,7 +19,7 @@ export async function commitLeaf(
 	// Add leaf to MMR
 	const trail = await mmr.addLeafWithTrail(leafIndex, newData)
 	// Store trail in local DB (efficient append-only)
-	await appendTrailToDB(storage, trail)
+	await appendTrailToDB(storageAdapter, trail)
 	// Pin and provide trail to IPFS
 	if (shouldPut) {
 		for (const { cid, dagCborEncodedData } of trail) {
@@ -41,7 +41,7 @@ export async function commitLeaf(
 export async function rebuildAndProvideMMR(
 	ipfs: IpfsAdapter,
 	mmr: MerkleMountainRange,
-	storage: StorageAdapter,
+	storageAdapter: StorageAdapter,
 	shouldPin: boolean,
 	shouldProvide: boolean,
 	getHighestCommittedLeafIndex: () => number,
@@ -51,21 +51,21 @@ export async function rebuildAndProvideMMR(
 		`[Accumulator] ⛰️ Rebuilding the Merkle Mountain Range from synced leaves${shouldPin ? " and pinning to IPFS" : ""}...`,
 	)
 	const fromIndex: number = getHighestCommittedLeafIndex() + 1
-	const toIndex: number = await getHighestContiguousLeafIndexWithData(storage)
+	const toIndex: number = await getHighestContiguousLeafIndexWithData(storageAdapter)
 	if (fromIndex > toIndex)
 		throw new Error(
 			`[Accumulator] Expected to commit leaves from ${fromIndex} to ${toIndex}, but found no newData for leaf ${fromIndex}`,
 		)
 	if (fromIndex === toIndex) return // All leaves already committed
 	for (let i = fromIndex; i <= toIndex; i++) {
-		const record = await getLeafRecord(storage, i)
+		const record = await getLeafRecord(storageAdapter, i)
 		if (!record || !record.newData) throw new Error(`[Accumulator] Expected newData for leaf ${i}`)
 		if (!(record.newData instanceof Uint8Array))
 			throw new Error(`[Accumulator] newData for leaf ${i} is not a Uint8Array`)
 		await commitLeaf(
 			ipfs,
 			mmr,
-			storage,
+			storageAdapter,
 			shouldPin,
 			shouldProvide,
 			getHighestCommittedLeafIndex,
@@ -75,5 +75,5 @@ export async function rebuildAndProvideMMR(
 		)
 	}
 	console.log(`[Accumulator] \u{2705} Fully rebuilt the Merkle Mountain Range up to leaf index ${toIndex}`)
-	await storage.persist()
+	await storageAdapter.persist()
 }

@@ -6,7 +6,7 @@ import { getAndResolveCID, rePinAllDataToIPFS, putPinProvideToIPFS } from "./ipf
 
 export function getIpfsNamespace(
 	ipfs: IpfsAdapter,
-	storage: StorageAdapter,
+	storageAdapter: StorageAdapter,
 	shouldPut: boolean,
 	shouldPin: boolean,
 	shouldProvide: boolean,
@@ -17,8 +17,8 @@ export function getIpfsNamespace(
 		shouldPin,
 		shouldProvide,
 		getAndResolveCID: (cid: CID<unknown, 113, 18, 1>, opts?: { signal?: AbortSignal }) =>
-			getAndResolveCID(ipfs, storage, cid, opts),
-		rePinAllDataToIPFS: () => rePinAllDataToIPFS(ipfs, storage, shouldPut, shouldPin, shouldProvide),
+			getAndResolveCID(ipfs, storageAdapter, cid, opts),
+		rePinAllDataToIPFS: () => rePinAllDataToIPFS(ipfs, storageAdapter, shouldPut, shouldPin, shouldProvide),
 		putPinProvideToIPFS: (cid: CID<unknown, 113, 18, 1>, dagCborEncodedData: DagCborEncodedData) =>
 			putPinProvideToIPFS(ipfs, shouldPut, shouldProvide, cid, dagCborEncodedData),
 	}

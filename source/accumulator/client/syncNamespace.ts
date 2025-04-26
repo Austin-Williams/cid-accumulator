@@ -15,7 +15,7 @@ import {
 export function getSyncNamespace(
 	ipfs: IpfsAdapter,
 	mmr: MerkleMountainRange,
-	storage: StorageAdapter,
+	storageAdapter: StorageAdapter,
 	ethereumHttpRpcUrl: string,
 	ethereumWsRpcUrl: string | undefined,
 	contractAddress: string,
@@ -42,7 +42,7 @@ export function getSyncNamespace(
 			startSubscriptionSync(
 				ipfs,
 				mmr,
-				storage,
+				storageAdapter,
 				ethereumHttpRpcUrl,
 				ethereumWsRpcUrl,
 				sync.websocket,
@@ -65,7 +65,7 @@ export function getSyncNamespace(
 			startPollingSync({
 				ipfs,
 				mmr,
-				storage,
+				storageAdapter,
 				ethereumHttpRpcUrl,
 				contractAddress,
 				getLiveSyncRunning: () => sync.liveSyncRunning,
@@ -89,7 +89,7 @@ export function getSyncNamespace(
 			startLiveSync(
 				ipfs,
 				mmr,
-				storage,
+				storageAdapter,
 				contractAddress,
 				ethereumHttpRpcUrl,
 				ethereumWsRpcUrl,
@@ -133,7 +133,7 @@ export function getSyncNamespace(
 				},
 			),
 		syncBackwardsFromLatest: () =>
-			syncBackwardsFromLatest(ipfs, storage, ethereumHttpRpcUrl, contractAddress, (b) => {
+			syncBackwardsFromLatest(ipfs, storageAdapter, ethereumHttpRpcUrl, contractAddress, (b) => {
 				lastProcessedBlock = b
 			}),
 	}
