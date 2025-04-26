@@ -25,6 +25,8 @@ export function getSyncNamespace(
 	shouldProvide: boolean,
 	getAccumulatorDataSignatureOverride: string | undefined,
 	getAccumulatorDataCalldataOverride: string | undefined,
+	getLatestCidSignatureOverride: string | undefined,
+	getLatestCidCalldataOverride: string | undefined,
 	eventTopicOverride: string | undefined,
 ): SyncNamespace {
 	let sync: SyncNamespace = {
@@ -115,6 +117,11 @@ export function getSyncNamespace(
 				},
 				shouldPin,
 				shouldProvide,
+				getAccumulatorDataSignatureOverride,
+				getAccumulatorDataCalldataOverride,
+				getLatestCidSignatureOverride,
+				getLatestCidCalldataOverride,
+				eventTopicOverride,
 			),
 		stopLiveSync: () =>
 			stopLiveSync(

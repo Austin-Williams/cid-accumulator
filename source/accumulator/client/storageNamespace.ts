@@ -13,24 +13,25 @@ import {
  * Returns a StorageNamespace object with methods bound to the given storage adapter.
  */
 export function getStorageNamespace(storage: StorageAdapter): StorageNamespace {
-	return {
+	const sync = {
 		storageAdapter: storage,
 		getLeafRecord: async (index: number) => {
-			const result = await getLeafRecord(storage, index)
+			const result = await getLeafRecord(sync.storageAdapter, index)
 			return result === undefined ? null : result
 		},
 		putLeafRecord: async (index: number, value: LeafRecord) => {
-			await putLeafRecordInDB(storage, index, value)
+			await putLeafRecordInDB(sync.storageAdapter, index, value)
 		},
-		getHighestContiguousLeafIndexWithData: () => getHighestContiguousLeafIndexWithData(storage),
+		getHighestContiguousLeafIndexWithData: () => getHighestContiguousLeafIndexWithData(sync.storageAdapter),
 		getLeafIndexesWithMissingNewData: async () => {
-			const maxLeafIndex = await getHighestContiguousLeafIndexWithData(storage)
-			return getLeafIndexesWithMissingNewData(storage, maxLeafIndex)
+			const maxLeafIndex = await getHighestContiguousLeafIndexWithData(sync.storageAdapter)
+			return getLeafIndexesWithMissingNewData(sync.storageAdapter, maxLeafIndex)
 		},
-		getCIDDataPairFromDB: (index: number) => getCIDDataPairFromDB(storage, index),
-		iterateTrailPairs: () => iterateTrailPairs(storage),
-		get: (key: string) => storage.get(key),
-		put: (key: string, value: string) => storage.put(key, value),
-		delete: (key: string) => storage.delete(key),
+		getCIDDataPairFromDB: (index: number) => getCIDDataPairFromDB(sync.storageAdapter, index),
+		iterateTrailPairs: () => iterateTrailPairs(sync.storageAdapter),
+		get: (key: string) => sync.storageAdapter.get(key),
+		put: (key: string, value: string) => sync.storageAdapter.put(key, value),
+		delete: (key: string) => sync.storageAdapter.delete(key),
 	}
+	return sync
 }

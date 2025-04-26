@@ -184,6 +184,11 @@ export async function startLiveSync(
 	setHighestCommittedLeafIndex: (index: number) => void,
 	shouldPut: boolean,
 	shouldProvide: boolean,
+	getAccumulatorDataSignatureOverride?: string,
+	getAccumulatorDataCalldataOverride?: string,
+	getLatestCidSignatureOverride?: string,
+	getLatestCidCalldataOverride?: string,
+	eventTopicOverride?: string,
 	pollIntervalMs = 10_000,
 ): Promise<void> {
 	if (getLiveSyncRunning()) return
@@ -234,6 +239,11 @@ export async function startLiveSync(
 			setHighestCommittedLeafIndex,
 			shouldPut,
 			shouldProvide,
+			getAccumulatorDataSignatureOverride,
+			getAccumulatorDataCalldataOverride,
+			getLatestCidSignatureOverride,
+			getLatestCidCalldataOverride,
+			eventTopicOverride,
 			pollIntervalMs,
 		})
 	}
@@ -376,12 +386,13 @@ export function startPollingSync(params: {
 	} = params
 	const poll = async () => {
 		try {
-			const { meta } = await getAccumulatorData({
+			const result = await getAccumulatorData({
 				ethereumHttpRpcUrl,
 				contractAddress,
 				getAccumulatorDataSignatureOverride,
 				getAccumulatorDataCalldataOverride,
 			})
+			const { meta } = result
 			const latestBlock = meta.previousInsertBlockNumber
 			if (latestBlock > lastProcessedBlock) {
 				const newEvents = await getLeafInsertLogs({
@@ -542,6 +553,7 @@ export async function processNewLeafEvent(
 	getAccumulatorDataCalldataOverride?: string,
 	getLatestCidSignatureOverride?: string,
 	getLatestCidCalldataOverride?: string,
+	eventTopicOverride?: string,
 ): Promise<void> {
 	// return if we have already processed this leaf
 	if (event.leafIndex <= getHighestCommittedLeafIndex()) return
@@ -558,6 +570,7 @@ export async function processNewLeafEvent(
 			event.leafIndex - 1,
 			event.previousInsertBlockNumber,
 			getHighestCommittedLeafIndex() + 1,
+			eventTopicOverride,
 		)
 		for (let i = 0; i < pastEvents.length; i++) {
 			await processNewLeafEvent(
@@ -571,6 +584,11 @@ export async function processNewLeafEvent(
 				shouldPut,
 				shouldProvide,
 				pastEvents[i],
+				getAccumulatorDataSignatureOverride,
+				getAccumulatorDataCalldataOverride,
+				getLatestCidSignatureOverride,
+				getLatestCidCalldataOverride,
+				eventTopicOverride,
 			)
 		}
 		console.log(`[Accumulator] \u{1F44D} Got the missing events.`)

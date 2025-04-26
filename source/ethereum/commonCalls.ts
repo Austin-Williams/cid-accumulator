@@ -36,27 +36,39 @@ export async function getAccumulatorData(params: {
 	getAccumulatorDataCalldataOverride?: string
 	blockTag?: number
 }): Promise<{ meta: AccumulatorMetadata; peaks: PeakWithHeight[] }> {
-	const {
-		ethereumHttpRpcUrl,
-		contractAddress,
-		getAccumulatorDataSignatureOverride,
-		getAccumulatorDataCalldataOverride,
-		blockTag,
-	} = params
-	const blockTagHex: string = blockTag ? "0x" + blockTag.toString(16) : "latest"
-	const signature = getAccumulatorDataSignatureOverride ?? "getAccumulatorData()"
-	const selector = getSelector(signature)
-	const callData = getAccumulatorDataCalldataOverride ?? selector
-	const accumulatorDataHex: string = await callContractView(ethereumHttpRpcUrl, contractAddress, callData, blockTagHex)
-	const [mmrMetaBits, peaks] = parseGetAccumulatorDataResult(accumulatorDataHex)
-	const meta = parseAccumulatorMetaBits(mmrMetaBits)
-	const activePeaks: Uint8Array[] = peaks.slice(0, meta.peakCount) // only active peaks
-	const activePeaksAsCids: CID<unknown, 113, 18, 1>[] = activePeaks.map(contractPeakHexToMmrCid)
-	const activePeaksWithHeight: PeakWithHeight[] = activePeaksAsCids.map((cid, i) => ({
-		cid,
-		height: meta.peakHeights[i],
-	}))
-	return { meta, peaks: activePeaksWithHeight }
+	try {
+		const {
+			ethereumHttpRpcUrl,
+			contractAddress,
+			getAccumulatorDataSignatureOverride,
+			getAccumulatorDataCalldataOverride,
+			blockTag,
+		} = params
+		const blockTagHex: string = blockTag ? "0x" + blockTag.toString(16) : "latest"
+
+		const signature = getAccumulatorDataSignatureOverride ?? "getAccumulatorData()"
+		const selector = getSelector(signature)
+		const callData = getAccumulatorDataCalldataOverride ?? selector
+		const accumulatorDataHex: string = await callContractView(
+			ethereumHttpRpcUrl,
+			contractAddress,
+			callData,
+			blockTagHex,
+		)
+
+		const [mmrMetaBits, peaks] = parseGetAccumulatorDataResult(accumulatorDataHex)
+		const meta = parseAccumulatorMetaBits(mmrMetaBits)
+		const activePeaks: Uint8Array[] = peaks.slice(0, meta.peakCount) // only active peaks
+		const activePeaksAsCids: CID<unknown, 113, 18, 1>[] = activePeaks.map(contractPeakHexToMmrCid)
+		const activePeaksWithHeight: PeakWithHeight[] = activePeaksAsCids.map((cid, i) => ({
+			cid,
+			height: meta.peakHeights[i],
+		}))
+		return { meta, peaks: activePeaksWithHeight }
+	} catch (err) {
+		console.error("][getAccumulatorData] Error:", err)
+		throw err
+	}
 }
 
 // --------------------- EVENTS --------------------
@@ -92,9 +104,26 @@ export async function getLeafInsertLogs(params: {
 		},
 	])
 
-	// Defensive: filter for logs with topics[0] matching the event topic
+	// Warn if topics[0] does not match eventTopic
+	rawLogs.forEach((log, idx) => {
+		const topic0 = log.topics ? log.topics[0].toLowerCase() : undefined
+		const expected = eventTopic.toLowerCase()
+		if (!log.topics || topic0 !== expected) {
+			console.warn(
+				`[WARN:getLeafInsertLogs] log[${idx}].topics[0] does not match eventTopic. topics[0]:`,
+				topic0,
+				"| eventTopic:",
+				expected,
+			)
+		}
+	})
+
 	const parsedLogs: NormalizedLeafInsertEvent[] = await Promise.all(
-		rawLogs.filter((log) => log.topics && log.topics[0] === eventTopic).map(parseLeafInsertLog),
+		rawLogs
+			.filter((log) => log.topics && log.topics[0] && log.topics[0].toLowerCase() === eventTopic.toLowerCase())
+			.map(async (log, idx) => {
+				return await parseLeafInsertLog(log)
+			}),
 	)
 	return parsedLogs
 }
