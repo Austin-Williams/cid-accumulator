@@ -37,7 +37,7 @@ export function getSyncNamespace(
 		liveSyncInterval: undefined,
 		websocket: undefined,
 		newLeafSubscribers: [],
-		onNewLeaf,
+		onNewLeaf: (callback: (index: number, data: string) => void) => onNewLeaf(sync.newLeafSubscribers, callback),
 		startSubscriptionSync: () =>
 			startSubscriptionSync(
 				ipfs,
@@ -53,6 +53,7 @@ export function getSyncNamespace(
 				(b) => {
 					lastProcessedBlock = b
 				},
+				sync.newLeafSubscribers,
 				contractAddress,
 				() => sync.highestCommittedLeafIndex,
 				(i) => {
@@ -72,6 +73,7 @@ export function getSyncNamespace(
 				setLiveSyncInterval: (interval) => {
 					sync.liveSyncInterval = interval
 				},
+				newLeafSubscribers: sync.newLeafSubscribers,
 				lastProcessedBlock,
 				setLastProcessedBlock: (b) => {
 					lastProcessedBlock = b
@@ -104,6 +106,7 @@ export function getSyncNamespace(
 				(interval) => {
 					sync.liveSyncInterval = interval
 				},
+				sync.newLeafSubscribers,
 				lastProcessedBlock,
 				(b) => {
 					lastProcessedBlock = b

@@ -58,7 +58,7 @@ export class AccumulatorClient {
 		this.data = getDataNamespace(
 			this.storage.storageAdapter,
 			() => this.sync!.highestCommittedLeafIndex,
-			(_callback: (index: number, data: string) => void) => () => {},
+			(this.sync!.onNewLeaf).bind(this.sync!)
 		)
 	}
 
@@ -110,6 +110,7 @@ export class AccumulatorClient {
 			() => this.sync!.liveSyncRunning,
 			(isRunning: boolean) => (this.sync!.liveSyncRunning = isRunning),
 			(interval: ReturnType<typeof setTimeout> | undefined) => (this.sync!.liveSyncInterval = interval),
+			this.sync.newLeafSubscribers,
 			this.sync.lastProcessedBlock,
 			(block: number) => (this.sync!.lastProcessedBlock = block),
 			() => this.sync!.highestCommittedLeafIndex,

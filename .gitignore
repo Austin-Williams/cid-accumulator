@@ -161,3 +161,6 @@ eslint.config.js
 db/
 
 vite.config.ts
+
+# Integration test output
+testing-community.json

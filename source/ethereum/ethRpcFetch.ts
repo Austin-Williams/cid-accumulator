@@ -33,19 +33,19 @@ export async function ethRpcFetch(ethereumHttpRpcUrl: string, method: string, pa
 
 /**
  * Calls a contract view function (e.g., getAccumulatorData, getLatestCID) using eth_call.
- * @param rpcUrl string
+ * @param ethereumHttpRpcUrl string
  * @param contractAddress string
  * @param data string (ABI-encoded call data)
  * @param blockTag string (default: "latest")
  * @returns Promise<string> (ABI-encoded result)
  */
 export async function callContractView(
-	rpcUrl: string,
+	ethereumHttpRpcUrl: string,
 	contractAddress: string,
 	data: string,
 	blockTag: string = "latest",
 ) {
-	return ethRpcFetch(rpcUrl, "eth_call", [{ to: contractAddress, data }, blockTag])
+	return ethRpcFetch(ethereumHttpRpcUrl, "eth_call", [{ to: contractAddress, data }, blockTag])
 }
 
 /**

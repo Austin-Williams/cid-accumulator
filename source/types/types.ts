@@ -75,6 +75,8 @@ export type DagCborEncodedData = Uint8Array & { __dagCborEncoded: true }
 
 export type CIDDataPair = { cid: CID<unknown, 113, 18, 1>; dagCborEncodedData: DagCborEncodedData }
 
+export type newLeafSubscriber = (index: number, data: string) => void
+
 export type SyncNamespace = {
 	ethereumHttpRpcUrl: string
 	ethereumWsRpcUrl: string | undefined
@@ -84,7 +86,7 @@ export type SyncNamespace = {
 	liveSyncRunning: boolean
 	liveSyncInterval: ReturnType<typeof setTimeout> | undefined
 	websocket: WebSocket | undefined
-	newLeafSubscribers: Array<(index: number, data: Uint8Array) => void>
+	newLeafSubscribers: Array<(index: number, data: string) => void>
 	onNewLeaf: (callback: (index: number, data: string) => void) => () => void
 	startSubscriptionSync: () => void
 	startPollingSync: () => void
@@ -122,6 +124,6 @@ export type DataNamespace = {
 	getRange: (start: number, end: number) => Promise<Array<{ index: number; data: string }>>
 	subscribe: (callback: (index: number, data: string) => void) => () => void
 	downloadAll: (prefix: string) => Promise<string>
-	iterate: (keyPrefix: string) => AsyncIterable<{ key: string; value: string }>
+	iterate: () => AsyncIterable<{ key: string; value: string }>
 	createIndexByPayloadSlice: (offset: number, length: number) => Promise<Map<string, string[]>>
 }

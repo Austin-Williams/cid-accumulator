@@ -1,5 +1,5 @@
 import { CID } from "../../utils/CID.ts"
-import type { NormalizedLeafInsertEvent, PeakWithHeight } from "../../types/types.ts"
+import type { NormalizedLeafInsertEvent, newLeafSubscriber, PeakWithHeight } from "../../types/types.ts"
 import { getAccumulatorData, getLeafInsertLogs, getLatestCID } from "../../ethereum/commonCalls.ts"
 import {
 	getHighestContiguousLeafIndexWithData,
@@ -176,6 +176,7 @@ export async function startLiveSync(
 	getLiveSyncRunning: () => boolean,
 	setLiveSyncRunning: (isRUnning: boolean) => void,
 	setLiveSyncInterval: (interval: ReturnType<typeof setTimeout> | undefined) => void,
+	newLeafSubscribers: newLeafSubscriber[],
 	lastProcessedBlock: number,
 	setLastProcessedBlock: (blockNumber: number) => void,
 	getHighestCommittedLeafIndex: () => number,
@@ -214,6 +215,7 @@ export async function startLiveSync(
 			setWs,
 			lastProcessedBlock,
 			setLastProcessedBlock,
+			newLeafSubscribers,
 			contractAddress,
 			getHighestCommittedLeafIndex,
 			setHighestCommittedLeafIndex,
@@ -229,6 +231,7 @@ export async function startLiveSync(
 			contractAddress,
 			getLiveSyncRunning,
 			setLiveSyncInterval,
+			newLeafSubscribers,
 			lastProcessedBlock,
 			setLastProcessedBlock,
 			getHighestCommittedLeafIndex,
@@ -344,6 +347,7 @@ export function startPollingSync(params: {
 	contractAddress: string
 	getLiveSyncRunning: () => boolean
 	setLiveSyncInterval: (interval: ReturnType<typeof setTimeout> | undefined) => void
+	newLeafSubscribers: newLeafSubscriber[]
 	lastProcessedBlock: number
 	setLastProcessedBlock: (blockNumber: number) => void
 	getHighestCommittedLeafIndex: () => number
@@ -363,6 +367,7 @@ export function startPollingSync(params: {
 		contractAddress,
 		getLiveSyncRunning,
 		setLiveSyncInterval,
+		newLeafSubscribers,
 		lastProcessedBlock,
 		setLastProcessedBlock,
 		getHighestCommittedLeafIndex,
@@ -403,6 +408,7 @@ export function startPollingSync(params: {
 						shouldPut,
 						shouldProvide,
 						event,
+						newLeafSubscribers,
 						getAccumulatorDataCalldataOverride,
 						getLatestCidCalldataOverride,
 					)
@@ -429,6 +435,7 @@ export function startSubscriptionSync(
 	setWs: (ws: WebSocket | undefined) => void,
 	lastProcessedBlock: number,
 	setLastProcessedBlock: (block: number) => void,
+	newLeafSubscribers: newLeafSubscriber[],
 	contractAddress: string,
 	getHighestCommittedLeafIndex: () => number,
 	setHighestCommittedLeafIndex: (index: number) => void,
@@ -501,6 +508,7 @@ export function startSubscriptionSync(
 								shouldPut,
 								shouldProvide,
 								event,
+								newLeafSubscribers,
 							)
 						}
 						setLastProcessedBlock(latestBlock)
@@ -534,6 +542,7 @@ export async function processNewLeafEvent(
 	shouldPut: boolean,
 	shouldProvide: boolean,
 	event: NormalizedLeafInsertEvent,
+	newLeafSubscribers: newLeafSubscriber[],
 	getAccumulatorDataCalldataOverride?: string,
 	getLatestCidCalldataOverride?: string,
 	eventTopicOverride?: string,
@@ -567,6 +576,7 @@ export async function processNewLeafEvent(
 				shouldPut,
 				shouldProvide,
 				pastEvents[i],
+				newLeafSubscribers,
 				getAccumulatorDataCalldataOverride,
 				getLatestCidCalldataOverride,
 				eventTopicOverride,
@@ -624,15 +634,13 @@ export async function processNewLeafEvent(
 	console.log(`[Accumulator] \u{1F343} Processed new leaf with index ${event.leafIndex}`)
 }
 
-const newLeafSubscribers: Array<(index: number, data: string) => void> = []
-
-export function processNewLeaf(index: number, data: string) {
-	for (const cb of newLeafSubscribers) {
-		cb(index, data)
+export function processNewLeaf(index: number, data: string, newLeafSubscribers: newLeafSubscriber[]) {
+	for (const newLeafSubscriber of newLeafSubscribers) {
+		newLeafSubscriber(index, data)
 	}
 }
 
-export function onNewLeaf(callback: (index: number, data: string) => void): () => void {
+export function onNewLeaf(newLeafSubscribers: newLeafSubscriber[], callback: (index: number, data: string) => void): () => void {
 	newLeafSubscribers.push(callback)
 	// Return unsubscribe function
 	return () => {
