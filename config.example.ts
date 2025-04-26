@@ -59,9 +59,7 @@ export const config: AccumulatorClientConfig = {
 	// (Optional) Signature and calldata overrides for getLatestCID, getAccumulatorData, and getLeafInsertLogs
 	// This is only relevant if you want to use a custom Accumulator contract (e.g. replacement for CIDAccumulator contract) 
 	// that doesn't have the same function signatures.
-	GET_LATEST_CID_SIGNATURE_OVERRIDE: undefined,
 	GET_LATEST_CID_CALLDATA_OVERRIDE: undefined,
-	GET_ACCUMULATOR_DATA_SIGNATURE_OVERRIDE: undefined,
 	GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE: undefined,
 	LEAF_INSERT_EVENT_SIGNATURE_OVERRIDE: undefined
 }

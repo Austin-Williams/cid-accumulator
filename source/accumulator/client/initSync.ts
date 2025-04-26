@@ -10,7 +10,6 @@ export async function initSync(
 	storageAdapter: StorageAdapter,
 	ipfs: IpfsNamespace,
 	mmr: MerkleMountainRange,
-	getAccumulatorDataSignatureOverride: string | undefined,
 	getAccumulatorDataCalldataOverride: string | undefined,
 	eventTopicOverride: string | undefined,
 ): Promise<SyncNamespace> {
@@ -24,7 +23,6 @@ export async function initSync(
 		const { meta } = await getAccumulatorData({
 			ethereumHttpRpcUrl: config.ETHEREUM_HTTP_RPC_URL,
 			contractAddress: config.CONTRACT_ADDRESS,
-			getAccumulatorDataSignatureOverride: config.GET_ACCUMULATOR_DATA_SIGNATURE_OVERRIDE,
 			getAccumulatorDataCalldataOverride: config.GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE,
 		})
 		console.log(`[Accumulator] \u{2705} Connected to Ethereum. Target contract address: ${config.CONTRACT_ADDRESS}`)
@@ -45,8 +43,8 @@ export async function initSync(
 		ipfs.shouldPut,
 		ipfs.shouldPin,
 		ipfs.shouldProvide,
-		getAccumulatorDataSignatureOverride,
 		getAccumulatorDataCalldataOverride,
+		config.GET_LATEST_CID_CALLDATA_OVERRIDE,
 		eventTopicOverride,
 	)
 	return sync

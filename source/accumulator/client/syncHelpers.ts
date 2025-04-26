@@ -30,7 +30,6 @@ export async function syncBackwardsFromLatest(
 	ethereumHttpRpcUrl: string,
 	contractAddress: string,
 	setLastProcessedBlock: (block: number) => void,
-	getAccumulatorDataSignatureOverride?: string,
 	getAccumulatorDataCalldataOverride?: string,
 	eventTopicOverride?: string,
 	maxBlockRangePerRpcCall = 1000,
@@ -38,7 +37,6 @@ export async function syncBackwardsFromLatest(
 	const { meta, peaks } = await getAccumulatorData({
 		ethereumHttpRpcUrl,
 		contractAddress,
-		getAccumulatorDataSignatureOverride,
 		getAccumulatorDataCalldataOverride,
 	})
 	const currentLeafIndex = meta.leafCount - 1
@@ -184,9 +182,7 @@ export async function startLiveSync(
 	setHighestCommittedLeafIndex: (index: number) => void,
 	shouldPut: boolean,
 	shouldProvide: boolean,
-	getAccumulatorDataSignatureOverride?: string,
 	getAccumulatorDataCalldataOverride?: string,
-	getLatestCidSignatureOverride?: string,
 	getLatestCidCalldataOverride?: string,
 	eventTopicOverride?: string,
 	pollIntervalMs = 10_000,
@@ -239,9 +235,7 @@ export async function startLiveSync(
 			setHighestCommittedLeafIndex,
 			shouldPut,
 			shouldProvide,
-			getAccumulatorDataSignatureOverride,
 			getAccumulatorDataCalldataOverride,
-			getLatestCidSignatureOverride,
 			getLatestCidCalldataOverride,
 			eventTopicOverride,
 			pollIntervalMs,
@@ -356,9 +350,7 @@ export function startPollingSync(params: {
 	setHighestCommittedLeafIndex: (index: number) => void
 	shouldPut: boolean
 	shouldProvide: boolean
-	getAccumulatorDataSignatureOverride?: string
 	getAccumulatorDataCalldataOverride?: string
-	getLatestCidSignatureOverride?: string
 	getLatestCidCalldataOverride?: string
 	eventTopicOverride?: string
 	pollIntervalMs?: number
@@ -377,9 +369,7 @@ export function startPollingSync(params: {
 		setHighestCommittedLeafIndex,
 		shouldPut,
 		shouldProvide,
-		getAccumulatorDataSignatureOverride,
 		getAccumulatorDataCalldataOverride,
-		getLatestCidSignatureOverride,
 		getLatestCidCalldataOverride,
 		eventTopicOverride,
 		pollIntervalMs,
@@ -389,7 +379,6 @@ export function startPollingSync(params: {
 			const result = await getAccumulatorData({
 				ethereumHttpRpcUrl,
 				contractAddress,
-				getAccumulatorDataSignatureOverride,
 				getAccumulatorDataCalldataOverride,
 			})
 			const { meta } = result
@@ -414,9 +403,7 @@ export function startPollingSync(params: {
 						shouldPut,
 						shouldProvide,
 						event,
-						getAccumulatorDataSignatureOverride,
 						getAccumulatorDataCalldataOverride,
-						getLatestCidSignatureOverride,
 						getLatestCidCalldataOverride,
 					)
 				}
@@ -447,7 +434,6 @@ export function startSubscriptionSync(
 	setHighestCommittedLeafIndex: (index: number) => void,
 	shouldPut: boolean,
 	shouldProvide: boolean,
-	getAccumulatorDataSignatureOverride?: string,
 	getAccumulatorDataCalldataOverride?: string,
 	eventTopicOverride?: string,
 ): void {
@@ -492,7 +478,6 @@ export function startSubscriptionSync(
 					const { meta } = await getAccumulatorData({
 						ethereumHttpRpcUrl,
 						contractAddress,
-						getAccumulatorDataSignatureOverride,
 						getAccumulatorDataCalldataOverride,
 					})
 					const latestBlock = meta.previousInsertBlockNumber
@@ -549,9 +534,7 @@ export async function processNewLeafEvent(
 	shouldPut: boolean,
 	shouldProvide: boolean,
 	event: NormalizedLeafInsertEvent,
-	getAccumulatorDataSignatureOverride?: string,
 	getAccumulatorDataCalldataOverride?: string,
-	getLatestCidSignatureOverride?: string,
 	getLatestCidCalldataOverride?: string,
 	eventTopicOverride?: string,
 ): Promise<void> {
@@ -584,9 +567,7 @@ export async function processNewLeafEvent(
 				shouldPut,
 				shouldProvide,
 				pastEvents[i],
-				getAccumulatorDataSignatureOverride,
 				getAccumulatorDataCalldataOverride,
-				getLatestCidSignatureOverride,
 				getLatestCidCalldataOverride,
 				eventTopicOverride,
 			)
@@ -616,7 +597,6 @@ export async function processNewLeafEvent(
 	const { meta } = await getAccumulatorData({
 		ethereumHttpRpcUrl,
 		contractAddress,
-		getAccumulatorDataSignatureOverride,
 		getAccumulatorDataCalldataOverride,
 	})
 	// This sanity check only makes sense when the node is fully synced
@@ -626,7 +606,6 @@ export async function processNewLeafEvent(
 			const onChainRootCid = await getLatestCID({
 				ethereumHttpRpcUrl,
 				contractAddress,
-				getLatestCidSignatureOverride,
 				getLatestCidCalldataOverride,
 			})
 			if (localRootCid !== onChainRootCid.toString()) {

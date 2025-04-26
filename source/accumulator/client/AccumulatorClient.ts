@@ -49,7 +49,6 @@ export class AccumulatorClient {
 			this.storage.storageAdapter,
 			this.ipfs,
 			this.mmr,
-			this.config.GET_ACCUMULATOR_DATA_SIGNATURE_OVERRIDE,
 			this.config.GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE,
 			this.config.LEAF_INSERT_EVENT_SIGNATURE_OVERRIDE,
 		)
@@ -67,7 +66,6 @@ export class AccumulatorClient {
 			this.sync.ethereumHttpRpcUrl,
 			this.sync.contractAddress,
 			(block: number) => (this.sync!.lastProcessedBlock = block),
-			this.config.GET_ACCUMULATOR_DATA_SIGNATURE_OVERRIDE,
 			this.config.GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE,
 			this.config.LEAF_INSERT_EVENT_SIGNATURE_OVERRIDE,
 			this.config.ETHEREUM_MAX_BLOCK_RANGE_PER_HTTP_RPC_CALL ?? 1000,
@@ -110,9 +108,7 @@ export class AccumulatorClient {
 			(leafIndex: number) => (this.sync!.highestCommittedLeafIndex = leafIndex),
 			this.ipfs.shouldPin,
 			this.ipfs.shouldProvide,
-			this.config.GET_ACCUMULATOR_DATA_SIGNATURE_OVERRIDE,
 			this.config.GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE,
-			this.config.GET_LATEST_CID_SIGNATURE_OVERRIDE,
 			this.config.GET_LATEST_CID_CALLDATA_OVERRIDE,
 			this.config.LEAF_INSERT_EVENT_SIGNATURE_OVERRIDE,
 		)

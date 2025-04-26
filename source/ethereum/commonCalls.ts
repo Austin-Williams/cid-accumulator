@@ -32,21 +32,14 @@ export async function getLatestCID(params: {
 export async function getAccumulatorData(params: {
 	ethereumHttpRpcUrl: string
 	contractAddress: string
-	getAccumulatorDataSignatureOverride?: string
 	getAccumulatorDataCalldataOverride?: string
 	blockTag?: number
 }): Promise<{ meta: AccumulatorMetadata; peaks: PeakWithHeight[] }> {
 	try {
-		const {
-			ethereumHttpRpcUrl,
-			contractAddress,
-			getAccumulatorDataSignatureOverride,
-			getAccumulatorDataCalldataOverride,
-			blockTag,
-		} = params
+		const { ethereumHttpRpcUrl, contractAddress, getAccumulatorDataCalldataOverride, blockTag } = params
 		const blockTagHex: string = blockTag ? "0x" + blockTag.toString(16) : "latest"
 
-		const signature = getAccumulatorDataSignatureOverride ?? "getAccumulatorData()"
+		const signature = "getAccumulatorData()"
 		const selector = getSelector(signature)
 		const callData = getAccumulatorDataCalldataOverride ?? selector
 		const accumulatorDataHex: string = await callContractView(
