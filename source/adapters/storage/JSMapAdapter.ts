@@ -54,4 +54,21 @@ export class JSMapAdapter implements StorageAdapter {
 		// Persist to disk as JSON (for compatibility)
 		await this.persist()
 	}
+
+	/**
+	 * Creates an index of all entries keyed by a substring of their payload.
+	 * @param keyPrefix The prefix of the keys to index (e.g. "leaf:")
+	 * @param offset The starting index of the substring.
+	 * @param length The length of the substring.
+	 */
+	async createIndexByPayloadSlice(keyPrefix: string, offset: number, length: number): Promise<Map<string, string[]>> {
+		const index = new Map<string, string[]>()
+		for (const [key, value] of this.store.entries()) {
+			if (!key.startsWith(keyPrefix)) continue
+			const slice = value.slice(offset, offset + length)
+			if (!index.has(slice)) index.set(slice, [])
+			index.get(slice)!.push(value)
+		}
+		return index
+	}
 }

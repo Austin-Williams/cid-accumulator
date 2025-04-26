@@ -18,19 +18,12 @@ export class MemoryAdapter implements StorageAdapter {
 		this.store.delete(key)
 	}
 
-	async clear(): Promise<void> {
-		this.store.clear()
-	}
-
-	async *iterate(prefix: string): AsyncIterable<{ key: string; value: string }> {
-		for (const [key, value] of this.store.entries()) {
-			if (key.startsWith(prefix)) {
-				yield { key, value }
-			}
-		}
-	}
-
 	async open(): Promise<void> {
+		// No-op for in-memory adapter
+		return
+	}
+
+	async close(): Promise<void> {
 		// No-op for in-memory adapter
 		return
 	}
@@ -40,8 +33,22 @@ export class MemoryAdapter implements StorageAdapter {
 		return
 	}
 
-	async close(): Promise<void> {
-		// No-op for in-memory adapter
-		return
+	async *iterate(keyPrefix: string): AsyncIterable<{ key: string; value: string }> {
+		for (const [key, value] of this.store.entries()) {
+			if (key.startsWith(keyPrefix)) {
+				yield { key, value }
+			}
+		}
+	}
+
+	async createIndexByPayloadSlice(keyPrefix: string, offset: number, length: number): Promise<Map<string, string[]>> {
+		const index = new Map<string, string[]>()
+		for (const [key, value] of this.store.entries()) {
+			if (!key.startsWith(keyPrefix)) continue
+			const slice = value.slice(offset, offset + length)
+			if (!index.has(slice)) index.set(slice, [])
+			index.get(slice)!.push(value)
+		}
+		return index
 	}
 }

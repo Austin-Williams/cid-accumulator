@@ -85,4 +85,20 @@ export class IndexedDBAdapter implements StorageAdapter {
 	async close(): Promise<void> {
 		// IndexedDB does not require explicit close
 	}
+
+	/**
+	 * Creates an index of all entries keyed by a substring of their payload.
+	 * @param keyPrefix The prefix of the keys to index (e.g. "leaf:")
+	 * @param offset The starting index of the substring.
+	 * @param length The length of the substring.
+	 */
+	async createIndexByPayloadSlice(keyPrefix: string, offset: number, length: number): Promise<Map<string, string[]>> {
+		const index = new Map<string, string[]>()
+		for await (const { value } of this.iterate(keyPrefix)) {
+			const slice = value.slice(offset, offset + length)
+			if (!index.has(slice)) index.set(slice, [])
+			index.get(slice)!.push(value)
+		}
+		return index
+	}
 }
