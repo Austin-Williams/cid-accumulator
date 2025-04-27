@@ -18,7 +18,7 @@
 	],
 	"dependencies": {
 		"@noble/hashes": "^1.7.2",
-		"cid-accumulator-client": "^0.0.2"
+		"cid-accumulator-client": "^0.0.3"
 	},
 	"devDependencies": {
 		"@types/node": "^22.14.1",
