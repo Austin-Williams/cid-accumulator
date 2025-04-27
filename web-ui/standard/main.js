@@ -58,10 +58,17 @@ form.addEventListener("submit", async (e) => {
     window._liveSyncPoll = setInterval(() => {
       if (!window.accumulatorClient || !window.accumulatorClient.sync) return;
       const running = window.accumulatorClient.sync.liveSyncRunning;
+      const liveEventsContainer = document.getElementById("live-events-container");
+      
       if (monitorState) {
         monitorState.textContent = running
           ? "🟢 Monitoring blockchain for new events"
           : "🔴 Not monitoring blockchain for new events";
+        
+        // Show live events container only when actively monitoring blockchain
+        if (liveEventsContainer) {
+          liveEventsContainer.style.display = running ? "block" : "none";
+        }
       }
     }, 1000);
   } catch (err) {
