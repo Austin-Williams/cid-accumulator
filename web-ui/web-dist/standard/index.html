@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CID Accumulator Client UI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script type="module" crossorigin src="/assets/index-Blprn0-j.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-1ootNUGg.css">
+</head>
+<body>
+  <h1>CID Accumulator Client (Browser UI)</h1>
+  <form id="client-form">
+    <label>
+      Contract Address:
+      <input type="text" id="contract-address" placeholder="0x..." required />
+    </label>
+    <fieldset>
+      <legend>Config Options</legend>
+      <label>
+        Ethereum HTTP RPC URL:
+        <input type="text" id="eth-http-url" placeholder="https://ethereum-rpc.publicnode.com" />
+      </label>
+      <label>
+        Ethereum Max Block Range Per HTTP RPC Call:
+        <input type="number" id="eth-max-block-range" placeholder="1000" min="1" />
+      </label>
+      <label>
+        Ethereum WS RPC URL:
+        <input type="text" id="eth-ws-url" placeholder="(optional)" />
+      </label>
+      <label>
+        IPFS Gateway URL:
+        <input type="text" id="ipfs-gateway-url" placeholder="https://dweb.link" />
+      </label>
+      <label>
+        IPFS API URL:
+        <input type="text" id="ipfs-api-url" placeholder="(optional) http://127.0.0.1:5001" />
+      </label>
+      <label>
+        IPFS Put If Possible:
+        <input type="checkbox" id="ipfs-put-if-possible" checked />
+      </label>
+      <label>
+        IPFS Pin If Possible:
+        <input type="checkbox" id="ipfs-pin-if-possible" checked />
+      </label>
+      <label>
+        IPFS Provide If Possible:
+        <input type="checkbox" id="ipfs-provide-if-possible" checked />
+      </label>
+      <label>
+        DB Path:
+        <input type="text" id="db-path" placeholder="(optional) .db/accumulator.json" />
+      </label>
+      <details>
+        <summary>Advanced options</summary>
+        <label>
+          Get Latest CID Calldata Override:
+          <input type="text" id="get-latest-cid-override" placeholder="(advanced, optional)" />
+        </label>
+        <label>
+          Get Accumulator Data Calldata Override:
+          <input type="text" id="get-accumulator-data-override" placeholder="(advanced, optional)" />
+        </label>
+        <label>
+          Leaf Insert Event Signature Override:
+          <input type="text" id="leaf-insert-event-override" placeholder="(advanced, optional)" />
+        </label>
+      </details>
+    </fieldset>
+    <button type="submit">Start Client</button>
+  </form>
+  <button id="clear-db-btn" type="button">Clear Local DB</button>
+  <pre id="output"></pre>
+</body>
+</html>

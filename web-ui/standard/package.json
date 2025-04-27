@@ -8,9 +8,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "cid-accumulator-client": "^0.0.3"
+    "cid-accumulator-client": "^0.0.5"
   },
   "devDependencies": {
-    "vite": "^5.2.0"
+    "vite": "^6.3.3"
   }
 }
