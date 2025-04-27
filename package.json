@@ -1,37 +1,30 @@
 {
 	"name": "cid-accumulator",
+	"version": "0.0.2",
 	"type": "module",
-	"version": "1.0.0",
-	"description": "",
-	"main": "index.js",
+	"description": "Smart contracts that implement the CIDAccumulator pattern.",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
 	"scripts": {
-		"dev": "vite",
-		"build": "vite build",
-		"test": "vitest",
-		"coverage": "vitest run --coverage",
-		"lint": "eslint --fix source/ integration/ test/",
-		"format": "prettier --write 'source/**/*.{js,ts,tsx}' 'integration/**/*.{js,ts,tsx}' 'test/**/*.{js,ts,tsx}'"
+		"prepare": "npm run build",
+		"build": "tsc",
+		"test": "echo \"Error: no test specified\" && exit 1"
 	},
-	"author": "",
+	"author": "Austn Williams",
 	"license": "MIT",
+	"homepage": "https://github.com/Austin-Williams/cid-accumulator#readme",
+	"files": [
+		"dist"
+	],
 	"dependencies": {
-		"@noble/hashes": "^1.7.2"
+		"@noble/hashes": "^1.7.2",
+		"cid-accumulator-client": "^0.0.2"
 	},
 	"devDependencies": {
 		"@types/node": "^22.14.1",
-		"@typescript-eslint/eslint-plugin": "^8.30.1",
-		"@typescript-eslint/parser": "^8.30.1",
-		"@vitest/coverage-v8": "^3.1.1",
-		"@vitest/ui": "^3.1.1",
-		"dotenv": "^16.5.0",
-		"eslint": "^9.24.0",
-		"eslint-config-prettier": "^10.1.2",
-		"eslint-plugin-prettier": "^5.2.6",
-		"ethers": "^6.13.5",
-		"globals": "^16.0.0",
-		"prettier": "^3.5.3",
 		"tsx": "^4.19.3",
-		"vite": "^6.3.2",
-		"vitest": "^3.1.1"
+		"typescript": "^5.8.3",
+		"dotenv": "^16.5.0",
+		"ethers": "^6.13.5"
 	}
 }

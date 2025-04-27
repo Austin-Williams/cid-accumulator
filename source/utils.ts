@@ -1,4 +1,5 @@
 import { keccak_256 } from "@noble/hashes/sha3"
+import { AccumulatorClient } from "cid-accumulator-client"
 
 // Compute the selector
 function getSelector(signature: string): string {
@@ -41,4 +42,45 @@ export function overrideForGetAccumulatorDataCalldata(address: string): string {
 	const result = "0x" + selector + arg
 	console.log(`Accumulator data calldata override: ${result}`)
 	return result.toLowerCase()
+}
+
+/**
+ * Returns true if running in a browser (window, document, navigator are defined).
+ */
+export function isBrowser(): boolean {
+	return typeof window !== "undefined" && typeof window.document !== "undefined"
+}
+
+/**
+ * Returns true if running in Node.js (process, global, require are defined).
+ */
+export function isNodeJs(): boolean {
+	return typeof process !== "undefined" && !!(process.versions && process.versions.node)
+}
+
+export function registerGracefulShutdown(node: AccumulatorClient) {
+	let shuttingDown = false
+
+	if (isNodeJs()) {
+		process.on("SIGINT", async () => {
+			if (shuttingDown) return
+			shuttingDown = true
+			console.log("\nCaught SIGINT (Ctrl+C). Shutting down gracefully...")
+			await node.shutdown()
+			console.log("Graceful shutdown complete. Exiting.")
+			process.exit(0)
+		})
+	}
+
+	if (isBrowser() && typeof window !== "undefined") {
+		window.addEventListener("beforeunload", () => {
+			if (shuttingDown) return
+			shuttingDown = true
+			// Best effort: call shutdown synchronously if possible
+			if (typeof node.shutdown === "function") {
+				// If shutdown is async, this won't always finish, but we try
+				node.shutdown()
+			}
+		})
+	}
 }

@@ -163,5 +163,11 @@ db/
 vite.config.ts
 
 # Integration test output
-testing-community.json
+testing-singleton.json
 config.json
+
+
+# misc
+vitest.config.ts
+config.ts
+.db/

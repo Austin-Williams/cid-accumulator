@@ -1,18 +1,17 @@
-import type { AccumulatorClientConfig } from "./source/types/types.ts"
-import { AccumulatorClient } from "./source/accumulator/client/AccumulatorClient.ts"
-import { registerGracefulShutdown } from "./source/utils/gracefulShutdown.ts"
-import { isNodeJs } from "./source/utils/envDetection.ts"
+import { AccumulatorClient } from "cid-accumulator-client"
+import { config } from "./config.ts"
+import { isNodeJs, registerGracefulShutdown } from "./source/utils.ts"
 
-// Load config.json dynamically
-// After loading config
-const config = await import("./config.json").then(m => m.default ?? m) as AccumulatorClientConfig
-async function main() {	
+async function main() {
+	const customConfig = {...config}
+	customConfig.DB_PATH = './.db/standard-example.json'
+	
 	// Create the client
 	const contractAddress = "0x7BD24761E84a9003B346168B5F84FC2045b60E0e"
-	const accumulatorClient = new AccumulatorClient(contractAddress, config)
+	const accumulatorClient = new AccumulatorClient(contractAddress, customConfig)
 	// Start the client
 	await accumulatorClient.start()
-
+	
 	if (isNodeJs()) {
 		// (Optional) Register SIGINT handler for graceful shutdown in NodeJs (not needed in browser)
 		registerGracefulShutdown(accumulatorClient)
