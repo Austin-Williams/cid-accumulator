@@ -35,6 +35,9 @@ form.addEventListener("submit", async (e) => {
     // Show syncing status
   const syncState = document.getElementById("sync-state");
   const monitorState = document.getElementById("monitor-state");
+  // Show the client started indicator
+  const clientStartedIndicator = document.getElementById("client-started-indicator");
+  if (clientStartedIndicator) clientStartedIndicator.style.display = "inline";
   if (syncState) syncState.textContent = "🔄 Syncing backwards...";
   if (monitorState) {
     monitorState.textContent = "";
