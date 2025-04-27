@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CID Accumulator Client UI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>CID Accumulator Client (Browser UI)</h1>
+  <form id="client-form">
+    <label>
+      Contract Address:
+      <input type="text" id="contract-address" placeholder="0x..." required />
+    </label>
+    <fieldset>
+      <legend>Config Options</legend>
+      <label>
+        Ethereum HTTP RPC URL:
+        <input type="text" id="eth-http-url" placeholder="https://ethereum-rpc.publicnode.com" required />
+      </label>
+      <label>
+        IPFS Gateway URL:
+        <input type="text" id="ipfs-gateway-url" placeholder="https://ipfs.io/ipfs" required />
+      </label>
+      <label>
+        IPFS API URL:
+        <input type="text" id="ipfs-api-url" placeholder="(optional) http://127.0.0.1:5001" />
+      </label>
+    </fieldset>
+    <button type="submit">Start Client</button>
+  </form>
+  <button id="clear-db-btn" type="button">Clear Local DB</button>
+  <pre id="output"></pre>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

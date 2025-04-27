@@ -200,7 +200,9 @@ export const defaultConfig: AccumulatorClientConfig = {
 
 	// The IPFS gateway URL for retrieving content-addressed data (CIDs).
 	// Used for fetching data from IPFS when not available locally.
-	IPFS_GATEWAY_URL: "https://ipfs.io/ipfs", // http://127.0.0.1:8080 if you have a local IPFS node.
+	// You MUST use a *verifiable* IPFS gateway (e.g.,https://dweb.link). See 
+	// https://ipfs.github.io/public-gateway-checker/ and look for the ✅ in the "Verifiable" column.
+	IPFS_GATEWAY_URL: "https://dweb.link", // http://127.0.0.1:8080 if you have a local IPFS node.
 
 	// The IPFS HTTP API endpoint for pinning, providing, and putting data.
 	// Used for writing data to your own IPFS node. Leave undefined if you don't have your own IPFS node.
