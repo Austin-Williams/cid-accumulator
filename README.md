@@ -5,13 +5,18 @@
 ## Table of Contents
 - [What it does](#what-it-does)
 - [Why we need it](#why-we-need-it)
-- [How to use it](#how-to-use-it)
-  - [On-chain component](#on-chain-component)
-  - [Off-chain component](#off-chain-component)
-  - [Accumulator Client](#accumulator-client)
-  - [Example use](#example-use)
-  - [Browser Usage](#browser-usage)
-- [⛽ Gas Costs](#-gas-costs)
+- [How to use the smart contract](#how-to-use-the-smart-contract)
+- [How the off-chain component works](#how-the-off-chain-component-works)
+- [The Accumulator Client](#the-accumulator-client)
+- [How to use the AccumulatorClient in your project](#how-to-use-the-accumulatorclient-in-your-project)
+  - [Installation](#installation)
+  - [Configure and start the client](#configure-and-start-the-client)
+  - [Wait for client to sync](#wait-for-client-to-sync)
+  - [Accessing data](#accessing-data)
+  - [Stopping Live Sync](#stopping-live-sync)
+  - [Shutting down](#shutting-down)
+  - [Config Options](#config-options)
+- [Gas Costs](#gas-costs)
 
 ## What it does
 
@@ -29,9 +34,8 @@ Storing the data on IPFS solves the first problem -- it lets users get the data 
 
 This contract, the `CIDAccumulator`, solves that by having _the smart contract itself_ compute and store an IPFS CID that points to a file containing all data ever emitted by the contract. The contract maintains this CID as an accumulator. Users can fetch everything they need directly from IPFS, with full trust in the data’s integrity — because _the smart contract itself_ computed the CID.
 
-## How to use it
+## How to use the smart contract
 
-### On-chain component
 Have your contract inherit from the `CIDAccumulator` contract.
 
 ```solidity
@@ -46,7 +50,7 @@ Your contract can then call `_addData` with any `bytes` payload you'd like to in
 
 > ℹ️ Most inserts fall in the 12.8k - 23.5k gas range for execution. See below for more about gas costs.
 
-### Off-chain component
+## How the off-chain component works
 
 The client-side UI can then call `getLatestCID()` to retrieve the IPFS CID of the file that includes all data added so far. But what if that CID is not available on IPFS?
 
@@ -56,9 +60,9 @@ A nice feature of this CID-walkback is that, once you find an older CID that is 
 
 (In the worst case, if you never find any of the CIDs on IPFS, you'll eventually walk all the way back to the contract deployent block. If that happens you'll have fully synced using event data alone -- with no help from IPFS.)
 
-This is all handled by a light-weight `AccumulatorClient` class.
+This is all handled by a light-weight `AccumulatorClient`.
 
-### Accumulator Client
+## The Accumulator Client
 
 The `AccumulatorClient` is a light-weight universal JS/TS class that:
 - Collects and verifies all historical contract data using IPFS (and filling in gaps with contract event data wherever needed) using the walkback method described above.
@@ -68,121 +72,172 @@ The `AccumulatorClient` is a light-weight universal JS/TS class that:
 
 The `AccumulatorClient` can be used directly in your front end code, or kept running long term in a NodeJs environment to ensure the data remains pinned and available for everyone.
 
-### Example use
+## How to use the AccumulatorClient in your project
 
-Set your conifguration options in `config.ts`. See `config.example.ts` for a full explaination of the options.
+### Installation
 
-```typescript
-// Example config
-export const config: AccumulatorClientConfig = {
-	ETHEREUM_HTTP_RPC_URL: "https://mainnet.infura.io/v3/<YOUR_INFURA_KEY>",
-	ETHEREUM_WS_RPC_URL: undefined, // or "wss://mainnet.infura.io/ws/v3/<YOUR_INFURA_KEY>"
-	CONTRACT_ADDRESS: "<YOUR_CONTRACT_ADDRESS>",
-	IPFS_GATEWAY_URL: "https://ipfs.io/ipfs", // or "http://127.0.0.1:8080" if you run a local IPFS node
-	IPFS_API_URL: "http://127.0.0.1:5001", // or undefined if you don't run your own IPFS node
-	IPFS_PUT_IF_POSSIBLE: true,
-	IPFS_PIN_IF_POSSIBLE: true,
-	IPFS_PROVIDE_IF_POSSIBLE: true,
-	DB_PATH: undefined
-}
+```bash
+npm install cid-accumulator-client
 ```
 
-Then you can use the client in NodeJs or the browser:
+### Configure and start the client:
 
 ```typescript
-// Create the client
-const accumulatorClient = new AccumulatorClient(...)
+import type { AccumulatorClientConfig } from "cid-accumulator-client"
+import { AccumulatorClient } from "cid-accumulator-client"
+
+// Set your configuration options
+const config: AccumulatorClientConfig = {...YourConfigOptions...}
+
+// Instantiate the client
+const client = new AccumulatorClient("0xYourContractAddress", config)
 
 // Start the client
-await accumulatorClient.start()
-
-// Keep the process running to monitor for new data (not necessary in browser)
-if (isNodeJs()) await new Promise(() => {})
+await client.start()
 ```
 
-Progress will be shown in console logs. Example:
+### Wait for client to sync
 
-```console
- % npx --no-install tsx ./example.ts
-[Accumulator] 📤 Found 0 leafs in DB
-[Accumulator] 👀 Checking Ethereum connection...
-[Accumulator] ✅ Connected to Ethereum node, chainId: 0xaa36a7
-[Accumulator] 👀 Checking IPFS Gateway connection...
-[Accumulator] ✅ Connected to IPFS Gateway.
-[Accumulator] 👀 Checking IPFS API connection (attempting to PUT a block)...
-[Accumulator] ✅ Connected to IPFS API and verified it can PUT blocks.
-[Accumulator] 👀 Checking if IPFS API can provide (advertise) blocks...
-[Accumulator] ✅ Connected to IPFS API and verified it can PROVIDE blocks.
-[Accumulator] ✅ Successfully initialized. Summary:
-[Accumulator] 📜 Summary: IPFS Gateway connected: YES
-[Accumulator] 📜 Summary: IPFS API PUT is set up: YES
-[Accumulator] 📜 Summary: IPFS API PIN is set up: YES
-[Accumulator] 📜 Summary: IPFS API PROVIDE is set up: YES
-[Accumulator] 🔁 Syncing backwards from block 8180977 to block 8147142 (33835 blocks), grabbing 1000 blocks per RPC call.
-[Accumulator] 🔎 Simultaneously checking IPFS for older root CIDs as we discover them.
-[Accumulator] 📦 Checking blocks 8179978 to 8180977 for LeafInsert events...
-[Accumulator] 🍃 Found 23 LeafInsert events
-[Accumulator] 📦 Checking blocks 8178978 to 8179977 for LeafInsert events...
-[Accumulator] 📦 Checking blocks 8177978 to 8178977 for LeafInsert events...
-[Accumulator] 📦 Checking blocks 8176978 to 8177977 for LeafInsert events...
-[Accumulator] 📦 Checking blocks 8175978 to 8176977 for LeafInsert events...
-[Accumulator] 📦 Checking blocks 8174978 to 8175977 for LeafInsert events...
-[Accumulator] 📦 Checking blocks 8173978 to 8174977 for LeafInsert events...
-[Accumulator] 🍃 Found 105 LeafInsert events
-[Accumulator] 📦 Checking blocks 8172978 to 8173977 for LeafInsert events...
-[Accumulator] 🍃 Found 3 LeafInsert events
-[Accumulator] 📦 Checking blocks 8171978 to 8172977 for LeafInsert events...
-[Accumulator] 📥 Downloaded all data for root CID bafyreihty4icxhngqeypbzlfgpmwuecbshkvk5sugy6m7qhgaycx3b2ffi from IPFS.
-[Accumulator] 🙌 Successfully resolved all remaining data from IPFS!
-[Accumulator] ✅ Your accumulator client is synced!
-[Accumulator] ⛰️ Rebuilding the Merkle Mountain Range from synced leaves and pinning to IPFS...
-[Accumulator] ✅ Fully rebuilt the Merkle Mountain Range up to leaf index 177
-[Accumulator] 👎 No ETHEREUM_WS_RPC_URL provided, will use polling.
-[Accumulator] 👀 Using HTTP polling to monitor the chain for new data insertions.
-[Accumulator] 📌 Attempting to pin all 522 CIDs (leaves, root, and intermediate nodes) to IPFS. Running in background. Will update you...
-[Accumulator] 📌 UPDATE: Re-pinned 100 CIDs to IPFS so far. Still working...
-[Accumulator] 📌 UPDATE: Re-pinned 200 CIDs to IPFS so far. Still working...
-[Accumulator] 📌 UPDATE: Re-pinned 300 CIDs to IPFS so far. Still working...
-[Accumulator] 📌 UPDATE: Re-pinned 400 CIDs to IPFS so far. Still working...
-[Accumulator] 📌 UPDATE: Re-pinned 500 CIDs to IPFS so far. Still working...
-[Accumulator] ✅ Pinned 522 CIDs to IPFS (0 failures). Done!
+You'll see verbose logs in the console showing syncing progress.
+
+```bash
+[Client] 🚀 Starting AccumulatorClient...
+[Client] 📤 Found 0 leafs in DB
+[Client] 👀 Checking IPFS Gateway connection...
+[Client] 🔗 Connected to IPFS Gateway.
+[Client] 👀 Checking IPFS API connection (attempting to PUT a block)...
+[Client] 🔗 Connected to IPFS API and verified it can PUT blocks.
+[Client] 👀 Checking if IPFS API can provide (advertise) blocks...
+[Client] 🔗 Connected to IPFS API and verified it can PROVIDE blocks.
+[Client] 📜 IPFS Capability Summary:
+[Client] 📜 Summary: IPFS Gateway connected: YES
+[Client] 📜 Summary: IPFS API PUT is set up: YES
+[Client] 📜 Summary: IPFS API PIN is set up: YES
+[Client] 📜 Summary: IPFS API PROVIDE is set up: YES
+[Client] 👀 Checking Ethereum connection...
+[Client] 🔗 Connected to Ethereum. Target contract address: <0xYOUR_CONTRACT_ADDRESS>
+[Client] 🔁 Syncing backwards from block 8200764 to block 8147142 (53622 blocks), grabbing 1000 blocks per RPC call.
+[Client] 🔎 Simultaneously checking IPFS for older root CIDs as we discover them.
+[Client] 📦 Checking blocks 8199765 to 8200764 for LeafInsert events...
+[Client] 🍃 Found 7 LeafInsert events
+[Client] 📦 Checking blocks 8198765 to 8199764 for LeafInsert events...
+[Client] 🍃 Found 5 LeafInsert events
+[Client] 📦 Checking blocks 8197765 to 8198764 for LeafInsert events...
+...
+[Client] 📥 Downloaded all data for root CID bafyreid...n5kpy74e from IPFS.
+[Client] 🙌 Successfully resolved all remaining data from IPFS!
+[Client] 🌲 Your accumulator client has acquired all data!
+[Client] ⛰️ Rebuilding the Merkle Mountain Range from synced leaves and pinning to IPFS. (This can take a while)...
+[Client] 🎉 Finished rebuilding the Merkle Mountain Range.
+[Client] 👎 No ETHEREUM_WS_RPC_URL provided, will use polling.
+[Client] 👀 Using HTTP polling to monitor the chain for new data insertions.
+[Client] 🟢 Client is ready to use.
 ```
 
-### Browser Usage
+When you see `[Client] 🟢 Client is ready to use.` you're ready to access data.
 
-In the browser, after the client has synced and rebuilt the Merkle Mountain Range, it will be attached to the `window`, so you'll have full access to it via `window.accumulatorClient`. For example, you can open the console and access the data in the following ways:
+### Accessing data
 
-```js
-// Get any data (hex string) by its index:
-await accumulatorClient.data.getData(135)
-// 5a8c9a999547577c45efefa0d9caf46736898d664164b37746d35b626934c1d248d57d6cf15fa20b52e04bf4b1
+```typescript
+// See how many items have been inserted into the accumulator
+const count = await client.data.getHighestIndex()
 
-// Get the data for a range of indexes:
-await accumulatorClient.data.getRange(133, 135)
-// [
-//   { "index": 133, "data": "177f0f...d7b065" },
-//   { "index": 134, "data": "fd7b90...e46916" },
-//   { "index": 135, "data": "5a8c9a...4bf4b1" }
-// ]
+// Access the ith data that was inserted into the accumulator
+const data = await client.data.getData(i)
 
-// Download the full dataset as a JSON file
-await accumulatorClient.data.downloadAll()
-// In Node.js, saves the file as leaves-1714052940000.json
-// In browse	: triggers a file download dialog
+// Get a range of data by insertion index
+const range = await client.data.getRange(start, end) // Returns array of { index: number; data: string }
 
-// Subscribe to new data insertions
-const unsubscribe = accumulatorClient.data.subscribe((index, data) => {
-  console.log("New data inserted:", { index, data })
+// Subscribe to new data as it is inserted
+const unsubscribe = client.data.subscribe((index, data) => {
+	console.log(`New data inserted at index ${index}: ${data}`)
 })
-// To unsubscribe later, call: unsubscribe()
+// Call unsubscribe() when you're done
+
+// Iterate over all data
+for await (const { key, value } of client.data.iterate()) {
+	console.log(`Key: ${key}, Value: ${value}`)
+}
+
+// Index by data payload slice
+const index = await client.data.createIndexByPayloadSlice(offset, length)
+const matches = await index.get("someSlice") // Returns array of data (strings) that match the slice
+
+// Download all data to a JSON file (saves to `accumulator-data-${Date.now()}.json` in Nodejs; triggers download prompt in browser)
+const filePath = await client.data.downloadAll()
+
 ```
 
+### Stopping Live Sync
 
-You can find a full working example in `./example.ts`.
+```typescript
+// To stop listening for new data
+client.sync.stopLiveSync()
+```
 
-> 🚧 Mainnet example anyone can submit data to for testing coming soon (maybe).
+### Shutting down
 
-### ⛽ Gas Costs
+```typescript
+// To shut down the client gracefully (unsubscribe from websockets, close DB connection, etc.)
+await client.shutdown()
+```
+
+### Config Options
+
+```typescript
+export const defaultConfig: AccumulatorClientConfig = {
+	// The Ethereum HTTP RPC endpoint to use for contract calls and syncing.
+	// Should be a full URL to a node that supports the desired network (e.g., mainnet, testnet).
+	ETHEREUM_HTTP_RPC_URL: "https://ethereum-rpc.publicnode.com",
+
+	// (Optional) Maximum block range to request per HTTP RPC call when syncing events.
+	// Set to undefined to use the default (1000 blocks).
+	ETHEREUM_MAX_BLOCK_RANGE_PER_HTTP_RPC_CALL: undefined,
+
+	// (Optional) Ethereum WebSocket RPC endpoint for real-time event subscriptions.
+	// If undefined, will fall back to HTTP RPC polling.
+	ETHEREUM_WS_RPC_URL: undefined,
+
+	// The IPFS gateway URL for retrieving content-addressed data (CIDs).
+	// Used for fetching data from IPFS when not available locally.
+	IPFS_GATEWAY_URL: "https://ipfs.io/ipfs", // http://127.0.0.1:8080 if you have a local IPFS node.
+
+	// The IPFS HTTP API endpoint for pinning, providing, and putting data.
+	// Used for writing data to your own IPFS node. Leave undefined if you don't have your own IPFS node.
+	IPFS_API_URL: undefined, // "http://127.0.0.1:5001" if you have a local IPFS node.
+
+	// If true, data will be put (added) to your IPFS node via the API whenever possible.
+	// Value is ignored if IPFS_API_URL is undefined or if the AccumulatorClient can't reach it.
+	IPFS_PUT_IF_POSSIBLE: true,
+
+	// If true, data will be pinned to your IPFS node to prevent garbage collection.
+	// Value is ignored if IPFS_API_URL is undefined, or if the AccumulatorClient can't reach it, or
+	// if IPFS_PUT_IF_POSSIBLE is false.
+	IPFS_PIN_IF_POSSIBLE: true,
+
+	// If true, your IPFS node will "provide" (advertise) data to the IPFS DHT for discoverability.
+	// Value is ignored if IPFS_API_URL is undefined, or if the AccumulatorClient can't reach it, or
+	// if IPFS_PIN_IF_POSSIBLE is false.
+	IPFS_PROVIDE_IF_POSSIBLE: true,
+
+	// (Optional) Path to the local database file for persistent storage (Node.js only).
+	// If undefined, will default to '.db/accumulator.json' (relative to the current working directory).
+	DB_PATH: undefined,
+
+	// (Advanced, optional) Override calldata for the getLatestCID() contract call.
+	// Only set if your contract uses a nonstandard method signature.
+	GET_LATEST_CID_CALLDATA_OVERRIDE: undefined,
+
+	// (Advanced, optional) Override calldata for the getAccumulatorData() contract call.
+	// Only set if your contract uses a nonstandard method signature.
+	GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE: undefined,
+
+	// (Advanced, optional) Override the event signature for LeafInsert events.
+	// Only set if your contract uses a nonstandard event signature.
+	LEAF_INSERT_EVENT_SIGNATURE_OVERRIDE: undefined,
+}
+
+## Gas Costs
 
 The execution gas cost of `_addData` depends on how many **merge steps** are triggered by that particular insert. Most inserts only require a single peak update and are cheap. Occasionally, an insert will trigger a chain of merges — and this is what increases gas (for that insert only).
 
