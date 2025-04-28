@@ -4,7 +4,7 @@ import { resolve } from "path";
 export default defineConfig({
   root: __dirname,
   build: {
-    outDir: resolve(__dirname, "../web-dist/standard"),
+    outDir: resolve(__dirname, "../web-dist"),
     emptyOutDir: true,
     rollupOptions: {
       input: resolve(__dirname, "index.html"),
