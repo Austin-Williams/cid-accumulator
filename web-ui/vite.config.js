@@ -7,6 +7,8 @@ export default defineConfig({
 	root: __dirname,
 	plugins: [viteSingleFile()],
 	build: {
+		// Disable minification so output remains human-readable
+		minify: false,
 		outDir: resolve(__dirname, "dist"),
 		emptyOutDir: true,
 		rollupOptions: {
