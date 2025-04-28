@@ -63,9 +63,12 @@ form.addEventListener("submit", async (e) => {
 		await window.client.start();
 		// Mark as synced after start
 		if (syncState) syncState.textContent = "🟢 Synced";
+		// Enable Download Data button now that we're synced
+		const downloadBtn = document.getElementById("download-data-btn");
+		if (downloadBtn) downloadBtn.disabled = false;
 		// Subscribe to live events
 		window.client.data.subscribe((index, bytes) => {
-			const displayText = `New data added: index: ${index}, bytes: ${bytes}`
+			const displayText = `New data: index: ${index}, bytes: ${bytes}`
 			displayNewLiveEvent(displayText);
 		})
 		// Now show and poll the monitor state
@@ -92,4 +95,25 @@ form.addEventListener("submit", async (e) => {
 	} catch (err) {
 		console.error("Error:", err);
 	}
-})
+});
+
+// Attach Download Data click handler
+const downloadBtn = document.getElementById("download-data-btn");
+if (downloadBtn) {
+    downloadBtn.addEventListener("click", async () => {
+        if (!window.client || !window.client.data) {
+            console.error("Client not initialized.");
+            return;
+        }
+        downloadBtn.disabled = true;
+        try {
+            await window.client.data.downloadAll();
+            displayNewLiveEvent("Downloaded all data.");
+        } catch (err) {
+            console.error("Download error:", err);
+            displayNewLiveEvent("Error downloading data. See console.");
+        } finally {
+            downloadBtn.disabled = false;
+        }
+    });
+}
