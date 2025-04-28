@@ -117,3 +117,39 @@ if (downloadBtn) {
         }
     });
 }
+
+// Attach Delete IndexedDB click handler
+const deleteDbBtn = document.getElementById("delete-db-btn");
+if (deleteDbBtn) {
+  deleteDbBtn.addEventListener("click", async () => {
+    // Shutdown client if running
+    if (window.client && typeof window.client.shutdown === "function") {
+      try {
+        await window.client.shutdown();
+      } catch (err) {
+        console.error("Error during client shutdown:", err);
+      }
+    }
+    // Clear the 'kv' store and reload
+    const openReq = indexedDB.open("cid-accumulator");
+    openReq.onsuccess = (event) => {
+      const db = event.target.result;
+      const tx = db.transaction("kv", "readwrite");
+      const store = tx.objectStore("kv");
+      const clearReq = store.clear();
+      clearReq.onsuccess = () => {
+        db.close();
+        location.reload();
+      };
+      clearReq.onerror = () => {
+        console.error("Failed to clear kv store");
+        db.close();
+        location.reload();
+      };
+    };
+    openReq.onerror = () => {
+      console.error("Failed to open cid-accumulator DB");
+      location.reload();
+    };
+  });
+}
