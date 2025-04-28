@@ -4,12 +4,9 @@ pragma solidity 0.8.25;
 import { DagCborCIDEncoder } from "../libraries/DagCborCIDEncoder.sol";
 
 
-// CUSTOM ERRORS
-error DataBlockTooLargeForIPFS(uint256 actualSize);
-
 /**
 * An on-chain Merkle Mountain Range (MMR) accumulator that allows arbitrary
-* data (bytes) to be appended as leaves (via the _addData function). The
+* data (bytes) to be appended as leaves (via the _appendLeaf function). The
 * contract maintains a root hash encoded as an IPFS CID (Content Identifier),
 * which is updated trustlessly -- by this contract itself -- with each insertion.
 * The CID can be used to fetch and verify the complete data set from IPFS, so
@@ -19,16 +16,22 @@ error DataBlockTooLargeForIPFS(uint256 actualSize);
 * historical data.
 */
 
-contract CIDAccumulator {
+// CUSTOM ERRORS
+error DataBlockTooLargeForIPFS(uint256 actualSize);
+
+/// @title CIDAccumulator
+/// @notice On-chain Merkle Mountain Range accumulator that appends arbitrary data leaves, stores nodes as DAG-CBOR encoded hashes, and makes the root available as an IPFS CIDv1 DAG-CBOR multihash.
+/// @dev Leaves are appended via `_appendLeaf(bytes calldata newData)`. Packs peak heights, leaf count, and block numbers into a single `mmrMetaBits` slot for gas/storage efficiency.
+abstract contract CIDAccumulator {
 	// LIBRARIES
 	using DagCborCIDEncoder for bytes;
 
 	// EVENTS
-	event LeafInsert(
+	event LeafAppended(
 		uint32 indexed leafIndex,
 		uint32 previousInsertBlockNumber,
 		bytes newData,
-		bytes32[] leftInputs
+		bytes32[] mergeLeftHashes
 	);
 
 	// CONSTANTS
@@ -41,7 +44,7 @@ contract CIDAccumulator {
 	uint256 private constant PREVIOUS_INSERT_BLOCKNUM_MASK = 0xFFFFFFFF; // 32 bits
 	uint256 private constant DEPLOY_BLOCKNUM_OFFSET = 229;
 	uint256 private constant DEPLOY_BLOCKNUM_MASK = 0x7FFFFFF; // 27 bits
-	uint256 private constant MAX_SIZE_IPFS_BLOCK = 1_000_000; // Just under 1 MB
+	uint256 private constant MAX_IPFS_BLOCK_SIZE = 1_000_000; // Just under 1 MB
 
 	// STATE VARIABLES
 	bytes32[32] private peaks; // Fixed-size array for node hashes
@@ -67,27 +70,46 @@ contract CIDAccumulator {
 	}
 
 	// EXTERNAL FUNCTIONS
-	// For low-level off-chain integration
-	function getAccumulatorData() external view returns (uint256, bytes32[32] memory) {
+
+	/// @notice Returns the packed MMR metadata bits and current peak hashes for off-chain integration.
+	/// @return mmrMetaBits Packed bit‐field (See comments for layout).
+	/// @return peaks Fixed‐size array of peak node hashes.
+	function getState() external view returns (uint256, bytes32[32] memory) {
 		return (mmrMetaBits, peaks);
 	}
 
 	// PUBLIC FUNCTIONS
-	function getLatestCID() public view returns (bytes memory) {
-		bytes32 root = _getMMRRoot();
-		return _wrapCID(root);
+
+	/// @notice Computes and returns the raw CIDv1 byte sequence (version + codec + multihash) for the root of the MMR.
+	/// @return rawCIDv1 The raw CIDv1 byte sequence.
+	/// @dev This does NOT apply any Multibase (Base32) encoding or produce the ASCII “bafy…” string.
+	/// @dev To get the Base32 string (“bafy…”), off-chain do: `multibase.encode('base32', rawCIDv1).toString()`.
+	function getRootCID() public view returns (bytes memory rawCIDv1) {
+		bytes32 root = _bagPeaks();
+		rawCIDv1= _encodeCID(root);
+	}
+
+	/// @notice Returns the packed MMR metadata bits.
+	/// @return mmrMetaBits Packed bit‐field (See comments for layout).
+	function getMMRMetaBits() public view returns (uint256) {
+		return mmrMetaBits;
 	}
 
 	// INTERNAL FUNCTIONS
-	function _addData(bytes calldata newData) internal {
+
+	/// @notice Appends a new leaf containing `newData` to the Merkle Mountain Range.
+	/// @param newData Raw data to append; must not exceed `MAX_IPFS_BLOCK_SIZE`.
+	/// @dev Encodes `newData` via DagCborCIDEncoder, merges the result with any existing peaks of equal height,
+	///      updates packed `mmrMetaBits`, stores the new peak, and emits a `LeafAppended` event with merge details.
+	function _appendLeaf(bytes calldata newData) internal {
 		// Defensive: Reject blocks too large for IPFS
-		if (newData.length > MAX_SIZE_IPFS_BLOCK) revert DataBlockTooLargeForIPFS(newData.length);
+		if (newData.length > MAX_IPFS_BLOCK_SIZE) revert DataBlockTooLargeForIPFS(newData.length);
 
 		// SLOAD the packed bitfield and get the peakCount
 		uint256 bits = mmrMetaBits;
 		uint256 peakCount = uint256((bits >> PEAK_COUNT_OFFSET) & PEAK_COUNT_MASK);
 
-		// Collect the left half of all _combine steps (required for off-chain integration)
+		// Collect the left half of all _mergeNodes steps (required for off-chain integration)
 		bytes32[32] memory leftInputs;
 
 		// Merge peaks of equal height
@@ -101,7 +123,7 @@ contract CIDAccumulator {
 			bytes32 topHash = peaks[peakCount - 1]; // SLOAD
 			peakCount--;
 
-			bytes32 combined = _combine(topHash, carryHash);
+			bytes32 combined = _mergeNodes(topHash, carryHash);
 
 			// Record the left input for this merge
 			leftInputs[mergeCount] = topHash;
@@ -120,11 +142,11 @@ contract CIDAccumulator {
 			unchecked { i++; }
 		}
 
-		emit LeafInsert(
+		emit LeafAppended(
 			uint32((bits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK),
 			uint32((bits >> PREVIOUS_INSERT_BLOCKNUM_OFFSET) & PREVIOUS_INSERT_BLOCKNUM_MASK),
 			newData, // This is NOT DAG-CBOR encoded
-			finalLeftInputs // These are the hashes of the DAG-CBOR encoded nodes on the left of each _combine for this merge
+			finalLeftInputs // These are the hashes of the DAG-CBOR encoded nodes on the left of each _mergeNodes for this merge
 		);
 
 		// Update packed heights
@@ -148,25 +170,31 @@ contract CIDAccumulator {
 		mmrMetaBits = bits; // SSTORE
 	}
 
-	function _getLeafCount() internal view returns (uint256) {
-		return uint256((mmrMetaBits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK);
-	}
-
 	// PRIVATE FUNCTIONS
-	function _combine(bytes32 left, bytes32 right) private pure returns (bytes32) {
-		return DagCborCIDEncoder.encodeLinkNode(left, right);
-	}
 
-	function _getMMRRoot() private view returns (bytes32 root) {
+	/// @notice Computes the root hash of the MMR by bagging all peaks.
+	/// @return rootHash The root hash of the MMR.
+	function _bagPeaks() private view returns (bytes32 rootHash) {
 		uint256 peakCount = (mmrMetaBits >> PEAK_COUNT_OFFSET) & PEAK_COUNT_MASK;
 		if (peakCount == 0) { return bytes32(0); }
-		root = peaks[0];
+		rootHash = peaks[0];
 		for (uint256 i = 1; i < peakCount; i++) {
-			root = _combine(root, peaks[i]);
+			rootHash = _mergeNodes(rootHash, peaks[i]);
 		}
 	}
 
-	function _wrapCID(bytes32 hash) private pure returns (bytes memory) {
+	/// @notice Merges two nodes (hashes) into a single node (hash) by encoding them as a DAG-CBOR link node.
+	/// @param left The hash of the left node.
+	/// @param right The hash of the right node.
+	/// @return The hash of the merged node.
+	function _mergeNodes(bytes32 left, bytes32 right) private pure returns (bytes32) {
+		return DagCborCIDEncoder.encodeLinkNode(left, right);
+	}
+
+	/// @notice Encodes a hash as a CIDv1 DAG-CBOR multihash by prepending the version, codec, hashcode, and length to the hash.
+	/// @param hash The hash to encode.
+	/// @return The encoded CIDv1 DAG-CBOR multihash.
+	function _encodeCID(bytes32 hash) private pure returns (bytes memory) {
 		// Multihash prefix: sha2-256 (0x12), length 32 (0x20)
 		bytes memory multihash = abi.encodePacked(
 			hex"12", // SHA2-256 code.

@@ -1,33 +1,77 @@
 [
-    {
-        "type": "function",
-        "name": "getLatestCID",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bytes",
-                "internalType": "bytes"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "getAccumulatorData",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            },
-            {
-                "name": "",
-                "type": "bytes32[32]",
-                "internalType": "bytes32[32]"
-            }
-        ],
-        "stateMutability": "view"
-    }
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint32",
+				"name": "leafIndex",
+				"type": "uint32"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint32",
+				"name": "previousInsertBlockNumber",
+				"type": "uint32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes",
+				"name": "newData",
+				"type": "bytes"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32[]",
+				"name": "mergeLeftHashes",
+				"type": "bytes32[]"
+			}
+		],
+		"name": "LeafAppended",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "getMMRMetaBits",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getRootCID",
+		"outputs": [
+			{
+				"internalType": "bytes",
+				"name": "rawCIDv1",
+				"type": "bytes"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getState",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32[32]",
+				"name": "",
+				"type": "bytes32[32]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
 ]
