@@ -20,27 +20,27 @@ function leftPadAddress(address: string): string {
 	return result.toLowerCase()
 }
 
-export function overrideForGetLeafInsertEventSignature(address: string): string {
+export function overrideForGetLeafAppendedEventSignature(address: string): string {
 	const result = "0x" + leftPadAddress(address)
-	console.log(`Leaf insert event signature override: ${result}`)
+	console.log(`LeafAppended event signature override: ${result}`)
 	return result.toLowerCase()
 }
 
 // Combine selector and argument
-export function overrideForGetLatestCIDCalldata(address: string): string {
-	const selector = getSelector("getLatestCID(address)")
+export function overrideForGetRootCIDCalldata(address: string): string {
+	const selector = getSelector("getRootCID(address)")
 	const arg = leftPadAddress(address)
 	const result = "0x" + selector + arg
-	console.log(`Latest CID calldata override: ${result}`)
+	console.log(`getRootCID calldata override: ${result}`)
 	return result.toLowerCase()
 }
 
 // Combine selector and argument
-export function overrideForGetAccumulatorDataCalldata(address: string): string {
-	const selector = getSelector("getAccumulatorData(address)")
+export function overrideForGetStateCalldata(address: string): string {
+	const selector = getSelector("getState(address)")
 	const arg = leftPadAddress(address)
 	const result = "0x" + selector + arg
-	console.log(`Accumulator data calldata override: ${result}`)
+	console.log(`getState calldata override: ${result}`)
 	return result.toLowerCase()
 }
 

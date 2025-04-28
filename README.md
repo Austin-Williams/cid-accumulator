@@ -22,7 +22,7 @@
 ## What it does
 
 - Enables your smart contract to trustlessly compute an IPFS CID that represents a (dag-cbor encoded) file containing **all data ever emitted by your contract**.
-- Allows users to make a single call to your contract's `getLatestCID()` view function, and then fetch the full dataset from IPFS using that CID.
+- Allows users to make a single call to your contract's `getRootCID()` view function, and then fetch the full dataset from IPFS using that CID.
 
 ## Why we need it
 
@@ -52,7 +52,7 @@ Your contract can then call `_addData` with any `bytes` payload you'd like to in
 
 ## How the off-chain component works
 
-The client-side UI can then call `getLatestCID()` to retrieve the IPFS CID of the file that includes all data added so far. But what if that CID is not available on IPFS?
+The client-side UI can then call `getRootCID()` to retrieve the IPFS CID of the file that includes all data added so far. But what if that CID is not available on IPFS?
 
 The `CIDAccumulator` is designed so that you can efficiently compute the _previous_ CID from the current CID + the small amount of data that was emitted by the contract during the last data insert. This allows you to efficiently "walkback" from the current CID through previous CIDs until you find one that is available on IPFS.
 
@@ -118,11 +118,11 @@ You'll see verbose logs in the console showing syncing progress.
 [Client] 🔗 Connected to Ethereum. Target contract address: <0xYOUR_CONTRACT_ADDRESS>
 [Client] 🔁 Syncing backwards from block 8200764 to block 8147142 (53622 blocks), grabbing 1000 blocks per RPC call.
 [Client] 🔎 Simultaneously checking IPFS for older root CIDs as we discover them.
-[Client] 📦 Checking blocks 8199765 to 8200764 for LeafInsert events...
-[Client] 🍃 Found 7 LeafInsert events
-[Client] 📦 Checking blocks 8198765 to 8199764 for LeafInsert events...
-[Client] 🍃 Found 5 LeafInsert events
-[Client] 📦 Checking blocks 8197765 to 8198764 for LeafInsert events...
+[Client] 📦 Checking blocks 8199765 to 8200764 for LeafAppended events...
+[Client] 🍃 Found 7 LeafAppended events
+[Client] 📦 Checking blocks 8198765 to 8199764 for LeafAppended events...
+[Client] 🍃 Found 5 LeafAppended events
+[Client] 📦 Checking blocks 8197765 to 8198764 for LeafAppended events...
 ...
 [Client] 📥 Downloaded all data for root CID bafyreid...n5kpy74e from IPFS.
 [Client] 🙌 Successfully resolved all remaining data from IPFS!
@@ -226,17 +226,17 @@ export const defaultConfig: AccumulatorClientConfig = {
 	// If undefined, will default to '.db/accumulator.json' (relative to the current working directory).
 	DB_PATH: undefined,
 
-	// (Advanced, optional) Override calldata for the getLatestCID() contract call.
+	// (Advanced, optional) Override calldata for the getRootCID() contract call.
 	// Only set if your contract uses a nonstandard method signature.
-	GET_LATEST_CID_CALLDATA_OVERRIDE: undefined,
+	GET_ROOT_CID_CALLDATA_OVERRIDE: undefined,
 
-	// (Advanced, optional) Override calldata for the getAccumulatorData() contract call.
+	// (Advanced, optional) Override calldata for the getState() contract call.
 	// Only set if your contract uses a nonstandard method signature.
-	GET_ACCUMULATOR_DATA_CALLDATA_OVERRIDE: undefined,
+	GET_STATE_CALLDATA_OVERRIDE: undefined,
 
-	// (Advanced, optional) Override the event signature for LeafInsert events.
+	// (Advanced, optional) Override the event signature for LeafAppended events.
 	// Only set if your contract uses a nonstandard event signature.
-	LEAF_INSERT_EVENT_SIGNATURE_OVERRIDE: undefined,
+	LEAF_APPENDED_EVENT_SIGNATURE_OVERRIDE: undefined,
 }
 ```
 
