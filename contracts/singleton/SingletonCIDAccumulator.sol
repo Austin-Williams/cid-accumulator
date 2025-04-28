@@ -18,7 +18,7 @@ error DataBlockTooLargeForIPFS(uint256 actualSize);
 * suitable for applications requiring efficient, verifiable access to
 * historical data.
 *
-* This is a "shared" version where a single contract can be "shared" by arbitrarily
+* This is a "singleton" version where a single contract can be used by arbitrarily
 * many clients, each of which can add data to their own "namespaced" accumulator (which emits
 * a custom event that is unique to their namespace). They can get the root CID and peaks for
 * their own namespace, and off-chain AccumulatorClients will get only the data for the desired
@@ -46,9 +46,18 @@ error DataBlockTooLargeForIPFS(uint256 actualSize);
 * reducing gas usage by packing everything into a single uint256.
 * 
 */
-contract SharedCIDAccumulator {
+contract SingletonCIDAccumulator {
 	// LIBRARIES
 	using DagCborCIDEncoder for bytes;
+
+	// EVENTS
+	event LeafInsert(
+		address indexed msgSender,
+		uint32 indexed leafIndex,
+		uint32 previousInsertBlockNumber,
+		bytes newData,
+		bytes32[] leftInputs
+	);
 
 	// CONSTANTS
 	// Packed bitfield layout for mmrMetaBits
@@ -66,12 +75,12 @@ contract SharedCIDAccumulator {
 
 	// Add data to your own accumulator
 	function addData(bytes calldata newData) external {
-		_addData(msg.sender, newData);
+		_addData(newData);
 	}
 
 	function addDataMany(bytes[] calldata newData) external {
 		for (uint256 i = 0; i < newData.length; i++) {
-			_addData(msg.sender, newData[i]);
+			_addData(newData[i]);
 		}
 	}
 	
@@ -91,12 +100,12 @@ contract SharedCIDAccumulator {
 	}
 
 	// PRIVATE FUNCTIONS
-	function _addData(address addr, bytes calldata newData) private {
+	function _addData(bytes calldata newData) private {
 		// Defensive: Reject blocks too large for IPFS
 		if (newData.length > MAX_SIZE_IPFS_BLOCK) revert DataBlockTooLargeForIPFS(newData.length);
 
 		// SLOAD the packed bitfield and get the peakCount
-		uint256 bits = _getMmrMetaBits(addr);
+		uint256 bits = _getMmrMetaBits(msg.sender);
 
 		// Get the deploy block number and set it if not already set
 		uint256 deployBlockNumber = uint256((bits >> DEPLOY_BLOCKNUM_OFFSET) & DEPLOY_BLOCKNUM_MASK);
@@ -116,7 +125,7 @@ contract SharedCIDAccumulator {
 			peakCount > 0 &&
 			uint256((bits >> ((peakCount - 1) * 5)) & 0x1F) == carryHeight
 		) {
-			bytes32 topHash = _getPeak(addr, peakCount - 1); // SLOAD
+			bytes32 topHash = _getPeak(msg.sender, peakCount - 1); // SLOAD
 			peakCount--;
 
 			bytes32 combined = _combine(topHash, carryHash);
@@ -130,7 +139,7 @@ contract SharedCIDAccumulator {
 		}
 
 		// Store the new peak
-		_setPeak(addr, peakCount, carryHash); // SSTORE the hash of the DAG-CBOR encoded link node
+		_setPeak(msg.sender, peakCount, carryHash); // SSTORE the hash of the DAG-CBOR encoded link node
 
 		// Shrink array to actual size
 		bytes32[] memory finalLeftInputs = new bytes32[](mergeCount);
@@ -139,12 +148,12 @@ contract SharedCIDAccumulator {
 			unchecked { i++; }
 		}
 
-		_emitLeafInsertLog(
-			addr,
+		emit LeafInsert(
+			msg.sender,
 			uint32((bits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK),
 			uint32((bits >> PREVIOUS_INSERT_BLOCKNUM_OFFSET) & PREVIOUS_INSERT_BLOCKNUM_MASK),
 			newData, // This is NOT DAG-CBOR encoded
-			finalLeftInputs // These are the hashes of the DAG-CBOR encoded nodes on the left of each _combine for this merge
+			finalLeftInputs // These are the hashes of the DAG-CBOR encoded nodes on the left of each _combine for this merge			
 		);
 
 		// Update packed heights
@@ -165,7 +174,7 @@ contract SharedCIDAccumulator {
 		bits &= ~(PREVIOUS_INSERT_BLOCKNUM_MASK << PREVIOUS_INSERT_BLOCKNUM_OFFSET); // clear
 		bits |= uint256(block.number) << PREVIOUS_INSERT_BLOCKNUM_OFFSET; // set
 
-		_setMmrMetaBits(addr, bits); // SSTORE
+		_setMmrMetaBits(msg.sender, bits); // SSTORE
 	}
 
 	function _getLeafCount(address addr) private view returns (uint256) {
@@ -197,28 +206,6 @@ contract SharedCIDAccumulator {
 			hex"71", // dag-cbor codec.
 			multihash
 		);
-	}
-
-	function _emitLeafInsertLog(
-		address addr,
-		uint32 leafIndex,
-		uint32 previousInsertBlockNumber,
-		bytes memory newData,
-		bytes32[] memory leftInputs
-	) private {
-		// ABI-encode only the non-indexed event parameters (excluding indexed)
-		bytes memory data = abi.encode(previousInsertBlockNumber, newData, leftInputs);
-
-		// Event signature (topic0)
-		bytes32 topic0 = bytes32(uint256(uint160(addr)));
-
-		// The indexed parameter (leafIndex) as topic1
-		bytes32 topic1 = bytes32(uint256(leafIndex));
-
-		assembly {
-			// data pointer skips the length prefix (first 32 bytes)
-			log2(add(data, 32), mload(data), topic0, topic1)
-		}
 	}
 
 	function _getMmrMetaBits(address addr) private view returns (uint256 value) {
