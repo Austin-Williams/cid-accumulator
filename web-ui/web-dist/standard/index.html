@@ -1,76 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>CID Accumulator Client UI</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script type="module" crossorigin src="/assets/index-Blprn0-j.js"></script>
+	<meta charset="UTF-8" />
+	<title>CID Accumulator Client UI</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script type="module" crossorigin src="/assets/index-CqfKCDnJ.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-1ootNUGg.css">
 </head>
 <body>
-  <h1>CID Accumulator Client (Browser UI)</h1>
-  <form id="client-form">
-    <label>
-      Contract Address:
-      <input type="text" id="contract-address" placeholder="0x..." required />
-    </label>
-    <fieldset>
-      <legend>Config Options</legend>
-      <label>
-        Ethereum HTTP RPC URL:
-        <input type="text" id="eth-http-url" placeholder="https://ethereum-rpc.publicnode.com" />
-      </label>
-      <label>
-        Ethereum Max Block Range Per HTTP RPC Call:
-        <input type="number" id="eth-max-block-range" placeholder="1000" min="1" />
-      </label>
-      <label>
-        Ethereum WS RPC URL:
-        <input type="text" id="eth-ws-url" placeholder="(optional)" />
-      </label>
-      <label>
-        IPFS Gateway URL:
-        <input type="text" id="ipfs-gateway-url" placeholder="https://dweb.link" />
-      </label>
-      <label>
-        IPFS API URL:
-        <input type="text" id="ipfs-api-url" placeholder="(optional) http://127.0.0.1:5001" />
-      </label>
-      <label>
-        IPFS Put If Possible:
-        <input type="checkbox" id="ipfs-put-if-possible" checked />
-      </label>
-      <label>
-        IPFS Pin If Possible:
-        <input type="checkbox" id="ipfs-pin-if-possible" checked />
-      </label>
-      <label>
-        IPFS Provide If Possible:
-        <input type="checkbox" id="ipfs-provide-if-possible" checked />
-      </label>
-      <label>
-        DB Path:
-        <input type="text" id="db-path" placeholder="(optional) .db/accumulator.json" />
-      </label>
-      <details>
-        <summary>Advanced options</summary>
-        <label>
-          Get Latest CID Calldata Override:
-          <input type="text" id="get-latest-cid-override" placeholder="(advanced, optional)" />
-        </label>
-        <label>
-          Get Accumulator Data Calldata Override:
-          <input type="text" id="get-accumulator-data-override" placeholder="(advanced, optional)" />
-        </label>
-        <label>
-          Leaf Insert Event Signature Override:
-          <input type="text" id="leaf-insert-event-override" placeholder="(advanced, optional)" />
-        </label>
-      </details>
-    </fieldset>
-    <button type="submit">Start Client</button>
-  </form>
-  <button id="clear-db-btn" type="button">Clear Local DB</button>
-  <pre id="output"></pre>
+	<h1>CID Accumulator Client Web Example</h1>
+	<form id="client-form">
+		<label>
+			Contract Address:
+			<input type="text" id="contract-address" placeholder="0x..." required />
+		</label>
+		<fieldset style="margin-bottom: 1em;">
+			<legend>Config Options</legend>
+			<details>
+				<summary>Ethereum options</summary>
+				<label>
+					Ethereum HTTP RPC URL: <sup><span title="The Ethereum HTTP RPC endpoint to use for contract calls and syncing. Should be a full URL to a node that supports the desired network (e.g., mainnet, testnet)." style="cursor: help;">ℹ️</span></sup>
+					<input type="text" id="eth-http-url" placeholder="https://ethereum-rpc.publicnode.com" />
+				</label>
+				<label>
+					Ethereum Max Block Range Per HTTP RPC Call: <sup><span title="(Optional) Maximum block range to request per HTTP RPC call when syncing events. Set to undefined to use the default (1000 blocks)." style="cursor: help;">ℹ️</span></sup>
+					<input type="number" id="eth-max-block-range" placeholder="1000" min="1" />
+				</label>
+				<label>
+					Ethereum WS RPC URL: <sup><span title="(Optional) Ethereum WebSocket RPC endpoint for real-time event subscriptions. If undefined, will fall back to HTTP RPC polling." style="cursor: help;">ℹ️</span></sup>
+					<input type="text" id="eth-ws-url" placeholder="(optional)" />
+				</label>
+			</details>
+			<details>
+				<summary>IPFS options</summary>
+				<label>
+					IPFS Gateway URL: <sup><span title="The IPFS gateway URL for retrieving content-addressed data (CIDs). Used for fetching data from IPFS when not available locally. You MUST use a verifiable IPFS gateway (e.g., https://dweb.link)." style="cursor: help;">ℹ️</span></sup>
+					<input type="text" id="ipfs-gateway-url" placeholder="https://dweb.link" />
+				</label>
+				<label>
+					IPFS API URL: <sup><span title="The IPFS HTTP API endpoint for pinning, providing, and putting data. Used for writing data to your own IPFS node. Leave undefined if you don't have your own IPFS node." style="cursor: help;">ℹ️</span></sup>
+					<input type="text" id="ipfs-api-url" placeholder="(optional) http://127.0.0.1:5001" />
+				</label>
+				<label>
+					IPFS Put If Possible: <sup><span title="If true, data will be put (added) to your IPFS node via the API whenever possible. Value is ignored if IPFS_API_URL is undefined or if the AccumulatorClient can't reach it." style="cursor: help;">ℹ️</span></sup>
+					<input type="checkbox" id="ipfs-put-if-possible" checked />
+				</label>
+				<label>
+					IPFS Pin If Possible: <sup><span title="If true, data will be pinned to your IPFS node to prevent garbage collection. Value is ignored if IPFS_API_URL is undefined, or if the AccumulatorClient can't reach it, or if IPFS_PUT_IF_POSSIBLE is false." style="cursor: help;">ℹ️</span></sup>
+					<input type="checkbox" id="ipfs-pin-if-possible" checked />
+				</label>
+				<label>
+					IPFS Provide If Possible: <sup><span title="If true, your IPFS node will 'provide' (advertise) data to the IPFS DHT for discoverability. Value is ignored if IPFS_API_URL is undefined, or if the AccumulatorClient can't reach it, or if IPFS_PIN_IF_POSSIBLE is false." style="cursor: help;">ℹ️</span></sup>
+					<input type="checkbox" id="ipfs-provide-if-possible" checked />
+				</label>
+			</details>
+			<details>
+				<summary>Advanced options</summary>
+				<label>
+					Get Latest CID Calldata Override: <sup><span title="(Advanced, optional) Override calldata for the getLatestCID() contract call. Only set if your contract uses a nonstandard method signature." style="cursor: help;">ℹ️</span></sup>
+					<input type="text" id="get-latest-cid-override" placeholder="(advanced, optional)" />
+				</label>
+				<label>
+					Get Accumulator Data Calldata Override: <sup><span title="(Advanced, optional) Override calldata for the getAccumulatorData() contract call. Only set if your contract uses a nonstandard method signature." style="cursor: help;">ℹ️</span></sup>
+					<input type="text" id="get-accumulator-data-override" placeholder="(advanced, optional)" />
+				</label>
+				<label>
+					Leaf Insert Event Signature Override: <sup><span title="(Advanced, optional) Override the event signature for LeafInsert events. Only set if your contract uses a nonstandard event signature." style="cursor: help;">ℹ️</span></sup>
+					<input type="text" id="leaf-insert-event-override" placeholder="(advanced, optional)" />
+				</label>
+			</details>
+		</fieldset>
+		<button type="submit">Start Client</button>
+		<button id="download-data-btn" type="button" disabled style="margin-left:0.5em;">Download Data</button>
+	</form>
+	<div id="sync-status" style="margin: 0.5em 0; font-weight: bold;">
+	  <span id="client-started-indicator" style="display:none;">🟢 Client has started. See console for logs.</span>
+	  <span id="client-started-state" style="display:none;"></span><br>
+	  <span id="sync-state">&nbsp;</span><br>
+	  <span id="monitor-state">🔴 Not monitoring</span>
+	</div>
+
+	<div id="live-events-container" style="display:none; margin-top:1em;">
+	<label for="live-events" style="font-weight:bold;">Live Events</label>
+	<pre id="live-events" style="background:#f8f8f8; padding:1em; height:200px; overflow:auto; margin:0;"></pre>
+</div>
 </body>
 </html>
