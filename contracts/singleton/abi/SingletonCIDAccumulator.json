@@ -2,6 +2,54 @@
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "actualSize",
+				"type": "uint256"
+			}
+		],
+		"name": "DataBlockTooLargeForIPFS",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "msgSender",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint32",
+				"name": "leafIndex",
+				"type": "uint32"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint32",
+				"name": "previousInsertBlockNumber",
+				"type": "uint32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes",
+				"name": "newData",
+				"type": "bytes"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32[]",
+				"name": "leftInputs",
+				"type": "bytes32[]"
+			}
+		],
+		"name": "LeafInsert",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "bytes",
 				"name": "newData",
 				"type": "bytes"
@@ -24,17 +72,6 @@
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "actualSize",
-				"type": "uint256"
-			}
-		],
-		"name": "DataBlockTooLargeForIPFS",
-		"type": "error"
 	},
 	{
 		"inputs": [
@@ -74,19 +111,6 @@
 				"internalType": "bytes",
 				"name": "",
 				"type": "bytes"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getMyEventTopic",
-		"outputs": [
-			{
-				"internalType": "bytes32",
-				"name": "",
-				"type": "bytes32"
 			}
 		],
 		"stateMutability": "view",

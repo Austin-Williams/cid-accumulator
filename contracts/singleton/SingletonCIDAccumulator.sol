@@ -75,12 +75,12 @@ contract SingletonCIDAccumulator {
 
 	// Add data to your own accumulator
 	function addData(bytes calldata newData) external {
-		_addData(newData);
+		_addData(msg.sender, newData);
 	}
 
 	function addDataMany(bytes[] calldata newData) external {
 		for (uint256 i = 0; i < newData.length; i++) {
-			_addData(newData[i]);
+			_addData(msg.sender, newData[i]);
 		}
 	}
 	
@@ -94,18 +94,13 @@ contract SingletonCIDAccumulator {
 		return _wrapCID(root);
 	}
 
-	// This is the event topic you can filter by to get all events for your namespace
-	function getMyEventTopic() external view returns (bytes32) {
-		return bytes32(uint256(uint160(msg.sender)));
-	}
-
 	// PRIVATE FUNCTIONS
-	function _addData(bytes calldata newData) private {
+	function _addData(address msgSender, bytes calldata newData) private {
 		// Defensive: Reject blocks too large for IPFS
 		if (newData.length > MAX_SIZE_IPFS_BLOCK) revert DataBlockTooLargeForIPFS(newData.length);
 
 		// SLOAD the packed bitfield and get the peakCount
-		uint256 bits = _getMmrMetaBits(msg.sender);
+		uint256 bits = _getMmrMetaBits(msgSender);
 
 		// Get the deploy block number and set it if not already set
 		uint256 deployBlockNumber = uint256((bits >> DEPLOY_BLOCKNUM_OFFSET) & DEPLOY_BLOCKNUM_MASK);
@@ -125,7 +120,7 @@ contract SingletonCIDAccumulator {
 			peakCount > 0 &&
 			uint256((bits >> ((peakCount - 1) * 5)) & 0x1F) == carryHeight
 		) {
-			bytes32 topHash = _getPeak(msg.sender, peakCount - 1); // SLOAD
+			bytes32 topHash = _getPeak(msgSender, peakCount - 1); // SLOAD
 			peakCount--;
 
 			bytes32 combined = _combine(topHash, carryHash);
@@ -139,7 +134,7 @@ contract SingletonCIDAccumulator {
 		}
 
 		// Store the new peak
-		_setPeak(msg.sender, peakCount, carryHash); // SSTORE the hash of the DAG-CBOR encoded link node
+		_setPeak(msgSender, peakCount, carryHash); // SSTORE the hash of the DAG-CBOR encoded link node
 
 		// Shrink array to actual size
 		bytes32[] memory finalLeftInputs = new bytes32[](mergeCount);
@@ -149,7 +144,7 @@ contract SingletonCIDAccumulator {
 		}
 
 		emit LeafInsert(
-			msg.sender,
+			msgSender,
 			uint32((bits >> LEAF_COUNT_OFFSET) & LEAF_COUNT_MASK),
 			uint32((bits >> PREVIOUS_INSERT_BLOCKNUM_OFFSET) & PREVIOUS_INSERT_BLOCKNUM_MASK),
 			newData, // This is NOT DAG-CBOR encoded
@@ -174,7 +169,7 @@ contract SingletonCIDAccumulator {
 		bits &= ~(PREVIOUS_INSERT_BLOCKNUM_MASK << PREVIOUS_INSERT_BLOCKNUM_OFFSET); // clear
 		bits |= uint256(block.number) << PREVIOUS_INSERT_BLOCKNUM_OFFSET; // set
 
-		_setMmrMetaBits(msg.sender, bits); // SSTORE
+		_setMmrMetaBits(msgSender, bits); // SSTORE
 	}
 
 	function _getLeafCount(address addr) private view returns (uint256) {
