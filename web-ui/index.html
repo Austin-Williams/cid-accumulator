@@ -52,6 +52,18 @@
 					IPFS Provide If Possible: <sup><span title="If true, your IPFS node will 'provide' (advertise) data to the IPFS DHT for discoverability. Value is ignored if IPFS_API_URL is undefined, or if the AccumulatorClient can't reach it, or if IPFS_PIN_IF_POSSIBLE is false." style="cursor: help;">ℹ️</span></sup>
 					<input type="checkbox" id="ipfs-provide-if-possible" checked />
 				</label>
+				<label>
+					Remote Pinning Service Base URL: <sup><span title="(Optional) Remote pinning service base URL. Example (Pinata): https://api.pinata.cloud/pinning. See https://docs.pinata.cloud/api-reference/pinning-service-api" style="cursor: help;">ℹ️</span></sup>
+					<input type="text" id="remote-pin-base-url" placeholder="(optional)" />
+				</label>
+				<label>
+					Remote Pinning Headers: <sup><span title="(Optional) Headers for remote pinning auth. Example (Pinata):  { 'Authorization': 'Bearer xYzAbC...YourPinataJWT...zYxWb93' }" style="cursor: help;">ℹ️</span></sup>
+					<input type="text" id="remote-pin-headers" placeholder="(JSON object)" />
+				</label>
+				<label>
+					Remote Pin Failure Threshold: <sup><span title="(Optional) Number of remote pin failures before disabling remote pinning. Default: 5" style="cursor: help;">ℹ️</span></sup>
+					<input type="number" id="remote-pin-failure-threshold" placeholder="5" min="0" />
+				</label>
 			</details>
 			<details>
 				<summary>Advanced options</summary>
@@ -81,7 +93,7 @@
 	</div>
 
 	<div id="live-events-container" style="display:none; margin-top:1em;">
-	<label for="live-events" style="font-weight:bold;">Live Events</label>
+	<h2 style="font-weight:bold; margin: 0 0 0.5em;">Live Events</h2>
 	<pre id="live-events" style="background:#f8f8f8; padding:1em; height:200px; overflow:auto; margin:0;"></pre>
 </div>
 <script type="module" src="main.js"></script>

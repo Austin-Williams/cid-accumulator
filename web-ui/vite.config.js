@@ -16,6 +16,8 @@ export default defineConfig({
 		},
 	},
 	server: {
+		// bind to 127.0.0.1 instead of localhost
+		host: '127.0.0.1',
 		port: 5174,
 		open: true,
 	},
