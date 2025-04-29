@@ -1,7 +1,5 @@
 # cid-accumulator
 
-> ⚠️ **Warning:** This project is unaudited and has not been thoroughly tested.
-
 ## Table of Contents
 - [What it does](#what-it-does)
 - [Why we need it](#why-we-need-it)
@@ -29,7 +27,7 @@
 
 Apps often emit on-chain events with data that users need later. For example, in privacy systems like Tornado Cash, Railgun, 0xbow, etc, users cannot withdraw their funds without having a local copy of the complete set of all historical deposit commitments for all users of the system. But reconstructing this data from on-chain events can be completely impractical for users on free-tier RPCs (which are almost all users).
 
-Typically, app developers rely on centralized services to provide the data directly to their users. This has a serious problem: when the centralized service goes offline or is forced censor, most users can't use the app because they can't get the data they need (for example, to create the merkle proof they need to withdraw funds from a privacy system). While the users could _in principle_ get the data they need from the blockchain, _in practice_ they often can't because that requires making far more RPC calls than the free-tier RPC providers allow.
+Typically, app developers rely on centralized services to provide the data directly to their users. This has a serious problem: when the centralized service goes offline or is forced to censor, most users can't use the app because they can't get the data they need (for example, to create the merkle proof they need to withdraw funds from a privacy system). While the users could _in principle_ get the data they need from the blockchain, _in practice_ they often can't because that requires making far more RPC calls than the free-tier RPC providers allow.
 
 Storing the data on IPFS solves half the problem -- it lets users get the data they need even when the centralized service goes offline. All they need is an IPFS CID (Content Identifier) for the data and they can fetch all the data they need from IPFS. But how can users learn what CID to use without having to rely on some trusted third party who could censor, lie, or go offline?
 
@@ -41,13 +39,13 @@ Have your contract inherit from the `CIDAccumulator` contract.
 
 ```solidity
 contract Example is CIDAccumulator {
-    function addData(bytes calldata newData) external {
-        _addData(newData);
-    }
+	function appendLeaf(bytes calldata data) external {
+		_appendLeaf(data);
+	}
 }
 ```
 
-Your contract can then call `_addData` with any `bytes` payload you'd like to include in the accumulator. The data will be inserted and the CID will be updated.
+Your contract can then call `_appendLeaf` with any `bytes` payload you'd like to include in the accumulator. The data will be emitted in an event and the CID will be updated.
 
 > ℹ️ Most inserts fall in the 12.8k - 23.5k gas range for execution. See below for more about gas costs.
 
