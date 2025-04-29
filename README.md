@@ -1,6 +1,8 @@
 # cid-accumulator
 
-Enables users to trustlessly and verifiably fetch large amounts of historical smart contract event data from IPFS without needing a full node or paid-tier RPC provider, and without having to trust anyone to provide them with the correct IPFS CID.
+A CID-accumulator is a Merkle tree whose leaves are IPFS CIDs (content identifiers) of arbitray binary data, and whose intermediate nodes are CIDs of IPLD-link objects that link to their children. CID-accumulators have the wonderful property that their root is a CID that resolves (via IPLD links) over IPFS to a file (in concise binary object representation) that consists of all the leaves' binary data concatenated together. They also come along with all of the other properties of Merkle trees: efficient proofs of membership, etc.
+
+This project uses CID-accumulators to enable users to trustlessly and verifiably fetch large amounts of historical smart contract event data from IPFS without needing a full node or paid-tier RPC provider, and without having to trust anyone to provide them with the correct IPFS CID.
 
 ## Table of Contents
 - [What it does](#what-it-does)
