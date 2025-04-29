@@ -16,6 +16,7 @@
   - [Stopping Live Sync](#stopping-live-sync)
   - [Shutting down](#shutting-down)
   - [Config Options](#config-options)
+- [Working Example Web UI](#working-example-web-ui)
 - [Gas Costs](#gas-costs)
 - [How the CID is computed by the smart contract (for nerds)](#how-the-cid-is-computed-by-the-smart-contract-for-nerds)
 
