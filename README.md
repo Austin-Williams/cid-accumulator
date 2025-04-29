@@ -240,6 +240,20 @@ export const defaultConfig: AccumulatorClientConfig = {
 }
 ```
 
+# Working Example Web UI
+
+There is an example contract on Ethereum mainnet at [0x7e71DE0438F287F229Be5d714164106473d39E41](https://etherscan.io/address/0x7e71DE0438F287F229Be5d714164106473d39E41).
+
+Anyone is welcome to submit random data to it for testing.
+
+A working example web UI for it can be seen at [https://dweb.link/ipfs/bafkreihtnhvetewhds5gqwndxa46pisb6mi76snn6g77b2iscryj6sik6q](https://dweb.link/ipfs/bafkreihtnhvetewhds5gqwndxa46pisb6mi76snn6g77b2iscryj6sik6q).
+
+You can click the "Start Client" button to see it run it with default settings.
+
+Open the console to see logs.
+
+![Example Web UI for the accumulator](example-web-ui.png)
+
 ## Gas Costs
 
 The execution gas cost of `_addData` depends on how many **merge steps** are triggered by that particular insert. Most inserts only require a single peak update and are cheap. Occasionally, an insert will trigger a chain of merges — and this is what increases gas (for that insert only). Gas estimations below assume a 32-byte payload, but the contract can handle arbitrary length bytes.
