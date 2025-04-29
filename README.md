@@ -312,6 +312,6 @@ To illustrate the difference in gas cost between using an MMR vs a typical balan
 
 By contrast, for an MMR, each new leaf insertion requires _exactly_ two SSTOREs, and _at most_ `log₂(n) + 1` SLOADs (one to load the metadata, and then one for each merge that occurs). Statistically, over 87% of inserts require three or fewer SLOADs (one to load the metadata, and two or fewer to load the peaks that are merged). So the gas cost for inserting a new leaf (when there are around 100k leaves, so we're comparing apples to apples) is _at most_ 47,800 gas, and is more typically 12,100 - 16,300 gas. (This assumes you're SSTORing to non-zero slots, which is the most common case).
 
-To view the root CID for an MMR, you have "bag the peaks", which requires at most `log₂(n) + 1` SLOADs (one for the metadata and then one for each peak in the MMR). However, this is only ever needs to be done off-chain, so the gas cost is not a concern there.
+To view the root CID for an MMR, you have to "bag the peaks" (merge them), which requires at most `log₂(n) + 1` SLOADs (one for the metadata and then one for each peak in the MMR). However, this is only ever needs to be done off-chain, so the gas cost is not a concern there.
 
 So the leaf insertions are stored in an MMR, the contract stores only the current peaks of the MMR, and then the "peak bagging" to get the root CID from the peaks is done off-chain.
