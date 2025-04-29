@@ -41,16 +41,23 @@ form.addEventListener("submit", async (e) => {
 	// Use placeholder as default if no address entered
 	const contractInput = document.getElementById("contract-address");
 	const contractAddress = (contractInput.value || contractInput.placeholder).trim();
-	// Parse max block range input as number, or set to undefined if blank
+	// Parse max block range input as number, or set to 250 if blank
 	const maxBlockRangeInput = document.getElementById("eth-max-block-range").value;
-	const maxBlockRange = maxBlockRangeInput ? parseInt(maxBlockRangeInput, 10) : undefined;
+	const maxBlockRange = maxBlockRangeInput ? parseInt(maxBlockRangeInput, 10) : 250;
 
 	const config = {
 		...defaultConfig,
 		ETHEREUM_HTTP_RPC_URL: document.getElementById("eth-http-url").value || defaultConfig.ETHEREUM_HTTP_RPC_URL,
 		ETHEREUM_MAX_BLOCK_RANGE_PER_HTTP_RPC_CALL: maxBlockRange,
+		ETHEREUM_WS_RPC_URL: document.getElementById("eth-ws-url").value || defaultConfig.ETHEREUM_WS_RPC_URL,
 		IPFS_GATEWAY_URL: document.getElementById("ipfs-gateway-url").value || defaultConfig.IPFS_GATEWAY_URL,
 		IPFS_API_URL: document.getElementById("ipfs-api-url").value || defaultConfig.IPFS_API_URL,
+		IPFS_PUT_IF_POSSIBLE: document.getElementById("ipfs-put-if-possible").checked,
+		IPFS_PIN_IF_POSSIBLE: document.getElementById("ipfs-pin-if-possible").checked,
+		IPFS_PROVIDE_IF_POSSIBLE: document.getElementById("ipfs-provide-if-possible").checked,
+		GET_ROOT_CID_CALLDATA_OVERRIDE: document.getElementById("get-root-cid-override").value || undefined,
+		GET_STATE_CALLDATA_OVERRIDE: document.getElementById("get-state-override").value || undefined,
+		LEAF_APPENDED_EVENT_SIGNATURE_OVERRIDE: document.getElementById("leaf-appended-event-override").value || undefined,
 	};
 
 	// Show syncing status
