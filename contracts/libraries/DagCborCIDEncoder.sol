@@ -6,7 +6,7 @@ pragma solidity 0.8.25;
 /// @dev Implements RFC 7049 §2.1 for byte strings and builds DAG-CBOR link nodes per Multiformats (CIDv1/Multihash).
 library DagCborCIDEncoder {
 
-error CBORLengthOverflow(uint256 len);
+	error CBORLengthOverflow(uint256 len);
 
 	// Maximum payload length that fits in a 4-byte CBOR length prefix (2^32−1)
 	uint256 private constant MAX_CBOR_BYTESTRING_LENGTH = type(uint32).max;

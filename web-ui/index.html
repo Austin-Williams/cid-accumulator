@@ -11,22 +11,22 @@
 	<form id="client-form">
 		<label>
 			Contract Address:
-			<input type="text" id="contract-address" placeholder="0x..." required />
+			<input type="text" id="contract-address" placeholder="0x7e71DE0438F287F229Be5d714164106473d39E41" />
 		</label>
 		<fieldset style="margin-bottom: 1em;">
 			<legend>Config Options</legend>
 			<details>
 				<summary>Ethereum options</summary>
 				<label>
-					Ethereum HTTP RPC URL: <sup><span title="The Ethereum HTTP RPC endpoint to use for contract calls and syncing. Should be a full URL to a node that supports the desired network (e.g., mainnet, testnet)." style="cursor: help;">ℹ️</span></sup>
+					Ethereum HTTP/S RPC URL: <sup><span title="The Ethereum HTTP/S RPC endpoint to use for contract calls and syncing. Should be a full URL to a node that supports the desired network (e.g., mainnet, testnet)." style="cursor: help;">ℹ️</span></sup>
 					<input type="text" id="eth-http-url" placeholder="https://ethereum-rpc.publicnode.com" />
 				</label>
 				<label>
-					Ethereum Max Block Range Per HTTP RPC Call: <sup><span title="(Optional) Maximum block range to request per HTTP RPC call when syncing events. Set to undefined to use the default (1000 blocks)." style="cursor: help;">ℹ️</span></sup>
+					Ethereum Max Block Range Per HTTP/S RPC Call: <sup><span title="(Optional) Maximum block range to request per HTTP RPC call when syncing events. Set to undefined to use the default (1000 blocks)." style="cursor: help;">ℹ️</span></sup>
 					<input type="number" id="eth-max-block-range" placeholder="1000" min="1" />
 				</label>
 				<label>
-					Ethereum WS RPC URL: <sup><span title="(Optional) Ethereum WebSocket RPC endpoint for real-time event subscriptions. If undefined, will fall back to HTTP RPC polling." style="cursor: help;">ℹ️</span></sup>
+					Ethereum WS/S RPC URL: <sup><span title="(Optional) Ethereum WebSocket RPC endpoint for real-time event subscriptions. If undefined, will fall back to HTTP RPC polling." style="cursor: help;">ℹ️</span></sup>
 					<input type="text" id="eth-ws-url" placeholder="(optional)" />
 				</label>
 			</details>

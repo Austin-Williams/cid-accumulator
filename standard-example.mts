@@ -7,7 +7,7 @@ async function main() {
 	customConfig.DB_PATH = './.db/standard-example.json'
 	
 	// Create the client
-	const contractAddress = "0xeCeaA1254fB90e15B1A73C361562BF075d328a66"
+	const contractAddress = "0x7e71DE0438F287F229Be5d714164106473d39E41"
 	const accumulatorClient = new AccumulatorClient(contractAddress, customConfig)
 	// Start the client
 	await accumulatorClient.start()

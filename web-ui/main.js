@@ -38,7 +38,9 @@ function displayNewLiveEvent(str) {
 form.addEventListener("submit", async (e) => {
 	e.preventDefault();
 
-	const contractAddress = document.getElementById("contract-address").value;
+	// Use placeholder as default if no address entered
+	const contractInput = document.getElementById("contract-address");
+	const contractAddress = (contractInput.value || contractInput.placeholder).trim();
 	const config = {
 		...defaultConfig,
 		ETHEREUM_HTTP_RPC_URL: document.getElementById("eth-http-url").value || defaultConfig.ETHEREUM_HTTP_RPC_URL,

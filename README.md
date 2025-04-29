@@ -186,7 +186,7 @@ await client.shutdown()
 
 ```typescript
 export const defaultConfig: AccumulatorClientConfig = {
-	// The Ethereum HTTP RPC endpoint to use for contract calls and syncing.
+	// The Ethereum HTTP/S RPC endpoint to use for contract calls and syncing.
 	// Should be a full URL to a node that supports the desired network (e.g., mainnet, testnet).
 	ETHEREUM_HTTP_RPC_URL: "https://ethereum-rpc.publicnode.com",
 
