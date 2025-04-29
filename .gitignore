@@ -171,3 +171,4 @@ config.json
 vitest.config.ts
 config.ts
 .db/
+singleton-example.mts
