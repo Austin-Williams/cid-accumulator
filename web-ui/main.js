@@ -41,9 +41,14 @@ form.addEventListener("submit", async (e) => {
 	// Use placeholder as default if no address entered
 	const contractInput = document.getElementById("contract-address");
 	const contractAddress = (contractInput.value || contractInput.placeholder).trim();
+	// Parse max block range input as number, or set to undefined if blank
+	const maxBlockRangeInput = document.getElementById("eth-max-block-range").value;
+	const maxBlockRange = maxBlockRangeInput ? parseInt(maxBlockRangeInput, 10) : undefined;
+
 	const config = {
 		...defaultConfig,
 		ETHEREUM_HTTP_RPC_URL: document.getElementById("eth-http-url").value || defaultConfig.ETHEREUM_HTTP_RPC_URL,
+		ETHEREUM_MAX_BLOCK_RANGE_PER_HTTP_RPC_CALL: maxBlockRange,
 		IPFS_GATEWAY_URL: document.getElementById("ipfs-gateway-url").value || defaultConfig.IPFS_GATEWAY_URL,
 		IPFS_API_URL: document.getElementById("ipfs-api-url").value || defaultConfig.IPFS_API_URL,
 	};
