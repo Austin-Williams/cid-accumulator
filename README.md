@@ -189,7 +189,7 @@ await client.shutdown()
 
 ```typescript
 export const defaultConfig: AccumulatorClientConfig = {
-	// The Ethereum HTTP/S RPC endpoint to use for contract calls and syncing.
+	// The Ethereum HTTP RPC endpoint to use for contract calls and syncing.
 	// Should be a full URL to a node that supports the desired network (e.g., mainnet, testnet).
 	ETHEREUM_HTTP_RPC_URL: "https://ethereum-rpc.publicnode.com",
 
@@ -216,7 +216,7 @@ export const defaultConfig: AccumulatorClientConfig = {
 	IPFS_PUT_IF_POSSIBLE: true,
 
 	// If true, data will be pinned to your IPFS node to prevent garbage collection.
-	// Value is ignored if IPFS_API_URL is undefined, or if the AccumulatorClient can't reach it, or
+	// Value is ignored if IPFS_API_URL is undefined,or if the AccumulatorClient can't reach it, or
 	// if IPFS_PUT_IF_POSSIBLE is false.
 	IPFS_PIN_IF_POSSIBLE: true,
 
@@ -225,8 +225,18 @@ export const defaultConfig: AccumulatorClientConfig = {
 	// if IPFS_PIN_IF_POSSIBLE is false.
 	IPFS_PROVIDE_IF_POSSIBLE: true,
 
+	// (Optional) Remote pinning service base URL. Example (Pinata): "https://api.pinata.cloud/pinning"
+	// See https://docs.pinata.cloud/api-reference/pinning-service-api
+	REMOTE_PIN_BASE_URL: undefined,
+
+	// (Optional) Headers for remote pinning auth. Example (Pinata): { Authorization: `Bearer <PINATA_JWT>` }
+	REMOTE_PIN_HEADERS: undefined,
+
+	// (Optional) Number of remote pin failures before disabling remote pinning. Default: 5
+	REMOTE_PIN_FAILURE_THRESHOLD: undefined,
+
 	// (Optional) Path to the local database file for persistent storage (Node.js only).
-	// If undefined, will default to '.db/accumulator.json' (relative to the current working directory).
+	// If undefined, will default to './.db/accumulator.json' (relative to the current working directory).
 	DB_PATH: undefined,
 
 	// (Advanced, optional) Override calldata for the getRootCID() contract call.
