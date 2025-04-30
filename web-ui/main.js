@@ -57,15 +57,7 @@ form.addEventListener("submit", async (e) => {
 		IPFS_PUT_IF_POSSIBLE: document.getElementById("ipfs-put-if-possible").checked,
 		IPFS_PIN_IF_POSSIBLE: document.getElementById("ipfs-pin-if-possible").checked,
 		IPFS_PROVIDE_IF_POSSIBLE: document.getElementById("ipfs-provide-if-possible").checked,
-		// Remote pinning options
-		REMOTE_PIN_BASE_URL: document.getElementById("remote-pin-base-url").value || defaultConfig.REMOTE_PIN_BASE_URL,
-		REMOTE_PIN_HEADERS: (() => {
-			try { return JSON.parse(document.getElementById("remote-pin-headers").value); }
-			catch { return defaultConfig.REMOTE_PIN_HEADERS; }
-		})(),
-		REMOTE_PIN_FAILURE_THRESHOLD: document.getElementById("remote-pin-failure-threshold").value
-			? parseInt(document.getElementById("remote-pin-failure-threshold").value, 10)
-			: defaultConfig.REMOTE_PIN_FAILURE_THRESHOLD,
+		// Advanced options
 		GET_ROOT_CID_CALLDATA_OVERRIDE: document.getElementById("get-root-cid-override").value || undefined,
 		GET_STATE_CALLDATA_OVERRIDE: document.getElementById("get-state-override").value || undefined,
 		LEAF_APPENDED_EVENT_SIGNATURE_OVERRIDE: document.getElementById("leaf-appended-event-override").value || undefined,

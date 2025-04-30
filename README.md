@@ -259,7 +259,7 @@ There is an example contract on Ethereum mainnet at [0x7e71DE0438F287F229Be5d714
 
 Anyone is welcome to submit random data to it for testing.
 
-A working example web UI for it can be seen at [https://dweb.link/ipfs/bafkreichtjy4j4sc3mjp33uml2jafsr4jiqf53o52c7oyl2mpgq6ti3oye](https://dweb.link/ipfs/bafkreichtjy4j4sc3mjp33uml2jafsr4jiqf53o52c7oyl2mpgq6ti3oye).
+A working example web UI for it can be seen at [https://dweb.link/ipfs/bafkreie4g2brfphusp627jikv52i2fqhcejghb7dkqck5aa4xbhkcngwbm](https://dweb.link/ipfs/bafkreie4g2brfphusp627jikv52i2fqhcejghb7dkqck5aa4xbhkcngwbm).
 
 You can click the "Start Client" button to see it run it with default settings.
 
